@@ -1,0 +1,169 @@
+/* The page itself, and the controls every part shares. */
+
+* {
+	box-sizing: border-box;
+}
+html {
+	background: var(--night);
+	scrollbar-color: var(--night-edge) var(--night);
+	/* The page always has its scrollbar, also when the list is short. Without
+	   this a search that leaves few games would widen the page and move the bar. */
+	overflow-y: scroll;
+}
+/* While a sheet is open the page does not scroll. The room its scrollbar took
+   is kept (--scrollbar is measured when the sheet opens), so nothing jumps. */
+html.is-locked {
+	overflow: hidden;
+}
+html.is-locked body {
+	padding-right: var(--scrollbar, 0px);
+}
+body {
+	min-height: 100dvh;
+	display: flex;
+	flex-direction: column;
+	margin: 0;
+	background: var(--night);
+	color: var(--starlight);
+	font-family: 'Archivo Variable', system-ui, sans-serif;
+	font-size: 15px;
+	line-height: 1.45;
+	font-stretch: 100%;
+	-webkit-font-smoothing: antialiased;
+}
+button,
+input {
+	font: inherit;
+	color: inherit;
+}
+button {
+	cursor: pointer;
+}
+h1,
+h2,
+h3,
+p {
+	margin: 0;
+}
+:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+.ic {
+	width: 1em;
+	height: 1em;
+	flex: none;
+	display: inline-block;
+	vertical-align: -0.125em;
+}
+.sr {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+.btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 9px;
+	height: 40px;
+	padding: 0 16px;
+	border-radius: var(--radius-control);
+	border: 1px solid var(--night-edge);
+	background: var(--night-control);
+	color: var(--starlight);
+	font-weight: 600;
+	text-decoration: none;
+	white-space: nowrap;
+}
+.btn:hover {
+	border-color: var(--starlight-faint);
+}
+.btn .ic {
+	font-size: 18px;
+}
+.btn-primary {
+	background: var(--accent);
+	border-color: var(--accent);
+	color: var(--accent-ink);
+	font-weight: 700;
+}
+.btn-primary:hover {
+	border-color: var(--starlight);
+}
+.btn-large {
+	height: 54px;
+	padding: 0 24px;
+	font-size: 17px;
+	font-stretch: 104%;
+	border-radius: 11px;
+}
+.btn-large .ic {
+	font-size: 22px;
+}
+.btn-small {
+	height: 32px;
+	padding: 0 11px;
+	font-size: 13.5px;
+}
+.icon-btn {
+	width: 36px;
+	height: 36px;
+	display: grid;
+	place-items: center;
+	border-radius: var(--radius-control);
+	border: 1px solid transparent;
+	background: transparent;
+	color: var(--starlight-dim);
+	font-size: 18px;
+	text-decoration: none;
+}
+/* While downloads are being started the buttons wait. */
+.btn:disabled,
+.icon-btn:disabled {
+	opacity: 0.6;
+	cursor: progress;
+}
+.icon-btn:hover {
+	background: var(--night-control);
+	color: var(--starlight);
+}
+
+.chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	height: 30px;
+	padding: 0 12px;
+	border-radius: 15px;
+	border: 1px solid var(--night-line);
+	background: transparent;
+	color: var(--starlight-dim);
+	font-size: 13.5px;
+	white-space: nowrap;
+}
+button.chip {
+	border-color: var(--night-edge);
+}
+button.chip:hover {
+	color: var(--starlight);
+	border-color: var(--starlight-dim);
+}
+.chip[aria-pressed='true'] {
+	background: var(--accent-wash);
+	border-color: var(--accent);
+	color: var(--accent);
+}
+.chip .n {
+	color: var(--starlight-faint);
+	font-variant-numeric: tabular-nums;
+	font-size: 12.5px;
+}
+.chip[aria-pressed='true'] .n {
+	color: inherit;
+	opacity: 0.75;
+}

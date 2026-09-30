@@ -1,0 +1,29 @@
+services:
+  canvas:
+    build: .
+    image: vangogh-canvas:local
+    container_name: vangogh-canvas
+    restart: unless-stopped
+    ports:
+      - "${CANVAS_PORT:-1854}:1854"
+    environment:
+      VANGOGH_URL: ${VANGOGH_URL:?set VANGOGH_URL}
+      VANGOGH_USERNAME: ${VANGOGH_USERNAME:?set VANGOGH_USERNAME}
+      VANGOGH_PASSWORD: ${VANGOGH_PASSWORD:?set VANGOGH_PASSWORD}
+      REBUILD_AT: ${REBUILD_AT:-04:30}
+      TZ: ${TZ:-Europe/Bratislava}
+      CUSTOM_LOGO: ${CUSTOM_LOGO:-}
+      SHUTDOWN_TIMEOUT: ${SHUTDOWN_TIMEOUT:-5}
+    volumes:
+      - canvas-cache:/cache
+      # A folder on the host when LOGO_DIR names one, otherwise an empty named volume.
+      - ${LOGO_DIR:-canvas-logo}:/logo:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+
+volumes:
+  canvas-cache:
+  canvas-logo:

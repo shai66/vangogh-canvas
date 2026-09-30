@@ -1,0 +1,125 @@
+/* Sheets over the page, and the filter panel. */
+
+dialog {
+	border: 0;
+	padding: 0;
+	color: var(--starlight);
+	background: var(--night-raised);
+}
+dialog::backdrop {
+	background: rgb(6 9 17 / 0.72);
+	backdrop-filter: blur(3px);
+}
+
+/* Filter panel: a sheet on the right, the list stays visible beside it. */
+.filters {
+	margin: 0 0 0 auto;
+	width: min(440px, 100vw);
+	height: 100dvh;
+	max-height: none;
+	border-left: 1px solid var(--night-line);
+	box-shadow: -30px 0 60px rgb(0 0 0 / 0.35);
+}
+.filters::backdrop {
+	background: rgb(6 9 17 / 0.35);
+	backdrop-filter: none;
+}
+.filters[open] {
+	display: flex;
+	flex-direction: column;
+	animation: sheet-in 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes sheet-in {
+	from {
+		translate: 40px 0;
+		opacity: 0;
+	}
+}
+.filters-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 16px 16px 12px 24px;
+}
+.filters-head h2 {
+	font-size: 21px;
+	font-stretch: 110%;
+	font-weight: 700;
+	letter-spacing: -0.01em;
+}
+/* The body always has its scrollbar, so that a longer list does not narrow it and move
+   what is in it. The room on the right is less by the width of the scrollbar (measured
+   when the panel opens), so that the content lines up with the head and the foot. */
+.filters-body {
+	flex: 1;
+	overflow-y: scroll;
+	padding: 4px calc(24px - var(--scrollbar, 0px)) 24px 24px;
+}
+.filters-body section + section {
+	margin-top: 26px;
+}
+.filters-body h3 {
+	font-size: 13.5px;
+	font-weight: 600;
+	color: var(--starlight-dim);
+	margin-bottom: 10px;
+}
+.filters-body .hint {
+	font-size: 12.5px;
+	color: var(--starlight-faint);
+	margin: -6px 0 10px;
+}
+.chip-set {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 7px;
+}
+.os-cards {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 8px;
+}
+.os-cards button {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 8px;
+	padding: 12px;
+	border-radius: var(--radius-control);
+	border: 1px solid var(--night-edge);
+	background: transparent;
+	color: var(--starlight-dim);
+	text-align: left;
+	font-size: 14px;
+}
+.os-cards button .ic {
+	font-size: 22px;
+}
+.os-cards button .n {
+	font-size: 12.5px;
+	color: var(--starlight-faint);
+	font-variant-numeric: tabular-nums;
+}
+.os-cards button:hover {
+	border-color: var(--starlight-faint);
+	color: var(--starlight);
+}
+.os-cards button[aria-pressed='true'] {
+	background: var(--accent-wash);
+	border-color: var(--accent);
+	color: var(--accent);
+}
+.os-cards button[aria-pressed='true'] .n {
+	color: inherit;
+	opacity: 0.75;
+}
+.filters-foot {
+	display: flex;
+	gap: 10px;
+	align-items: center;
+	padding: 14px 24px;
+	border-top: 1px solid var(--night-line);
+}
+.filters-foot .btn-primary {
+	flex: 1;
+}

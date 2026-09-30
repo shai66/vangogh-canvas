@@ -1,0 +1,34 @@
+/* Every colour of Canvas, as named tokens. A light theme is a second set of values. */
+
+:root {
+	/* Night: the blues of a painted night sky, not a neutral black. */
+	--night: #0d1321;
+	--night-raised: #151d31;
+	--night-control: #1f2a45;
+	--night-line: #2c3857;
+	/* The edge of a control: 3 to 1 against the night, so it is seen as a thing to use. */
+	--night-edge: #55648f;
+	/* Starlight: warm white for text. */
+	--starlight: #f1ebda;
+	--starlight-dim: #a6aec4;
+	--starlight-faint: #8a95b1;
+	/* The reading text of a description: softer than starlight, so a long text is easy on the eye. */
+	--starlight-soft: #d5d2c6;
+	/* Chrome yellow: "this is the thing to press" and "this is on". */
+	--accent: #f5bd1f;
+	--accent-ink: #1b1604;
+	--accent-wash: rgb(245 189 31 / 0.14);
+	/* Geranium red: something is wrong. */
+	--danger: #f0553f;
+	--danger-wash: rgb(240 85 63 / 0.14);
+
+	--radius-poster: 6px;
+	--radius-control: 9px;
+	--radius-sheet: 16px;
+	/* Widths of the page are shares of the page, not of the window: the window
+	   grows by a scrollbar while a sheet is open, the page does not. */
+	--gutter: clamp(16px, 2.8%, 44px);
+	--bar-height: 64px;
+
+	color-scheme: dark;
+}

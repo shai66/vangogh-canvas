@@ -1,0 +1,184 @@
+/* Narrow screens. Desktop comes first; this makes a phone able to browse and read. */
+
+@media (max-width: 760px) {
+	:root {
+		--bar-height: 116px;
+	}
+	.bar {
+		flex-wrap: wrap;
+		gap: 8px 10px;
+		padding-top: 10px;
+		padding-bottom: 10px;
+		align-content: center;
+	}
+	.brand {
+		font-size: 17px;
+		margin-right: auto;
+	}
+	.brand span {
+		display: block;
+	}
+	.search {
+		order: 5;
+		flex-basis: 100%;
+		max-width: none;
+	}
+	.search .key {
+		display: none;
+	}
+	.bar-spacer {
+		display: none;
+	}
+	.filter-button .label {
+		display: none;
+	}
+	.grid {
+		grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+	}
+	.sort .by {
+		display: none;
+	}
+	.detail-inner {
+		width: 100%;
+		min-height: 100dvh;
+		margin: 0;
+		border-radius: 0;
+		box-shadow: none;
+	}
+	.ambience,
+	.backdrop {
+		border-radius: 0;
+	}
+	.backdrop {
+		height: 340px;
+	}
+	.detail-head {
+		grid-template-columns: 112px minmax(0, 1fr);
+		gap: 16px;
+		padding: 20px 16px 0;
+	}
+	.detail-poster {
+		grid-row: auto;
+	}
+	.detail-head .dl-top {
+		grid-column: 1 / -1;
+		margin-top: 18px;
+	}
+	.detail-head .dl-list {
+		margin-top: 18px;
+	}
+	/* A narrow window of a computer: the menu of the switch fits into it, with
+	   "This computer" on a line of its own. */
+	.menu {
+		max-width: calc(100vw - 32px);
+	}
+	.menu button {
+		height: auto;
+		min-height: 44px;
+		padding: 6px 12px;
+	}
+	.menu .here {
+		display: block;
+		margin-left: 0;
+	}
+	.detail-title {
+		font-size: 24px;
+		padding-right: 44px;
+	}
+	.facts {
+		gap: 6px 12px;
+		font-size: 13px;
+	}
+	.facts .sep {
+		display: none;
+	}
+	.section-title,
+	.shots {
+		padding-left: 16px;
+		padding-right: 16px;
+	}
+	.shots {
+		scroll-padding: 0 16px;
+	}
+	.shots-arrow {
+		display: none;
+	}
+	.about-grid {
+		grid-template-columns: 1fr;
+		gap: 30px;
+		padding: 24px 16px 48px;
+	}
+	.file {
+		grid-template-columns: minmax(0, 1fr) auto auto;
+	}
+	.file .ver,
+	.file .fn {
+		display: none;
+	}
+	/* Fingers need 44 px. */
+	.icon-btn,
+	.detail-close {
+		width: 44px;
+		height: 44px;
+	}
+	.os-toggle {
+		height: 44px;
+	}
+	.os-toggle button {
+		height: 36px;
+		min-width: 40px;
+		position: relative;
+	}
+	/* Drawn 36 px high in a group of 44: a finger reaches 4 px more above and below. */
+	.os-toggle button::after {
+		content: '';
+		position: absolute;
+		inset: -4px 0;
+	}
+	.search input {
+		height: 44px;
+	}
+	/* Drawn 26 px: a finger reaches 44 px high and 40 px wide. */
+	.search .clear::after {
+		content: '';
+		position: absolute;
+		inset: -9px -7px;
+	}
+	.status .active-chip,
+	.side .chip {
+		height: 40px;
+		border-radius: 20px;
+	}
+	.status .active-chip {
+		padding: 0 10px 0 14px;
+	}
+	.side .chip {
+		padding: 0 14px;
+	}
+	/* Drawn as text: a finger reaches 40 px or more. */
+	.link-button {
+		position: relative;
+	}
+	.link-button::after {
+		content: '';
+		position: absolute;
+		inset: -7px 0;
+	}
+	.filter-button {
+		height: 44px;
+	}
+	.filters .chip {
+		height: 40px;
+		border-radius: 20px;
+		padding: 0 14px;
+	}
+	.sort button {
+		padding: 10px 10px;
+	}
+	.btn-small {
+		height: 40px;
+	}
+	.lightbox img {
+		max-width: 100vw;
+	}
+}

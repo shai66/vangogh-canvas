@@ -1,0 +1,416 @@
+/* The game detail: the sheet, its head, screenshots, the text. */
+
+/* Game detail. The dialog fills the window and is what scrolls, so its
+   scrollbar is at the edge of the window, where the page's own was. The sheet
+   lies inside it and has no scrollbar of its own. The dialog always has its
+   scrollbar, as the page has: a sheet that grows longer than the window would
+   otherwise narrow and move. */
+.detail {
+	width: 100vw;
+	height: 100dvh;
+	max-width: none;
+	max-height: none;
+	margin: 0;
+	background: transparent;
+	overflow-x: hidden;
+	overflow-y: scroll;
+	overscroll-behavior: contain;
+	scrollbar-color: var(--night-edge) transparent;
+}
+.detail-inner {
+	position: relative;
+	isolation: isolate;
+	outline: none;
+	width: min(1120px, 100% - 48px);
+	margin: 24px auto;
+	border-radius: var(--radius-sheet);
+	background: var(--night);
+	box-shadow:
+		0 0 0 1px var(--night-line),
+		0 40px 120px rgb(0 0 0 / 0.7);
+}
+.detail[open] .detail-inner {
+	animation: detail-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes detail-in {
+	from {
+		translate: 0 18px;
+		opacity: 0;
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.detail[open] .detail-inner,
+	.filters[open],
+	.filter-button.is-active .count {
+		animation: none;
+	}
+	.poster img,
+	.poster::after {
+		transition: none;
+	}
+}
+/* The game's own artwork colours the top of its sheet. */
+.ambience {
+	position: absolute;
+	z-index: -1;
+	inset: 0 0 auto 0;
+	height: 560px;
+	overflow: hidden;
+	border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+	mask-image: linear-gradient(#000 20%, transparent 100%);
+}
+.ambience img {
+	position: absolute;
+	inset: -90px;
+	width: calc(100% + 180px);
+	height: calc(100% + 180px);
+	object-fit: cover;
+	object-position: center 30%;
+	filter: blur(64px) saturate(1.5);
+	opacity: 0.5;
+}
+/* The wide artwork of the game, dimmed, where the archive has one. */
+.backdrop {
+	position: absolute;
+	z-index: -1;
+	inset: 0 0 auto 0;
+	height: 520px;
+	overflow: hidden;
+	border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+}
+.backdrop img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	object-position: 58% 20%;
+	display: block;
+	opacity: 0.5;
+	transition: opacity 400ms ease-out;
+}
+.backdrop img.is-waiting {
+	opacity: 0;
+}
+.backdrop::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background:
+		linear-gradient(to bottom, rgb(13 19 33 / 0) 0%, rgb(13 19 33 / 0.6) 50%, var(--night) 92%),
+		linear-gradient(to right, rgb(13 19 33 / 0.9) 0%, rgb(13 19 33 / 0.62) 50%, rgb(13 19 33 / 0.1) 100%);
+}
+.detail-close-holder {
+	position: sticky;
+	top: 0;
+	z-index: 5;
+	height: 0;
+	display: flex;
+	justify-content: flex-end;
+}
+.detail-close {
+	flex: none;
+	margin: 12px 12px 0 0;
+	width: 40px;
+	height: 40px;
+	border-radius: 50%;
+	background: rgb(13 19 33 / 0.75);
+	backdrop-filter: blur(8px);
+	border: 1px solid var(--night-line);
+	color: var(--starlight);
+	display: grid;
+	place-items: center;
+	font-size: 18px;
+}
+.detail-close:hover {
+	border-color: var(--starlight);
+}
+.detail-head {
+	display: grid;
+	grid-template-columns: 236px minmax(0, 1fr);
+	/* The room the poster leaves goes under the button, so the button stays where it is
+	   when a note appears below it. */
+	grid-template-rows: auto 1fr;
+	gap: 0 36px;
+	padding: 40px 44px 8px;
+	align-items: start;
+}
+.detail-info {
+	min-width: 0;
+}
+/* In the detail the button sits beside the poster and the file list spans the sheet. */
+.detail-head .dl-slot,
+.detail-head .dl {
+	display: contents;
+}
+.detail-head .dl-top {
+	grid-column: 2;
+	min-width: 0;
+}
+.detail-head .dl-list {
+	grid-column: 1 / -1;
+	margin-top: 32px;
+}
+.detail-poster {
+	grid-row: 1 / span 2;
+	aspect-ratio: 342 / 482;
+	border-radius: 8px;
+	overflow: hidden;
+	position: relative;
+	background: var(--night-raised);
+	box-shadow:
+		0 0 0 1px rgb(241 235 218 / 0.1),
+		0 24px 50px rgb(0 0 0 / 0.55);
+}
+.detail-poster img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+.detail-title {
+	font-size: clamp(28px, 3.3vw, 44px);
+	line-height: 1.04;
+	font-weight: 780;
+	font-stretch: 112%;
+	letter-spacing: -0.022em;
+	text-wrap: balance;
+	padding-right: 40px;
+	/* A title of one very long word breaks rather than widening the sheet. */
+	overflow-wrap: anywhere;
+}
+.detail-makers {
+	margin-top: 10px;
+	color: var(--starlight-dim);
+	font-size: 15.5px;
+}
+.detail-makers b {
+	color: var(--starlight);
+	font-weight: 550;
+}
+.facts {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 18px;
+	margin-top: 16px;
+	font-size: 14px;
+	color: var(--starlight-dim);
+}
+.facts span {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+.facts .ic {
+	font-size: 17px;
+	color: var(--starlight);
+}
+.facts .sep {
+	width: 1px;
+	height: 16px;
+	background: var(--night-line);
+	align-self: center;
+}
+.relation {
+	margin-top: 14px;
+	font-size: 14px;
+	color: var(--starlight-dim);
+}
+.relation b {
+	color: var(--starlight);
+	font-weight: 600;
+}
+
+/* Screenshots */
+.shots-wrap {
+	position: relative;
+	margin-top: 36px;
+}
+.section-title {
+	font-size: 15px;
+	font-weight: 650;
+	color: var(--starlight);
+	padding: 0 44px;
+	margin-bottom: 12px;
+	display: flex;
+	align-items: baseline;
+	gap: 10px;
+}
+.section-title span {
+	color: var(--starlight-faint);
+	font-weight: 400;
+	font-size: 13.5px;
+}
+.shots {
+	display: flex;
+	gap: 12px;
+	overflow-x: auto;
+	scroll-snap-type: x proximity;
+	scroll-padding: 0 44px;
+	padding: 4px 44px 14px;
+	scrollbar-width: none;
+}
+.shots::-webkit-scrollbar {
+	display: none;
+}
+.shot {
+	/* Holds its hidden label. Without this the label is placed outside the row and widens the sheet. */
+	position: relative;
+	flex: none;
+	height: clamp(150px, 19vw, 236px);
+	aspect-ratio: 16 / 9;
+	padding: 0;
+	border: 0;
+	border-radius: 8px;
+	overflow: hidden;
+	background: var(--night-raised);
+	scroll-snap-align: start;
+	cursor: zoom-in;
+	box-shadow: 0 0 0 1px rgb(241 235 218 / 0.07);
+}
+.shot img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+.shot:hover {
+	box-shadow: 0 0 0 2px var(--starlight);
+}
+.shots-arrow {
+	position: absolute;
+	top: calc(50% + 8px);
+	translate: 0 -50%;
+	width: 44px;
+	height: 44px;
+	border-radius: 50%;
+	background: rgb(13 19 33 / 0.85);
+	backdrop-filter: blur(8px);
+	border: 1px solid var(--night-line);
+	color: var(--starlight);
+	display: grid;
+	place-items: center;
+	font-size: 20px;
+	z-index: 2;
+}
+.shots-arrow:hover {
+	border-color: var(--starlight);
+}
+.shots-arrow[disabled] {
+	opacity: 0;
+	pointer-events: none;
+}
+.shots-arrow.prev {
+	left: 14px;
+}
+.shots-arrow.next {
+	right: 14px;
+}
+
+/* About */
+.about-grid {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 300px;
+	gap: 56px;
+	padding: 30px 44px 52px;
+}
+.about-grid h3 {
+	font-size: 15px;
+	font-weight: 650;
+	margin-bottom: 10px;
+}
+.description {
+	max-width: 68ch;
+	color: var(--starlight-soft);
+	font-size: 15.5px;
+	line-height: 1.6;
+}
+.description > :first-child {
+	margin-top: 0;
+}
+.description p,
+.description ul,
+.description ol {
+	margin: 0 0 1em;
+}
+.description h1,
+.description h2,
+.description h3,
+.description h4 {
+	font-size: 17px;
+	font-weight: 650;
+	color: var(--starlight);
+	margin: 1.5em 0 0.5em;
+}
+.description a {
+	color: var(--accent);
+}
+.description ul,
+.description ol {
+	padding-left: 1.2em;
+}
+.side section + section {
+	margin-top: 26px;
+}
+.side .plain {
+	color: var(--starlight-dim);
+	font-size: 14px;
+	line-height: 1.55;
+}
+.side .chip {
+	height: 28px;
+	font-size: 13px;
+	padding: 0 10px;
+}
+
+/* Larger view of a screenshot */
+.lightbox {
+	width: 100vw;
+	height: 100dvh;
+	max-width: none;
+	max-height: none;
+	background: rgb(6 9 17 / 0.96);
+	margin: 0;
+}
+.lightbox-inner {
+	width: 100%;
+	height: 100%;
+	display: grid;
+	place-items: center;
+}
+.lightbox img {
+	max-width: calc(100vw - 160px);
+	max-height: calc(100dvh - 90px);
+	border-radius: 6px;
+	display: block;
+}
+.lightbox .shots-arrow {
+	top: 50%;
+	width: 52px;
+	height: 52px;
+}
+.lightbox .prev {
+	left: 22px;
+}
+.lightbox .next {
+	right: 22px;
+}
+.lightbox .where {
+	position: absolute;
+	bottom: 14px;
+	left: 0;
+	right: 0;
+	text-align: center;
+	color: var(--starlight-dim);
+	font-size: 13.5px;
+	font-variant-numeric: tabular-nums;
+}
+.lightbox .detail-close {
+	position: absolute;
+	top: 14px;
+	right: 14px;
+	margin: 0;
+}
+
+/* A detail without a description ends with some room. */
+.detail-end {
+	height: 44px;
+}

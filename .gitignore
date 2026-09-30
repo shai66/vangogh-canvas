@@ -1,0 +1,27 @@
+# GOG's trademark. Reference material only, never committed.
+docs/reference/gog-logo.svg
+
+# The home deployment's logo, derived from GOG's mark.
+/local/
+
+# Real responses captured from vangogh. They describe the owner's library.
+/samples/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Build and tools
+node_modules/
+.svelte-kit/
+build/
+/cache/
+test-results/
+playwright-report/
+
+.DS_Store
+
+# Vite
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
