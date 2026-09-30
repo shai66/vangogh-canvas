@@ -29,5 +29,5 @@
 	<span>
 		{t.foot.archivedBy} <a href={VANGOGH_URL} target="_blank" rel="noreferrer">{t.foot.vangogh}</a>. {t.foot.readsApi}
 	</span>
-	<span class="links"><a href={SOURCE_URL} target="_blank" rel="noreferrer">{t.foot.source}</a></span>
+	<span class="links"><a href={SOURCE_URL} target="_blank" rel="noreferrer"><Icon name="github" />{t.foot.source}</a></span>
 </footer>

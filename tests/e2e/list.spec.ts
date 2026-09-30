@@ -1,6 +1,12 @@
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { expect, place, test, titles } from './helpers';
 import { LONG_TITLE } from './setup';
+
+async function box(locator: Locator): Promise<{ x: number; y: number; width: number; height: number }> {
+	const b = await locator.boundingBox();
+	if (!b) throw new Error('not visible');
+	return b;
+}
 
 // setup.ts gives seven entries: a game for three systems with a DLC, a game for
 // Windows only, a DLC without its base game, a record that could not be read,
@@ -91,10 +97,38 @@ test.describe('the list', () => {
 		await expect(foot).toContainText(/Canvas \d+\.\d+\.\d+/);
 		await expect(foot).toContainText(/Library updated \d+ \w+, \d\d:\d\d(?!\d)/);
 		await expect(foot.getByRole('link', { name: 'vangogh' })).toHaveAttribute('href', 'https://github.com/arelate/vangogh');
-		const source = foot.getByRole('link', { name: 'Source code' });
+		const source = foot.getByRole('link', { name: 'Canvas on GitHub' });
 		await expect(source).toHaveAttribute('href', 'https://github.com/shai66/vangogh-canvas');
 		await expect(source).toHaveAttribute('target', '_blank');
 		await expect(source).toHaveAttribute('rel', 'noreferrer');
+		// GitHub's mark stands before the words, 15 px, on their line, 6 px apart.
+		const icon = source.locator('svg.ic');
+		await expect(icon).toHaveAttribute('aria-hidden', 'true');
+		const iconBox = await box(icon);
+		const linkBox = await box(source);
+		expect(iconBox.width).toBeCloseTo(15, 0);
+		expect(iconBox.x).toBeCloseTo(linkBox.x, 0);
+		const words = await source.evaluate((a) => {
+			const text = [...a.childNodes].find((n) => n.nodeType === Node.TEXT_NODE);
+			if (!text) throw new Error('no words in the link');
+			const range = document.createRange();
+			range.selectNodeContents(text);
+			const r = range.getBoundingClientRect();
+			return { left: r.left, middle: r.top + r.height / 2 };
+		});
+		expect(words.left - (iconBox.x + iconBox.width)).toBeCloseTo(6, 0);
+		expect(iconBox.y + iconBox.height / 2).toBeCloseTo(words.middle, 0);
+		// The mark does not make the link taller than the other lines of the foot.
+		const sentence = await box(foot.locator('span', { hasText: 'archived by' }));
+		expect(linkBox.height).toBeCloseTo(sentence.height, 0);
+	});
+
+	test('the foot fits a phone', async ({ page }) => {
+		await page.setViewportSize({ width: 390, height: 800 });
+		await page.goto('/');
+		await expect(page.locator('.foot').getByRole('link', { name: 'Canvas on GitHub' })).toBeVisible();
+		// The page has a real scrollbar: no sideways scroll means nothing wider than the viewport minus it.
+		expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
 	});
 });
 

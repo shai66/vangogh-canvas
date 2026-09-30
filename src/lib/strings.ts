@@ -164,7 +164,7 @@ export const t = {
 		archivedBy: 'The games are archived by',
 		vangogh: 'vangogh',
 		readsApi: 'Canvas reads them through its API.',
-		source: 'Source code'
+		source: 'Canvas on GitHub'
 	},
 
 	preparing: {

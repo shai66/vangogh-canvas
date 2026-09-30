@@ -366,6 +366,14 @@ main {
 .foot a:hover {
 	color: var(--starlight);
 }
+.foot .links a {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+.foot .links .ic {
+	font-size: 15px;
+}
 .foot .stale {
 	display: inline-flex;
 	align-items: center;

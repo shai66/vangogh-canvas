@@ -24,6 +24,7 @@ import eyeSvg from '@phosphor-icons/core/regular/eye.svg?raw';
 import filterSvg from '@phosphor-icons/core/regular/funnel.svg?raw';
 import flagCheckeredSvg from '@phosphor-icons/core/regular/flag-checkered.svg?raw';
 import ghostSvg from '@phosphor-icons/core/regular/ghost.svg?raw';
+import githubLogoSvg from '@phosphor-icons/core/regular/github-logo.svg?raw';
 import globeHemisphereWestSvg from '@phosphor-icons/core/regular/globe-hemisphere-west.svg?raw';
 import hammerSvg from '@phosphor-icons/core/regular/hammer.svg?raw';
 import handFistSvg from '@phosphor-icons/core/regular/hand-fist.svg?raw';
@@ -72,6 +73,7 @@ export const ICONS = {
 	windows: inner(windowsSvg),
 	macos: inner(macosSvg),
 	linux: inner(linuxSvg),
+	github: inner(githubLogoSvg),
 	warning: inner(warningSvg),
 	multiplayer: inner(multiplayerSvg),
 	coop: inner(coopSvg),
