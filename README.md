@@ -22,7 +22,8 @@ Like GOG.com and vangogh, it trusts you not to abuse this.
 
 ## What it needs
 
-- A running vangogh that Canvas can reach over HTTP.
+- A running vangogh that Canvas can reach over HTTP. Canvas was tested
+  with vangogh 1.2.18; other versions were not checked.
 - A vangogh account of role `user`. Create it on the host of vangogh:
 
   ```bash
@@ -59,9 +60,9 @@ All settings are environment variables.
 | `CACHE_DIR` | Folder for the cached index | `/cache` |
 | `PORT` | Port inside the container | `1854` |
 
-`compose.yml` names two more: `CANVAS_PORT`, the port on the host, and
-`SHUTDOWN_TIMEOUT`, the number of seconds (default `5`) that Canvas waits
-for open connections when it is asked to stop.
+The repository's `compose.yml` names two more: `CANVAS_PORT`, the port
+on the host, and `SHUTDOWN_TIMEOUT`, the number of seconds (default `5`)
+that Canvas waits for open connections when it is asked to stop.
 
 Canvas refuses to start when a required variable is missing, and says which.
 `docker compose` refuses too, before it starts anything. `VANGOGH_URL` must
@@ -78,9 +79,40 @@ it: the password is wrong, or a character in it was changed on the way.
 
 ## Run it
 
+Canvas is an image on GHCR, `ghcr.io/shai66/vangogh-canvas`, for amd64
+and arm64. `latest` is the newest version, `0.7` the newest of that line,
+`0.7.0` one version. A `compose.yml`, with the address of your vangogh
+in `VANGOGH_URL`:
+
+```yaml
+services:
+  canvas:
+    image: ghcr.io/shai66/vangogh-canvas:latest
+    container_name: vangogh-canvas
+    restart: unless-stopped
+    ports:
+      - "1854:1854"
+    environment:
+      VANGOGH_URL: http://vangogh.lan:1853
+      VANGOGH_USERNAME: ${VANGOGH_USERNAME:?set VANGOGH_USERNAME in .env}
+      VANGOGH_PASSWORD: ${VANGOGH_PASSWORD:?set VANGOGH_PASSWORD in .env}
+    volumes:
+      - canvas-cache:/cache
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+
+volumes:
+  canvas-cache:
+```
+
+With the account in a file `.env` next to it (`VANGOGH_USERNAME=api` and
+`VANGOGH_PASSWORD=...`):
+
 ```bash
-cp .env.example .env      # then fill in the account
-docker compose up -d --build
+docker compose up -d
 curl http://127.0.0.1:1854/healthz
 ```
 
@@ -95,10 +127,53 @@ Canvas rebuilds the library at start, and then once a day at or after
 `REBUILD_AT`. When the container starts after that time, the rebuild at start
 counts as the rebuild of that day.
 
+## Run it next to vangogh
+
+`examples/compose.vangogh-stack.yml` runs vangogh and Canvas in one stack:
+vangogh's minimal service from its wiki, and Canvas with `VANGOGH_URL`
+pointing at the service name, so no host address is needed. The order
+matters:
+
+1. Copy the file into a folder of its own as `compose.yml`, and put the
+   account for Canvas into `.env` next to it: `VANGOGH_USERNAME=api` and
+   `VANGOGH_PASSWORD=...`.
+2. `docker compose up -d`.
+3. Create that account in vangogh and restart both services. vangogh
+   reads its users at start, and Canvas, which could not log in yet,
+   would otherwise wait for its next try.
+
+   ```bash
+   docker exec vangogh vangogh users -create -username api -password '<password>' -role user
+   docker compose restart
+   ```
+
+4. Log in to vangogh at port 1853, authenticate it with GOG and run its
+   sync, as vangogh's wiki says. From another machine over plain
+   `http://`, vangogh keeps the login only with
+   `VANGOGH_INSECURE-COOKIES=true`: uncomment that line in `compose.yml`
+   and run `docker compose up -d` again before you log in. Canvas read an
+   empty library at its start and reads it again once a day, so ask it
+   once:
+
+   ```bash
+   curl -X POST http://127.0.0.1:1854/api/rebuild
+   ```
+
+The example keeps vangogh's volumes under `/docker/vangogh`; vangogh's
+wiki says which permissions they need.
+
 ## Update it
 
-Canvas is meant to run as a stack that Portainer deploys from the git repo.
-Portainer fetches the repo and builds the image on the host.
+From the image:
+
+```bash
+docker compose pull
+docker compose up -d
+curl http://127.0.0.1:1854/healthz     # version shows the new version
+```
+
+A stack that Portainer builds from the repository, as the repository's
+own `compose.yml` does, updates by a push and a click:
 
 1. Bring the new version into the repo that the stack is built from.
 2. In Portainer, open the stack and press *Pull and redeploy*.
@@ -108,13 +183,6 @@ If a redeploy ever keeps the old version, Portainer reused the old image.
 Then build the image by hand first (*Images > Build a new image*, from the
 archive address of the repo, under the name `vangogh-canvas:local`) and
 redeploy the stack after that.
-
-Without Portainer, on any host with Docker:
-
-```bash
-git pull
-docker compose up -d --build
-```
 
 Two things to know when you update to a version that changes the shape of
 the cached index, as some versions do:
@@ -187,6 +255,14 @@ npm run check              # types
 
 The browser tests need a browser of their own, once per machine:
 `npx playwright install chromium-headless-shell`.
+
+To build the image from the clone instead of pulling it, the repository's
+own `compose.yml` builds `vangogh-canvas:local` from the Dockerfile:
+
+```bash
+cp .env.example .env      # then fill in the account
+docker compose up -d --build
+```
 
 `scripts/capture-samples.ts` saves real responses of your vangogh to
 `samples/`, which is not committed. With samples present, more tests run:

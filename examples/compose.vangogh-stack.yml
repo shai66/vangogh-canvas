@@ -1,0 +1,74 @@
+# vangogh and Canvas in one stack. Tested with vangogh v1.2.18; other
+# versions were not checked.
+#
+# 1. Copy this file into a folder of its own as compose.yml, and put the
+#    account for Canvas into a file .env next to it:
+#      VANGOGH_USERNAME=api
+#      VANGOGH_PASSWORD=<a password without $>
+# 2. docker compose up -d
+# 3. Create that account in vangogh, then restart both services, since
+#    vangogh reads its users at start and Canvas could not log in yet:
+#      docker exec vangogh vangogh users -create -username api -password '<password>' -role user
+#      docker compose restart
+# 4. Log in to vangogh at port 1853, authenticate it with GOG and run its
+#    sync. From another machine over plain http://, uncomment
+#    VANGOGH_INSECURE-COOKIES below and run docker compose up -d first, or
+#    vangogh will not keep the login. Then ask Canvas to read the library
+#    again:
+#      curl -X POST http://127.0.0.1:1854/api/rebuild
+#
+# The vangogh service is the minimal example of vangogh's wiki. Its
+# volumes and their permissions (the container runs as nobody:users):
+# https://github.com/arelate/vangogh/wiki/1.-Installation-with-docker
+
+services:
+  vangogh:
+    container_name: vangogh
+    image: ghcr.io/arelate/vangogh:latest
+    restart: unless-stopped
+    environment:
+      - VANGOGH_OS=Windows # Windows, macOS, Linux
+      - VANGOGH_LANG-CODE=en
+      - VANGOGH_NO-PATCHES=true
+      # To log in to vangogh's own pages over plain HTTP. Canvas does not
+      # need it: it logs in with a token.
+      # - VANGOGH_INSECURE-COOKIES=true
+    volumes:
+      - /docker/vangogh/backups:/var/lib/vangogh/backups
+      - /docker/vangogh/downloads:/var/lib/vangogh/downloads
+      - /docker/vangogh/images:/var/lib/vangogh/images
+      - /docker/vangogh/binaries:/var/lib/vangogh/binaries
+      - /docker/vangogh/logs:/var/lib/vangogh/logs
+      - /docker/vangogh/metadata:/var/lib/vangogh/metadata
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
+    ports:
+      - "1853:1853"
+    group_add:
+      - users
+
+  canvas:
+    image: ghcr.io/shai66/vangogh-canvas:latest
+    container_name: vangogh-canvas
+    restart: unless-stopped
+    depends_on:
+      - vangogh
+    ports:
+      - "${CANVAS_PORT:-1854}:1854"
+    environment:
+      # The service name resolves on the stack's network: no host address needed.
+      VANGOGH_URL: http://vangogh:1853
+      VANGOGH_USERNAME: ${VANGOGH_USERNAME:?set VANGOGH_USERNAME in .env}
+      VANGOGH_PASSWORD: ${VANGOGH_PASSWORD:?set VANGOGH_PASSWORD in .env}
+      REBUILD_AT: ${REBUILD_AT:-04:30}
+      TZ: ${TZ:-Europe/Bratislava}
+    volumes:
+      - canvas-cache:/cache
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+
+volumes:
+  canvas-cache:

@@ -17,3 +17,5 @@ scripts
 screenshots
 README.md
 *.md
+.github
+examples

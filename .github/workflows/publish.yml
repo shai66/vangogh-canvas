@@ -1,0 +1,66 @@
+# Builds the image for a release and pushes it to GHCR. Started by a
+# published GitHub Release, or by hand for a tag.
+name: Publish image
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check that the tag is the version
+        run: |
+          set -eu
+          tag="${GITHUB_REF_NAME#v}"
+          version=$(node -p "require('./package.json').version")
+          if [ "${GITHUB_REF_TYPE:-}" != "tag" ] || [ "$tag" = "$GITHUB_REF_NAME" ]; then
+            echo "::error::run this on a tag v*, not on $GITHUB_REF_NAME"
+            exit 1
+          fi
+          if [ "$tag" != "$version" ]; then
+            echo "::error::the tag says $tag, package.json says $version"
+            exit 1
+          fi
+          echo "tag $tag is version $version"
+
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository }}
+          # latest=auto adds "latest" for a version that is not a prerelease.
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+          labels: |
+            org.opencontainers.image.description=A web frontend for a GOG library archived by vangogh
+            org.opencontainers.image.licenses=MIT
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          # No record of how the image was built: it would be listed as two
+          # more platforms, unknown/unknown, beside amd64 and arm64.
+          provenance: false
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
