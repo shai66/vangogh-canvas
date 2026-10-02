@@ -4,7 +4,7 @@ import { createLogger, silentLogger } from './log';
 import { Rebuilder } from './rebuilder';
 
 const index: Index = {
-	schema: 4,
+	schema: 5,
 	builtAt: '2026-09-29T02:30:00.000Z',
 	version: 'v1',
 	entries: [],

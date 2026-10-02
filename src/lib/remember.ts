@@ -1,5 +1,5 @@
 import { ALL_OS, type Os } from './types';
-import type { Sort, ViewState } from './search/state';
+import { parseSort, type Sort, type ViewState } from './search/state';
 
 /**
  * The browser remembers two settings of the view: the platform filter and
@@ -24,7 +24,7 @@ export function parseRemembered(value: string | undefined): Remembered {
 	return {
 		// In the fixed order, each once.
 		os: ALL_OS.filter((name) => wanted.includes(name)),
-		sort: sort === 'recent' ? 'recent' : 'title'
+		sort: parseSort(sort)
 	};
 }
 

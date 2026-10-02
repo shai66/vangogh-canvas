@@ -76,7 +76,19 @@ export function query(entries: ListEntry[], state: ViewState): Match[] {
 		return matches.sort((a, b) => a.entry.order - b.entry.order);
 	}
 	const keys = new Map(matches.map((m) => [m, sortKey(m.entry.title)]));
-	return matches.sort((a, b) => keys.get(a)!.localeCompare(keys.get(b)!, 'en', { numeric: true }));
+	const byTitle = (a: Match, b: Match) => keys.get(a)!.localeCompare(keys.get(b)!, 'en', { numeric: true });
+	if (state.sort === 'year') {
+		// Newest first, as "Recently added". A game without a year comes last, and equal years go by title.
+		return matches.sort((a, b) => {
+			const ya = a.entry.releaseYear;
+			const yb = b.entry.releaseYear;
+			if (ya === yb) return byTitle(a, b);
+			if (ya == null) return 1;
+			if (yb == null) return -1;
+			return yb - ya;
+		});
+	}
+	return matches.sort(byTitle);
 }
 
 /** Every genre of the library, for the filter. */

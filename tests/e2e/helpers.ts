@@ -43,3 +43,10 @@ export async function place(page: Page, selector: string): Promise<[number, numb
 export function titles(page: Page): Promise<string[]> {
 	return page.locator('.card .card-title').allTextContents();
 }
+
+/** The sheet rises into place when it opens. Measure once it has arrived. */
+export function arrived(page: Page): Promise<unknown> {
+	return page.locator('dialog.detail').evaluate((node) =>
+		Promise.all(node.getAnimations({ subtree: true }).map((animation) => animation.finished))
+	);
+}

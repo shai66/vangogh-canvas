@@ -34,7 +34,7 @@ export const GAP_MS = 700;
  */
 export async function startDownloads(
 	gameId: string,
-	files: FileEntry[],
+	files: Pick<FileEntry, 'fileId'>[],
 	io: Starter,
 	gapMs = GAP_MS
 ): Promise<StartResult> {

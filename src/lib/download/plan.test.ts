@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest';
 import type { Detail, FileEntry } from '$lib/types';
 import {
 	blockKind,
+	buttonForTab,
 	buttonSystems,
 	buttonTarget,
 	dlcFor,
 	discouraged,
 	firstTab,
+	isPrimary,
 	macNote,
 	notePlace,
 	partLabel,
@@ -57,9 +59,13 @@ function detail(over: Partial<Detail> = {}): Detail {
 		backdrop: null,
 		releaseYear: null,
 		macNotice: null,
+		requirements: {},
+		storeUrl: null,
 		downloads: { windows: [file({ run: true })] },
 		downloadLanguage: null,
 		dlc: [],
+		extraKinds: [],
+		extras: [],
 		requires: null,
 		partOf: [],
 		...over
@@ -286,5 +292,39 @@ describe('discouraged', () => {
 		expect(discouraged({ kind: 'gog', text: 'x' }, null)).toBe(false);
 		expect(discouraged({ kind: 'unlisted' }, 'macos')).toBe(false);
 		expect(discouraged(null, 'macos')).toBe(false);
+	});
+});
+
+describe('buttonForTab', () => {
+	it('turns the button to the system of a tab the game has files for', () => {
+		const d = detail({ os: ['windows', 'linux'], downloads: { windows: [file()], linux: [file()] } });
+		expect(buttonForTab(d, 'linux')).toBe('linux');
+		expect(buttonForTab(d, 'windows')).toBe('windows');
+	});
+
+	it('leaves the button where it is for a tab that only a DLC has files for', () => {
+		const d = detail({ downloads: { windows: [file()] }, dlc: [{ title: 'Expansion', downloads: { macos: [file()] } }] });
+		expect(buttonForTab(d, 'macos')).toBeNull();
+	});
+});
+
+describe('isPrimary', () => {
+	const gog: MacNote = { kind: 'gog', text: 'Will not work.' };
+
+	it('is yellow for the visitor\'s own system, before it was pressed', () => {
+		expect(isPrimary('mine', 'windows', 'windows', false, null)).toBe(true);
+	});
+
+	it('is quiet for any other system, once pressed, and without a button', () => {
+		expect(isPrimary('mine', 'windows', 'linux', false, null)).toBe(false);
+		expect(isPrimary('mine', 'windows', 'windows', true, null)).toBe(false);
+		expect(isPrimary('mine', 'windows', null, false, null)).toBe(false);
+		expect(isPrimary('not-mine', 'macos', 'windows', false, null)).toBe(false);
+		expect(isPrimary('other', 'other', 'windows', false, null)).toBe(false);
+	});
+
+	it('is quiet on macOS where GOG says the installer will not work, also on a Mac', () => {
+		expect(isPrimary('mine', 'macos', 'macos', false, gog)).toBe(false);
+		expect(isPrimary('mine', 'macos', 'macos', false, { kind: 'unlisted' })).toBe(true);
 	});
 });

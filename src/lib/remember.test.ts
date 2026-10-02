@@ -3,6 +3,10 @@ import { DEFAULT_STATE } from './search/state';
 import { NOTHING_REMEMBERED, parseRemembered, nextRemembered, recall, rememberedCookie } from './remember';
 
 describe('what the browser remembers', () => {
+	it('remembers the sort order by release year', () => {
+		expect(parseRemembered('linux|year')).toEqual({ os: ['linux'], sort: 'year' });
+	});
+
 	it('is nothing without a cookie', () => {
 		expect(parseRemembered(undefined)).toEqual(NOTHING_REMEMBERED);
 		expect(parseRemembered('')).toEqual({ os: [], sort: 'title' });

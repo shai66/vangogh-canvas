@@ -2,6 +2,7 @@
 // file of this shape. Text that comes from GOG (titles, genres, descriptions)
 // is not here: it is shown as it is.
 
+import { upperFirst } from './format';
 import type { GenreGroup } from './genres';
 import type { MatchField } from './search/query';
 import type { Together } from './search/state';
@@ -16,6 +17,38 @@ function list(items: string[]): string {
 }
 
 const osName: Record<Os, string> = { windows: 'Windows', macos: 'macOS', linux: 'Linux' };
+
+/** The names the kinds of extras are shown by, by GOG's word. Their order is in src/lib/extras.ts. */
+const EXTRA_KIND_NAMES = new Map<string, string>([
+	['manuals', 'Manual'],
+	['guides & reference', 'Guide'],
+	['audio', 'Audio'],
+	['artworks', 'Artwork'],
+	['wallpapers', 'Wallpaper'],
+	['avatars', 'Avatars'],
+	['video', 'Video'],
+	['game add-ons', 'Add-on']
+]);
+
+/** A kind of extra as it is shown. A kind GOG adds later keeps GOG's word, with a capital letter. */
+function extraKind(kind: string): string {
+	const word = kind.trim();
+	if (word === '') return 'Extra';
+	return EXTRA_KIND_NAMES.get(word.toLowerCase()) ?? upperFirst(word);
+}
+
+/** Canvas's names for GOG's rows of system requirements, by GOG's id. Another row keeps GOG's label. */
+const REQUIREMENT_ROWS = new Map<string, string>([
+	['system', 'System'],
+	['processor', 'Processor'],
+	['memory', 'Memory'],
+	['graphics', 'Graphics'],
+	['directx', 'DirectX'],
+	['sound', 'Sound'],
+	['network', 'Network'],
+	['storage', 'Storage'],
+	['other', 'Other']
+]);
 
 export const t = {
 	name: 'Canvas',
@@ -46,7 +79,8 @@ export const t = {
 		clearAll: 'Clear all',
 		sorted: 'Sorted',
 		sortTitle: 'A to Z',
-		sortRecent: 'Recently added'
+		sortRecent: 'Recently added',
+		sortYear: 'Release year'
 	},
 
 	card: {
@@ -100,7 +134,31 @@ export const t = {
 		tags: 'Tags',
 		searchTag: (tag: string) => `Search for the tag ${tag}`,
 		languages: 'Languages',
-		features: 'Features'
+		features: 'Features',
+		/** The link to the game's page on GOG.com, after the makers. Words only: GOG's logo is a trademark. */
+		store: 'GOG.com',
+		storeTitle: 'This game on GOG.com, in a new tab'
+	},
+
+	requirements: {
+		title: 'System requirements',
+		/** The row of tabs, for a screen reader. */
+		tabs: 'System requirements for',
+		minimum: 'Minimum',
+		recommended: 'Recommended',
+		none: (os: Os) => `GOG lists none for ${osName[os]}.`,
+		/** The name a row is shown by: Canvas's for a row it knows, GOG's label for another. */
+		row: (id: string, name: string) => REQUIREMENT_ROWS.get(id) ?? name
+	},
+
+	extras: {
+		title: 'Extras',
+		kind: extraKind,
+		/** The kinds with their numbers, for the pill and the panel: "Manual (5), Audio (4), Artwork". */
+		kinds: (counts: [string, number][]) => counts.map(([kind, n]) => (n > 1 ? `${extraKind(kind)} (${n})` : extraKind(kind))).join(', '),
+		/** What a screen reader hears for the pill. */
+		count: (n: number) => plural(n, 'extra', 'extras'),
+		pill: (kinds: string) => `Extras: ${kinds}`
 	},
 
 	download: {

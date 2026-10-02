@@ -2,6 +2,7 @@
 	import { t } from '$lib/strings';
 	import type { Os } from '$lib/types';
 	import Icon from './Icon.svelte';
+	import { nextTab } from './tabs';
 
 	interface Props {
 		systems: Os[];
@@ -20,13 +21,7 @@
 
 	/** Arrow keys move between tabs, as in every tab row. Tab itself leaves the row. */
 	function keydown(event: KeyboardEvent) {
-		const at = systems.indexOf(tab);
-		const to =
-			event.key === 'ArrowRight' ? (at + 1) % systems.length
-			: event.key === 'ArrowLeft' ? (at - 1 + systems.length) % systems.length
-			: event.key === 'Home' ? 0
-			: event.key === 'End' ? systems.length - 1
-			: -1;
+		const to = nextTab(event.key, systems.length, systems.indexOf(tab));
 		if (to < 0) return;
 		event.preventDefault();
 		onselect(systems[to]);

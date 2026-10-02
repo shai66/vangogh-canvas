@@ -1,9 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_STATE, parseState, toParams } from './state';
+import { DEFAULT_STATE, parseSort, parseState, toParams } from './state';
 
 const parse = (text: string) => parseState(new URLSearchParams(text));
 
 describe('parseState', () => {
+	it('reads and writes the sort order by release year, and takes anything else as A to Z', () => {
+		expect(parseState(new URLSearchParams('sort=year')).sort).toBe('year');
+		expect(toParams({ ...DEFAULT_STATE, sort: 'year' }).toString()).toBe('sort=year');
+		expect(parseSort('year')).toBe('year');
+		expect(parseSort('recent')).toBe('recent');
+		expect(parseSort('price')).toBe('title');
+		expect(parseSort(null)).toBe('title');
+		expect(parseSort(undefined)).toBe('title');
+	});
+
 	it('gives the defaults for an empty address', () => {
 		expect(parse('')).toEqual(DEFAULT_STATE);
 		expect(DEFAULT_STATE).toEqual({ q: '', os: [], genres: [], together: [], sort: 'title' });

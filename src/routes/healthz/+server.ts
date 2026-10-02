@@ -17,7 +17,7 @@ export const GET: RequestHandler = () => {
 				version: index.version
 			},
 			rebuild: rebuilder.status(),
-			login: client.loginRejected ? 'rejected' : 'ok',
+			login: client.loginState,
 			cache: store.cacheState()
 		},
 		{ status: index ? 200 : 503, headers: { 'cache-control': 'no-store' } }

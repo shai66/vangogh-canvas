@@ -7,7 +7,7 @@ import { createLogger } from './log';
 import { IndexStore } from './store';
 
 const index: Index = {
-	schema: 4,
+	schema: 5,
 	builtAt: '2026-09-29T02:30:00.000Z',
 	version: '0123456789abcdef',
 	entries: [],
@@ -68,6 +68,7 @@ describe('IndexStore', () => {
 		['the schema before hasFiles', { ...index, schema: 1 }],
 		['the schema before the wide images', { ...index, schema: 2 }],
 		['the schema before the Mac notice', { ...index, schema: 3 }],
+		['the schema before the year in the list, the extras and the requirements', { ...index, schema: 4 }],
 		['no schema', { ...index, schema: undefined }],
 		['entries that are not a list', { ...index, entries: {} }],
 		['no files', { ...index, files: undefined }],

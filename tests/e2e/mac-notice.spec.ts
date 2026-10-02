@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { expect, test, UA } from './helpers';
+import { arrived, expect, test, UA } from './helpers';
 import { MAC_NOTICE } from './setup';
 
 const GOG_SAYS = `GOG says: ${MAC_NOTICE}`;
@@ -18,13 +18,6 @@ function places(page: Page): Promise<number[][]> {
 			const size = selector === '.dl-list' ? [box.width] : [box.width, box.height];
 			return [box.left, box.top, ...size].map((n) => Math.round(n * 10) / 10);
 		})
-	);
-}
-
-/** The sheet rises into place when it opens. Measure once it has arrived. */
-function arrived(page: Page): Promise<unknown> {
-	return page.locator('dialog.detail').evaluate((node) =>
-		Promise.all(node.getAnimations({ subtree: true }).map((animation) => animation.finished))
 	);
 }
 
@@ -66,19 +59,23 @@ test.describe('the note about an old macOS installer', () => {
 		expect(await places(page)).toEqual(before);
 	});
 
-	test('stands with the macOS files while the button is on another system', async ({ page }) => {
+	test('stands under the button, which turns quiet, when the macOS tab is chosen', async ({ page }) => {
 		await page.goto('/game/2101');
 		const block = page.locator('.dl');
-		await expect(block.locator('.dl-list .caution')).toHaveCount(0);
+		await arrived(page);
+		const before = await places(page);
 		await page.getByRole('tab', { name: 'macOS' }).click();
-		await expect(block.locator('.dl-list .caution')).toHaveText(GOG_SAYS);
+		await expect(block.locator('.dl-main .caution')).toHaveText(GOG_SAYS);
+		await expect(block.locator('.dl-list .caution')).toHaveCount(0);
+		await expect(block.getByRole('button', { name: 'Download for macOS' })).not.toHaveClass(/btn-primary/);
+		// The note takes the room kept for it beside the poster: nothing moved.
+		expect(await places(page)).toEqual(before);
+		await page.getByRole('tab', { name: 'Windows' }).click();
 		await expect(block.locator('.dl-main .caution')).toBeHidden();
 		await expect(block.getByRole('button', { name: 'Download for Windows' })).toHaveClass(/btn-primary/);
-		await page.getByRole('tab', { name: 'Windows' }).click();
-		await expect(block.locator('.dl-list .caution')).toHaveCount(0);
 	});
 
-	test('says in its own words that GOG does not list the game for macOS, and leaves the button yellow', async ({ page }) => {
+	test('says in its own words that GOG does not list the game for macOS', async ({ page }) => {
 		await page.goto('/game/2102');
 		const block = page.locator('.dl');
 		await block.getByRole('button', { name: 'Download for another system' }).click();
@@ -88,7 +85,9 @@ test.describe('the note about an old macOS installer', () => {
 		const note = block.locator('.dl-main .caution');
 		await expect(note).toHaveText(UNLISTED);
 		await expect(note).not.toHaveClass(/is-sure/);
-		await expect(block.getByRole('button', { name: 'Download for macOS' })).toHaveClass(/btn-primary/);
+		// A visitor on Windows chose macOS: another system, so the button is quiet. On a Mac it is
+		// yellow under this note: the test "shows the quieter note under a yellow button".
+		await expect(block.getByRole('button', { name: 'Download for macOS' })).not.toHaveClass(/btn-primary/);
 	});
 
 	test('wraps in a narrow window instead of widening the sheet', async ({ page }) => {

@@ -27,7 +27,7 @@ test.describe('the game detail', () => {
 		await expect(page).toHaveURL(/\/game\/1001$/);
 		await expect(page).toHaveTitle('The Long Dark Road | Canvas for vangogh');
 		await expect(detail.locator('h1')).toHaveText('The Long Dark Road');
-		await expect(detail.locator('.detail-makers')).toHaveText('Šťastný Studio, published by Road Works, 2002');
+		await expect(detail.locator('.detail-makers')).toHaveText('Šťastný Studio, published by Road Works, 2002 · GOG.com');
 		await expect(detail.locator('.relation')).toHaveText('Part of Road Trilogy');
 		// The list is still there, behind the sheet.
 		await expect(page.locator('.card')).toHaveCount(1);
@@ -297,6 +297,31 @@ test.describe('the game detail', () => {
 		await expect(detail.locator('.dl-list')).toHaveCount(0);
 	});
 
+	test('links to the game\'s page on GOG.com, in a new tab, and only where there is one', async ({ page }) => {
+		await page.goto('/game/1001');
+		const link = page.locator('.detail-makers .store');
+		await expect(link).toHaveText('GOG.com');
+		await expect(link).toHaveAttribute('href', 'https://www.gog.com/en/game/the_long_dark_road');
+		await expect(link).toHaveAttribute('target', '_blank');
+		await expect(link).toHaveAttribute('rel', 'noreferrer');
+		await expect(link).toHaveAttribute('title', 'This game on GOG.com, in a new tab');
+
+		await page.goto('/game/1002');
+		await expect(page.locator('.detail-makers .store')).toHaveCount(0);
+	});
+
+	test('keeps the dot and the link to GOG.com together in a narrow window', async ({ page }) => {
+		await page.setViewportSize({ width: 360, height: 800 });
+		await page.goto('/game/1001');
+		const on = page.locator('.detail-makers .store-on');
+		await expect(on).toHaveText('· GOG.com');
+		expect(await on.evaluate((n) => getComputedStyle(n).whiteSpace)).toBe('nowrap');
+		// The dot and the link are two runs of one inline box, so they have two rectangles. Split
+		// across two lines they would sit at two heights.
+		const tops = await on.evaluate((node) => [...node.getClientRects()].map((r) => Math.round(r.top)));
+		expect(new Set(tops).size).toBe(1);
+	});
+
 	test('says that the files are missing, and offers nothing to download', async ({ page }) => {
 		await page.goto('/game/1005');
 		const block = page.locator('.dl');
@@ -404,6 +429,8 @@ test.describe('the download block', () => {
 		await expect(block.locator('.about .on strong')).toHaveText('1 file, 7 GB');
 		// The file list turns to the chosen system.
 		await expect(page.getByRole('tab', { selected: true })).toHaveText('Linux1 file');
+		// Another system than the visitor's own: the quiet button.
+		await expect(block.getByRole('button', { name: 'Download for Linux' })).not.toHaveClass(/btn-primary/);
 
 		await block.getByRole('button', { name: 'Download for Linux' }).click();
 		await expect(block.locator('.notice-done')).toContainText('The download has started.');
@@ -517,6 +544,8 @@ test.describe('the download block', () => {
 		await page.getByRole('tab', { name: 'macOS' }).click();
 		await page.getByRole('link', { name: 'Download the_long_dark_road_2.1.pkg' }).click();
 		await expect.poll(() => names).toContain('the_long_dark_road_2.1.pkg');
+		// The tab turned the button to macOS: back on Windows it is still busy with its parts.
+		await page.getByRole('tab', { name: 'Windows' }).click();
 		await expect(button).toBeDisabled();
 		await expect.poll(() => names).toHaveLength(4);
 	});
@@ -572,12 +601,27 @@ test.describe('the download block', () => {
 		await expect(page.getByRole('tab', { selected: true })).toHaveText('Windows3 files');
 	});
 
-	test('leaves the button alone when a tab of the file list is chosen', async ({ page }) => {
+	test('turns the button to the system of a chosen tab, in the quiet style, and moves nothing', async ({ page }) => {
 		await page.goto('/game/1001');
+		const block = page.locator('.dl');
+		await expect(block.getByRole('button', { name: 'Download for Windows' })).toHaveClass(/btn-primary/);
+		// In view first: a click that has to scroll would move everything measured.
+		await page.getByRole('tab', { name: 'macOS' }).scrollIntoViewIfNeeded();
+		const before = await places(page);
+
 		await page.getByRole('tab', { name: 'macOS' }).click();
 		await expect(page.getByRole('tab', { selected: true })).toHaveText('macOS1 file');
-		await expect(page.locator('.dl').getByRole('button', { name: 'Download for Windows' })).toBeVisible();
-		await expect(page.locator('.about .on strong')).toHaveText('3 files, 7.5 GB');
+		const mac = block.getByRole('button', { name: 'Download for macOS' });
+		await expect(mac).toBeVisible();
+		// Yellow is for this computer only.
+		await expect(mac).not.toHaveClass(/btn-primary/);
+		await expect(block.getByRole('button', { name: 'Download for another system' })).not.toHaveClass(/btn-primary/);
+		await expect(page.locator('.about .on strong')).toHaveText('1 file, 7 GB');
+		expect(await places(page)).toEqual(before);
+
+		await page.getByRole('tab', { name: 'Windows' }).click();
+		await expect(block.getByRole('button', { name: 'Download for Windows' })).toHaveClass(/btn-primary/);
+		expect(await places(page)).toEqual(before);
 	});
 
 	test('has no note, and keeps no room for one, for a game that GOG says nothing against', async ({ page }) => {

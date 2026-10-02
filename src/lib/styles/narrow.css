@@ -115,6 +115,22 @@
 	.file .fn {
 		display: none;
 	}
+	/* The kind of an extra keeps its icon and gives up its word. */
+	.file.is-extra {
+		grid-template-columns: auto minmax(0, 1fr) auto auto;
+	}
+	/* Visually hidden, like .sr: the word stays for a screen reader while the icon alone shows. */
+	.file .kind span {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
+	}
+	.detail-head .extras {
+		margin-top: 12px;
+	}
 	/* Fingers need 44 px. */
 	.icon-btn,
 	.detail-close {

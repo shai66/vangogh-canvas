@@ -149,6 +149,10 @@
 	grid-column: 1 / -1;
 	margin-top: 32px;
 }
+.detail-head .extras {
+	grid-column: 1 / -1;
+	margin-top: 16px;
+}
 .detail-poster {
 	grid-row: 1 / span 2;
 	aspect-ratio: 342 / 482;
@@ -185,6 +189,21 @@
 .detail-makers b {
 	color: var(--starlight);
 	font-weight: 550;
+}
+/* The game's page on GOG.com, after the makers, in the look of the links of the foot. */
+.detail-makers .store-on {
+	white-space: nowrap;
+}
+.detail-makers .store {
+	color: var(--starlight-dim);
+	text-underline-offset: 3px;
+}
+.detail-makers .store:hover {
+	color: var(--starlight);
+}
+.detail-makers .store .ic {
+	margin-left: 3px;
+	font-size: 14px;
 }
 .facts {
 	display: flex;
@@ -359,6 +378,79 @@
 	height: 28px;
 	font-size: 13px;
 	padding: 0 10px;
+}
+/* System requirements: their own row of tabs on a line of its own, no borders, the chosen tab
+   underlined. Every tab keeps its size when chosen, so choosing moves nothing. */
+.req-tabs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 18px;
+	margin: -2px 0 14px;
+}
+.req-tabs button {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 0 5px;
+	border: 0;
+	border-bottom: 2px solid transparent;
+	background: none;
+	color: var(--starlight-dim);
+	font-size: 13.5px;
+	font-weight: 550;
+}
+.req-tabs button .ic {
+	font-size: 14px;
+}
+.req-tabs button:hover {
+	color: var(--starlight);
+}
+.req-tabs button[aria-selected='true'] {
+	color: var(--starlight);
+	border-bottom-color: var(--accent);
+}
+.req-stack {
+	display: grid;
+}
+.req-stack > *,
+.req-sizers > * {
+	grid-area: 1 / 1;
+}
+.req-sizers {
+	display: grid;
+	visibility: hidden;
+	pointer-events: none;
+}
+.req-group + .req-group {
+	margin-top: 14px;
+}
+.req-group h4,
+.req-group .h {
+	margin: 0 0 6px;
+	color: var(--starlight-faint);
+	font-size: 12px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+.req-group dl,
+.req-group .req-rows {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr);
+	gap: 5px 14px;
+	margin: 0;
+	font-size: 13.5px;
+	line-height: 1.45;
+}
+.req-group dt,
+.req-group .k {
+	color: var(--starlight-faint);
+}
+.req-group dd,
+.req-group .v {
+	margin: 0;
+	color: var(--starlight-dim);
+	overflow-wrap: anywhere;
 }
 
 /* Larger view of a screenshot */

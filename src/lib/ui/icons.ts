@@ -2,7 +2,10 @@
 // <svg> with a 256 by 256 view box, drawn in the current text colour.
 
 import airplaneTiltSvg from '@phosphor-icons/core/regular/airplane-tilt.svg?raw';
+import arrowUpRightSvg from '@phosphor-icons/core/regular/arrow-up-right.svg?raw';
 import binocularsSvg from '@phosphor-icons/core/regular/binoculars.svg?raw';
+import bookBookmarkSvg from '@phosphor-icons/core/regular/book-bookmark.svg?raw';
+import bookOpenSvg from '@phosphor-icons/core/regular/book-open.svg?raw';
 import boxingGloveSvg from '@phosphor-icons/core/regular/boxing-glove.svg?raw';
 import campfireSvg from '@phosphor-icons/core/regular/campfire.svg?raw';
 import cardsSvg from '@phosphor-icons/core/regular/cards.svg?raw';
@@ -21,14 +24,17 @@ import downSvg from '@phosphor-icons/core/regular/caret-down.svg?raw';
 import downloadSvg from '@phosphor-icons/core/regular/download-simple.svg?raw';
 import eyeSlashSvg from '@phosphor-icons/core/regular/eye-slash.svg?raw';
 import eyeSvg from '@phosphor-icons/core/regular/eye.svg?raw';
+import filmStripSvg from '@phosphor-icons/core/regular/film-strip.svg?raw';
 import filterSvg from '@phosphor-icons/core/regular/funnel.svg?raw';
 import flagCheckeredSvg from '@phosphor-icons/core/regular/flag-checkered.svg?raw';
 import ghostSvg from '@phosphor-icons/core/regular/ghost.svg?raw';
+import giftSvg from '@phosphor-icons/core/regular/gift.svg?raw';
 import githubLogoSvg from '@phosphor-icons/core/regular/github-logo.svg?raw';
 import globeHemisphereWestSvg from '@phosphor-icons/core/regular/globe-hemisphere-west.svg?raw';
 import hammerSvg from '@phosphor-icons/core/regular/hammer.svg?raw';
 import handFistSvg from '@phosphor-icons/core/regular/hand-fist.svg?raw';
 import hourglassMediumSvg from '@phosphor-icons/core/regular/hourglass-medium.svg?raw';
+import imageSvg from '@phosphor-icons/core/regular/image.svg?raw';
 import infoSvg from '@phosphor-icons/core/regular/info.svg?raw';
 import joystickSvg from '@phosphor-icons/core/regular/joystick.svg?raw';
 import leftSvg from '@phosphor-icons/core/regular/caret-left.svg?raw';
@@ -37,7 +43,10 @@ import linuxSvg from '@phosphor-icons/core/fill/linux-logo-fill.svg?raw';
 import macosSvg from '@phosphor-icons/core/fill/apple-logo-fill.svg?raw';
 import magicWandSvg from '@phosphor-icons/core/regular/magic-wand.svg?raw';
 import mapTrifoldSvg from '@phosphor-icons/core/regular/map-trifold.svg?raw';
+import monitorSvg from '@phosphor-icons/core/regular/monitor.svg?raw';
 import multiplayerSvg from '@phosphor-icons/core/fill/users-three-fill.svg?raw';
+import musicNotesSvg from '@phosphor-icons/core/regular/music-notes.svg?raw';
+import packageSvg from '@phosphor-icons/core/regular/package.svg?raw';
 import planetSvg from '@phosphor-icons/core/regular/planet.svg?raw';
 import puzzlePieceSvg from '@phosphor-icons/core/regular/puzzle-piece.svg?raw';
 import rightSvg from '@phosphor-icons/core/regular/caret-right.svg?raw';
@@ -50,6 +59,7 @@ import steeringWheelSvg from '@phosphor-icons/core/regular/steering-wheel.svg?ra
 import strategySvg from '@phosphor-icons/core/regular/strategy.svg?raw';
 import swordSvg from '@phosphor-icons/core/regular/sword.svg?raw';
 import timerSvg from '@phosphor-icons/core/regular/timer.svg?raw';
+import userCircleSvg from '@phosphor-icons/core/regular/user-circle.svg?raw';
 import userFocusSvg from '@phosphor-icons/core/regular/user-focus.svg?raw';
 import warningSvg from '@phosphor-icons/core/fill/warning-fill.svg?raw';
 import windowsSvg from '@phosphor-icons/core/fill/windows-logo-fill.svg?raw';
@@ -111,7 +121,17 @@ export const ICONS = {
 	campfire: inner(campfireSvg),
 	shieldChevron: inner(shieldChevronSvg),
 	userFocus: inner(userFocusSvg),
-	hourglassMedium: inner(hourglassMediumSvg)
+	hourglassMedium: inner(hourglassMediumSvg),
+	gift: inner(giftSvg),
+	bookOpen: inner(bookOpenSvg),
+	bookBookmark: inner(bookBookmarkSvg),
+	musicNotes: inner(musicNotesSvg),
+	image: inner(imageSvg),
+	monitor: inner(monitorSvg),
+	userCircle: inner(userCircleSvg),
+	filmStrip: inner(filmStripSvg),
+	package: inner(packageSvg),
+	external: inner(arrowUpRightSvg)
 } as const;
 
 export type IconName = keyof typeof ICONS;
@@ -156,4 +176,20 @@ const GENRE_ICON = new Map<string, IconName>([
 
 export function genreIcon(genre: string): IconName | null {
 	return GENRE_ICON.get(genre) ?? null;
+}
+
+/** The icon of a kind of extra, by GOG's word for it. A kind without one gets the parcel. */
+const EXTRA_ICON = new Map<string, IconName>([
+	['manuals', 'bookOpen'],
+	['guides & reference', 'bookBookmark'],
+	['audio', 'musicNotes'],
+	['artworks', 'image'],
+	['wallpapers', 'monitor'],
+	['avatars', 'userCircle'],
+	['video', 'filmStrip'],
+	['game add-ons', 'puzzlePiece']
+]);
+
+export function extraIcon(kind: string): IconName {
+	return EXTRA_ICON.get(kind.toLowerCase()) ?? 'package';
 }

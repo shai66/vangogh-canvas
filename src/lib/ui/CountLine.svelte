@@ -38,5 +38,8 @@
 		<button type="button" aria-pressed={view.sort === 'recent'} data-label={t.count.sortRecent} onclick={() => view.setSort('recent')}>
 			{t.count.sortRecent}
 		</button>
+		<button type="button" aria-pressed={view.sort === 'year'} data-label={t.count.sortYear} onclick={() => view.setSort('year')}>
+			{t.count.sortYear}
+		</button>
 	</div>
 </div>

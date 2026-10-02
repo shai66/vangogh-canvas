@@ -61,6 +61,11 @@ export function fixtureData(): FakeData {
 			};
 		}
 	}
+	for (const [id, names] of Object.entries(records.extraFiles)) {
+		for (const [manualUrl, name] of Object.entries(names)) {
+			files[`${id}/extra/${manualUrl.replace(/^\/+/, '')}`] = { name, body: Buffer.from(`content of ${name}, long enough to ask for a part of it`) };
+		}
+	}
 	const jpeg = (text: string) => ({ type: 'image/jpeg', body: Buffer.from(text) });
 	return {
 		username: 'api',
@@ -185,7 +190,9 @@ export async function startFakeVangogh(
 		if (!header.startsWith('Bearer ') || !tokens.has(header.slice(7))) {
 			return send(res, 401, 'session is not valid');
 		}
-		if (req.method !== 'GET') return send(res, 405);
+		// HEAD on the file route asks whether a file is on disk, as Go's router answers it for GET routes.
+		const head = req.method === 'HEAD' && path.startsWith('/api/gog/manual-url/');
+		if (req.method !== 'GET' && !head) return send(res, 405);
 
 		if (path === '/api/available-products') return sendJson(res, data.library);
 

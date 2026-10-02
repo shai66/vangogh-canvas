@@ -1,6 +1,11 @@
 import { ALL_OS, type Os } from '$lib/types';
 
-export type Sort = 'title' | 'recent';
+export type Sort = 'title' | 'recent' | 'year';
+
+/** A sort order as the address or the cookie writes it. Anything else is "A to Z". */
+export function parseSort(value: string | null | undefined): Sort {
+	return value === 'recent' || value === 'year' ? value : 'title';
+}
 
 /** The ways of playing with others that can be filtered by. Each is a flag of a list entry. */
 export type Together = 'multiplayer' | 'coop';
@@ -32,7 +37,7 @@ export function parseState(params: URLSearchParams): ViewState {
 		together: values(params, 'play', true).filter((v): v is Together =>
 			(ALL_TOGETHER as readonly string[]).includes(v)
 		),
-		sort: params.get('sort') === 'recent' ? 'recent' : 'title'
+		sort: parseSort(params.get('sort'))
 	};
 }
 

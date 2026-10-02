@@ -1,13 +1,14 @@
 <script lang="ts">
 	import { genreName } from '$lib/genres';
 	import { t } from '$lib/strings';
-	import type { Detail } from '$lib/types';
+	import type { Detail, Os } from '$lib/types';
 	import type { Visitor } from '$lib/visitor';
 	import DownloadBlock from './DownloadBlock.svelte';
 	import Icon from './Icon.svelte';
 	import { genreIcon } from './icons';
 	import Picture from './Picture.svelte';
 	import Poster from './Poster.svelte';
+	import Requirements from './Requirements.svelte';
 	import Screenshots from './Screenshots.svelte';
 
 	interface Props {
@@ -24,6 +25,12 @@
 	let backdropFailed = $state(false);
 	// Without the wide artwork the poster, heavily blurred, colours the head.
 	const wash = $derived(detail.poster ?? detail.banner);
+	/** The system the download block shows, and how often it changed. The system requirements follow it. */
+	let block = $state<{ os: Os | null; turn: number }>({ os: null, turn: 0 });
+	function blockShows(os: Os | null) {
+		if (os !== block.os) block = { os, turn: block.turn + 1 };
+	}
+	const hasRequirements = $derived(Object.keys(detail.requirements).length > 0);
 </script>
 
 <!-- svelte-ignore a11y_autofocus -->
@@ -46,15 +53,19 @@
 		</div>
 		<div class="detail-info">
 			<h1 class="detail-title">{detail.title}</h1>
-			{#if hasMakers || detail.releaseYear}
-				<!-- The makers, then the year the game first came out: "Studio, published by House, 2002". -->
+			{#if hasMakers || detail.releaseYear || detail.storeUrl}
+				<!-- The makers, the year the game first came out, and its page on GOG.com: "Studio, published by House, 2002 · GOG.com". -->
 				<p class="detail-makers">
 					{#if developers && detail.publisher && developers !== detail.publisher}
 						<b>{developers}</b>, {t.detail.publishedBy} <b>{detail.publisher}</b>{#if detail.releaseYear}, <b>{detail.releaseYear}</b>{/if}
 					{:else if hasMakers}
 						<b>{developers || detail.publisher}</b>{#if detail.releaseYear}, <b>{detail.releaseYear}</b>{/if}
-					{:else}
+					{:else if detail.releaseYear}
 						<b>{detail.releaseYear}</b>
+					{/if}
+					{#if detail.storeUrl}
+						<!-- The dot goes with the link, so a narrow window wraps them together. -->
+						<span class="store-on">{#if hasMakers || detail.releaseYear}·{' '}{/if}<a class="store" href={detail.storeUrl} target="_blank" rel="noreferrer" title={t.detail.storeTitle}>{t.detail.store}<Icon name="external" /></a></span>
 					{/if}
 				</p>
 			{/if}
@@ -81,12 +92,12 @@
 				<p class="relation">{t.detail.partOf} <b>{detail.partOf.join(', ')}</b></p>
 			{/if}
 		</div>
-		<div class="dl-slot"><DownloadBlock {detail} {visitor} /></div>
+		<div class="dl-slot"><DownloadBlock {detail} {visitor} onsystem={blockShows} /></div>
 	</div>
 
 	<Screenshots screenshots={detail.screenshots} />
 
-	{#if detail.description || detail.tags.length > 0 || detail.languages.length > 0 || detail.features.length > 0}
+	{#if detail.description || detail.tags.length > 0 || detail.languages.length > 0 || detail.features.length > 0 || hasRequirements}
 		<div class="about-grid">
 			<div>
 				{#if detail.description}
@@ -118,6 +129,7 @@
 						<p class="plain">{detail.features.join(', ')}</p>
 					</section>
 				{/if}
+					<Requirements {detail} follow={block.os} turn={block.turn} {visitor} />
 			</aside>
 		</div>
 	{:else}

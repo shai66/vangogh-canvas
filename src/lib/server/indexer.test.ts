@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { createLogger } from './log';
 import { RebuildFailed, buildIndex, fileId } from './indexer';
-import { apiProduct, details, file, records } from './testing/fixtures';
+import { apiProduct, details, extra, file, records } from './testing/fixtures';
 import {
 	VangoghAuthError,
 	VangoghHttpError,
@@ -16,6 +16,10 @@ function source(overrides: Partial<VangoghSource> = {}): VangoghSource {
 		metadata: async (type, id) =>
 			(type === 'gog-api-products' ? records.apiProducts[id] : records.details[id]) ?? null,
 		filenames: async (id) => records.filenames[id] ?? {},
+		fileOnDisk: async ({ productId, manualUrl }) => {
+			const names = records.extraFiles[productId] ?? {};
+			return Object.hasOwn(names, manualUrl) ? names[manualUrl] : null;
+		},
 		...overrides
 	};
 }
@@ -36,7 +40,7 @@ describe('buildIndex', () => {
 			['2002', 'orphaned-dlc'],
 			['1003', 'game']
 		]);
-		expect(index.schema).toBe(4);
+		expect(index.schema).toBe(5);
 		expect(index.builtAt).toBe('2026-09-29T02:30:00.000Z');
 	});
 
@@ -60,7 +64,9 @@ describe('buildIndex', () => {
 			coop: true,
 			poster: 'a'.repeat(64),
 			banner: '3'.repeat(64),
+			releaseYear: 2002,
 			dlc: ['Road Expansion'],
+			extraKinds: ['manuals', 'audio', 'wallpapers'],
 			order: 0,
 			complete: true,
 			hasFiles: true
@@ -75,11 +81,12 @@ describe('buildIndex', () => {
 		expect(index.entries[0]).not.toHaveProperty('backdrop');
 	});
 
-	it('hands the year of the original release to the detail only', async () => {
+	it('hands the year of the original release to the list entry and the detail', async () => {
 		const index = await buildIndex(source(), logger().log);
+		expect(index.entries[0].releaseYear).toBe(2002);
 		expect(index.details['1001'].releaseYear).toBe(2002);
+		expect(index.entries[1].releaseYear).toBeNull();
 		expect(index.details['1002'].releaseYear).toBeNull();
-		expect(index.entries[0]).not.toHaveProperty('releaseYear');
 	});
 
 	it('hands what GOG says about the macOS installer to the detail only', async () => {
@@ -104,6 +111,41 @@ describe('buildIndex', () => {
 		// A record without metadata has none either.
 		expect(index.details['1003'].macNotice).toBeNull();
 		expect(index.entries[0]).not.toHaveProperty('macNotice');
+	});
+
+	it('hands the address of the game\'s page on GOG.com to the detail only', async () => {
+		const index = await buildIndex(source(), logger().log);
+		expect(index.details['1001'].storeUrl).toBe('https://www.gog.com/en/game/the_long_dark_road');
+		expect(index.details['1002'].storeUrl).toBeNull();
+		// A record without metadata has none.
+		expect(index.details['1003'].storeUrl).toBeNull();
+		expect(index.entries[0]).not.toHaveProperty('storeUrl');
+	});
+
+	it('hands the system requirements to the detail only', async () => {
+		const withRequirements = apiProduct({
+			title: 'The Long Dark Road',
+			os: ['windows', 'osx', 'linux'],
+			requirements: { windows: { minimum: [['memory', 'Memory:', '4 GB RAM']] } }
+		});
+		const index = await buildIndex(
+			source({
+				metadata: async (type, id) =>
+					type === 'gog-api-products'
+						? id === '1001'
+							? withRequirements
+							: (records.apiProducts[id] ?? null)
+						: (records.details[id] ?? null)
+			}),
+			logger().log
+		);
+		expect(index.details['1001'].requirements).toEqual({
+			windows: { minimum: [{ id: 'memory', name: 'Memory', text: '4 GB RAM' }], recommended: [] }
+		});
+		expect(index.details['1002'].requirements).toEqual({});
+		// A record without metadata has none.
+		expect(index.details['1003'].requirements).toEqual({});
+		expect(index.entries[0]).not.toHaveProperty('requirements');
 	});
 
 	it('nests the DLC with its files', async () => {
@@ -175,7 +217,127 @@ describe('buildIndex', () => {
 			productId: '1001',
 			downloadType: 'downloadable-content'
 		});
-		expect(Object.keys(index.files)).toHaveLength(7);
+		expect(Object.keys(index.files)).toHaveLength(10);
+	});
+
+	it('lists the extras that are on disk, the DLC\'s with the game\'s, by kind', async () => {
+		const index = await buildIndex(source(), logger().log);
+		expect(index.details['1001'].extras).toEqual([
+			{ fileId: fileId('/downloads/the_long_dark_road/en0extra0'), name: 'manual', kind: 'manuals', sizeText: '12 MB', sizeBytes: 12 * 1024 ** 2 },
+			{ fileId: fileId('/downloads/the_long_dark_road/en0extra1'), name: 'original soundtrack', kind: 'audio', sizeText: '150 MB', sizeBytes: 150 * 1024 ** 2 },
+			{ fileId: fileId('/downloads/road_expansion/en0extra0'), name: 'wallpapers', kind: 'wallpapers', sizeText: '5 MB', sizeBytes: 5 * 1024 ** 2 }
+		]);
+		expect(index.details['1002'].extras).toEqual([]);
+		expect(index.entries.find((e) => e.id === '1002')!.extraKinds).toEqual([]);
+	});
+
+	it('records where each extra is in vangogh, under the base game', async () => {
+		const index = await buildIndex(source(), logger().log);
+		expect(index.files[`1001/${fileId('/downloads/road_expansion/en0extra0')}`]).toEqual({
+			productId: '1001',
+			downloadType: 'extra',
+			manualUrl: '/downloads/road_expansion/en0extra0',
+			filename: 'road_expansion_wallpapers.zip'
+		});
+		// Not on disk: no place.
+		expect(index.files[`1001/${fileId('/downloads/the_long_dark_road/en0extra2')}`]).toBeUndefined();
+	});
+
+	it('asks only about extras vangogh downloads, of products that are listed', async () => {
+		const asked: string[] = [];
+		await buildIndex(
+			source({
+				fileOnDisk: async ({ productId, manualUrl }) => {
+					asked.push(`${productId}${manualUrl}`);
+					return null;
+				}
+			}),
+			logger().log
+		);
+		expect(asked.sort()).toEqual([
+			'1001/downloads/road_expansion/en0extra0',
+			'1001/downloads/the_long_dark_road/en0extra0',
+			'1001/downloads/the_long_dark_road/en0extra1',
+			'1001/downloads/the_long_dark_road/en0extra2'
+		]);
+		// Not the extra of "0 MB", and nothing of 1004, which is left out: GOG offers no installer for it.
+	});
+
+	it('leaves out the extras of a game vangogh cannot say about, logs it, and builds the rest', async () => {
+		const { lines, log } = logger();
+		const index = await buildIndex(
+			source({
+				fileOnDisk: async () => {
+					throw new VangoghHttpError(500, '/api/gog/manual-url/…');
+				}
+			}),
+			log
+		);
+		expect(index.details['1001'].extras).toEqual([]);
+		expect(index.entries[0].extraKinds).toEqual([]);
+		// The installers are still there.
+		expect(index.details['1001'].downloads.windows).toHaveLength(3);
+		expect(lines.some((l) => l.includes('extras not available') && l.includes('id=1001'))).toBe(true);
+	});
+
+	it('leaves out an extra whose address is refused, without a word, and lists the others', async () => {
+		const { lines, log } = logger();
+		const base = records.details['1001'] as object;
+		const index = await buildIndex(
+			source({
+				metadata: async (type, id) =>
+					type === 'gog-details' && id === '1001'
+						? {
+								...base,
+								dlcs: [],
+								extras: [
+									extra('/downloads/x/../en0extra0', 'sneaky', 'manuals', '1 MB'),
+									extra('/downloads/the_long_dark_road/en0extra0', 'manual', 'manuals', '12 MB')
+								]
+							}
+						: ((type === 'gog-api-products' ? records.apiProducts[id] : records.details[id]) ?? null),
+				// What the client answers for an address it refuses.
+				fileOnDisk: async ({ manualUrl }) =>
+					manualUrl.includes('..') ? null : 'the_long_dark_road_manual.pdf'
+			}),
+			log
+		);
+		expect(index.details['1001'].extras.map((e) => e.name)).toEqual(['manual']);
+		expect(lines.some((l) => l.includes('extras not available'))).toBe(false);
+	});
+
+	it('fails when the extras of more than half of the records cannot be checked', async () => {
+		const withExtras = details({
+			english: { windows: [file('/downloads/x/en1installer0', 'X')] },
+			extras: [extra('/downloads/x/en0extra0', 'manual', 'manuals', '1 MB')]
+		});
+		const error = await buildIndex(
+			source({
+				availableProducts: async () => [
+					{ id: '1001', tt: 'A', os: [1] },
+					{ id: '1002', tt: 'B', os: [1] }
+				],
+				metadata: async (type, id) => (type === 'gog-api-products' ? (records.apiProducts[id] ?? null) : withExtras),
+				filenames: async () => ({ '/downloads/x/en1installer0': 'x.exe' }),
+				fileOnDisk: async () => {
+					throw new VangoghUnreachable();
+				}
+			}),
+			logger().log
+		).catch((e) => e);
+		expect(error).toBeInstanceOf(RebuildFailed);
+	});
+
+	it('passes a rejected login during the check of the extras on as it is', async () => {
+		const error = await buildIndex(
+			source({
+				fileOnDisk: async () => {
+					throw new VangoghAuthError('vangogh rejected the login');
+				}
+			}),
+			logger().log
+		).catch((e) => e);
+		expect(error).toBeInstanceOf(VangoghAuthError);
 	});
 
 	it('sends no address of vangogh to the browser', async () => {
@@ -765,7 +927,9 @@ describe.skipIf(!existsSync('samples/available-products.json'))('buildIndex on t
 			const names = read(`filenames/${id}.json`);
 			if (names === null) throw new VangoghHttpError(500, `/api/gog/filenames/${id}`);
 			return names as Record<string, string>;
-		}
+		},
+		// The samples do not say what is on disk.
+		fileOnDisk: async () => null
 	};
 
 	it('builds an index in which a game has files exactly when vangogh names some, and leaves out what gog offers no installer for', async () => {

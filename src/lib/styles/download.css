@@ -377,3 +377,87 @@
 .dlc-block .files {
 	padding: 0;
 }
+
+/* Extras: a panel of their own under the file list, folded by default. */
+.extras {
+	border-radius: 13px;
+	background: rgb(21 29 49 / 0.82);
+	border: 1px solid var(--night-line);
+}
+.extras-head {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 3px 16px;
+	width: 100%;
+	padding: 14px 20px;
+	border: 0;
+	border-radius: 12px;
+	background: none;
+	color: var(--starlight);
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+.extras-head:hover {
+	background: rgb(31 42 69 / 0.45);
+}
+.extras-head .t {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 15px;
+	font-weight: 650;
+}
+.extras-head .t .ic {
+	font-size: 17px;
+	color: var(--starlight-dim);
+}
+.extras-head .n {
+	margin-left: 2px;
+	color: var(--starlight-faint);
+	font-weight: 400;
+	font-size: 13px;
+	font-variant-numeric: tabular-nums;
+}
+.extras-head .kinds {
+	font-size: 13px;
+	color: var(--starlight-dim);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.extras-head .caret {
+	grid-column: 2;
+	grid-row: 1 / span 2;
+	display: flex;
+	font-size: 18px;
+	color: var(--starlight-dim);
+	transition: rotate 0.15s ease;
+}
+.extras.is-open .extras-head .caret {
+	rotate: 180deg;
+}
+.extras .files {
+	padding: 0 8px 6px;
+}
+.file.is-extra {
+	grid-template-columns: 120px minmax(0, 1fr) auto auto;
+}
+.file .kind {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	font-size: 13px;
+	color: var(--starlight-dim);
+	white-space: nowrap;
+}
+.file .kind .ic {
+	font-size: 16px;
+	color: var(--starlight-faint);
+}
+@media (prefers-reduced-motion: reduce) {
+	.extras-head .caret {
+		transition: none;
+	}
+}

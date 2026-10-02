@@ -1,8 +1,17 @@
 import { createHash } from 'node:crypto';
-import { ALL_OS, type Detail, type DlcDetail, type Downloads, type Kind, type ListEntry } from '../types';
+import { byKind } from '../extras';
+import {
+	ALL_OS,
+	type Detail,
+	type DlcDetail,
+	type Downloads,
+	type ExtraFile,
+	type Kind,
+	type ListEntry
+} from '../types';
 import { INDEX_SCHEMA, type FileTarget, type Index } from './index-types';
 import type { Logger } from './log';
-import { mapDetails, type MappedDetails, type MappedDownloads } from './mapper/downloads';
+import { mapDetails, type MappedDetails, type MappedDownloads, type MappedExtra } from './mapper/downloads';
 import { mapLibrary, type LibraryProduct } from './mapper/library';
 import { mapApiProduct, type MappedProduct } from './mapper/product';
 import { mapLimit } from './util';
@@ -32,6 +41,24 @@ interface Gathered {
 	error: string | null;
 	/** True when file names call threw VangoghHttpError for a product with gog-details. */
 	filenamesFailed: boolean;
+	/** The extras on disk, each with the name of its file. */
+	extras: PresentExtra[];
+	/** True when vangogh could not say which extras are on disk. */
+	extrasFailed: boolean;
+}
+
+interface PresentExtra extends MappedExtra {
+	filename: string;
+}
+
+/** The extras that are on disk. vangogh's file names never list them, so it is asked about each, one after another. */
+async function presentExtras(source: VangoghSource, productId: string, extras: MappedExtra[]): Promise<PresentExtra[]> {
+	const present: PresentExtra[] = [];
+	for (const extra of extras) {
+		const filename = await source.fileOnDisk({ productId, downloadType: 'extra', manualUrl: extra.manualUrl });
+		if (filename !== null) present.push({ ...extra, filename });
+	}
+	return present;
 }
 
 function reason(error: unknown): string {
@@ -59,6 +86,7 @@ async function gather(
 	try {
 		const productRaw = await source.metadata('gog-api-products', library.id);
 		const detailsRaw = await source.metadata('gog-details', library.id);
+		const details = detailsRaw === null ? null : mapDetails(detailsRaw);
 		let filenames: Record<string, string> = {};
 		let filenamesFailed = false;
 		// vangogh answers 500 for file names of a product without details.
@@ -71,17 +99,40 @@ async function gather(
 				log.warn('file names not available', { id: library.id, status: error.status });
 			}
 		}
+		// Only a product that offers installers is listed, so only its extras are asked about.
+		let extras: PresentExtra[] = [];
+		let extrasFailed = false;
+		if (details?.offersInstallers) {
+			try {
+				extras = await presentExtras(source, library.id, details.extras);
+			} catch (error) {
+				if (error instanceof VangoghAuthError) throw error;
+				extrasFailed = true;
+				log.warn('extras not available', { id: library.id, reason: reason(error) });
+			}
+		}
 		return {
 			library,
 			product: productRaw === null ? null : mapApiProduct(productRaw),
-			details: detailsRaw === null ? null : mapDetails(detailsRaw),
+			details,
 			filenames,
 			error: null,
-			filenamesFailed
+			filenamesFailed,
+			extras,
+			extrasFailed
 		};
 	} catch (error) {
 		if (error instanceof VangoghAuthError) throw error;
-		return { library, product: null, details: null, filenames: {}, error: reason(error), filenamesFailed: false };
+		return {
+			library,
+			product: null,
+			details: null,
+			filenames: {},
+			error: reason(error),
+			filenamesFailed: false,
+			extras: [],
+			extrasFailed: false
+		};
 	}
 }
 
@@ -125,18 +176,30 @@ function toDownloads(
 	return out;
 }
 
+/** The extras on disk as the index holds them, in the panel's order, each with its place in vangogh. */
+function toExtras(extras: PresentExtra[], productId: string, targets: Record<string, FileTarget>): ExtraFile[] {
+	return extras
+		.map((e) => {
+			const id = fileId(e.manualUrl);
+			targets[`${productId}/${id}`] = { productId, downloadType: 'extra', manualUrl: e.manualUrl, filename: basename(e.filename) };
+			return { fileId: id, name: e.name, kind: e.kind, sizeText: e.sizeText, sizeBytes: e.sizeBytes };
+		})
+		.sort(byKind);
+}
+
 function offersFiles(downloads: Downloads, dlc: DlcDetail[]): boolean {
 	return [downloads, ...dlc.map((d) => d.downloads)].some((d) => Object.keys(d).length > 0);
 }
 
 /**
  * Whether a record counts as not read for the threshold that fails a rebuild.
- * A product without a product record does. So does one whose file names could
- * not be fetched, unless its details offer no installer: it is left out, and
- * no file name could matter for it.
+ * A product without a product record does. So does one whose extras vangogh
+ * could not say about, and one whose file names could not be fetched, unless
+ * its details offer no installer: it is left out, and no file name could matter for it.
  */
 function countsAsFailed(g: Gathered): boolean {
 	if (g.product === null) return true;
+	if (g.extrasFailed) return true;
 	return g.filenamesFailed && !(g.details !== null && !g.details.offersInstallers);
 }
 
@@ -215,6 +278,7 @@ export async function buildIndex(
 				dlc.push({ title: listed.title, downloads: {} });
 			}
 		}
+		const extras = toExtras(g.extras, id, targets);
 
 		let kind: Kind = 'game';
 		let requires: string | null = null;
@@ -262,7 +326,9 @@ export async function buildIndex(
 			coop: product?.coop ?? false,
 			poster: product?.poster ?? null,
 			banner: product?.banner ?? null,
+			releaseYear: product?.releaseYear ?? null,
 			dlc: dlc.map((d) => d.title),
+			extraKinds: extras.map((e) => e.kind),
 			order,
 			complete: product !== null,
 			hasFiles: offersFiles(downloads, dlc)
@@ -284,11 +350,13 @@ export async function buildIndex(
 			features: product?.features ?? [],
 			screenshots: product?.screenshots ?? [],
 			backdrop: product?.backdrop ?? null,
-			releaseYear: product?.releaseYear ?? null,
 			macNotice: product?.macNotice ?? null,
+			requirements: product?.requirements ?? {},
+			storeUrl: product?.storeUrl ?? null,
 			downloads,
 			downloadLanguage: g.details?.downloads.language ?? null,
 			dlc,
+			extras,
 			requires,
 			partOf: [...new Set(packs)]
 		};

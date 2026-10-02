@@ -26,7 +26,7 @@ export class VangoghHttpError extends Error {
 	}
 }
 
-export type DownloadType = 'installer' | 'downloadable-content';
+export type DownloadType = 'installer' | 'downloadable-content' | 'extra';
 
 export interface FileAddress {
 	productId: string;
@@ -43,6 +43,8 @@ export interface VangoghSource {
 	availableProducts(): Promise<unknown>;
 	metadata(type: MetadataType, id: string): Promise<unknown | null>;
 	filenames(id: string): Promise<Record<string, string>>;
+	/** The name of a file when it is on disk, null when it is not. */
+	fileOnDisk(address: FileAddress): Promise<string | null>;
 }
 
 export interface VangoghFiles {
@@ -73,6 +75,7 @@ export interface ClientOptions {
 const TIMEOUT_MS = 30_000;
 
 interface RequestOptions {
+	method?: 'GET' | 'HEAD';
 	headers?: Record<string, string>;
 	signal?: AbortSignal;
 }
@@ -89,6 +92,18 @@ function isTimeout(error: unknown): boolean {
 
 function segments(path: string): string {
 	return path.split('/').filter(Boolean).map(encodeURIComponent).join('/');
+}
+
+/** The file name in a Content-Disposition header, as vangogh writes it: attachment; filename="name". */
+function nameIn(header: string | null): string | null {
+	const match = header?.match(/filename="([^"]*)"|filename=([^;]+)/i);
+	const name = (match?.[1] ?? match?.[2] ?? '').trim();
+	return name === '' ? null : name;
+}
+
+/** The last part of an address. */
+function lastPart(path: string): string {
+	return path.split('/').filter(Boolean).pop() ?? path;
 }
 
 /** Validates a single ID component (type, id, imageId, productId, downloadType). */
@@ -141,6 +156,8 @@ export class VangoghClient implements VangoghSource, VangoghFiles {
 	#currentToken: string | null = null;
 	#pendingLogin: Promise<string> | null = null;
 	#rejected = false;
+	/** True once vangogh accepted a login, until it refuses one. */
+	#accepted = false;
 
 	constructor(options: ClientOptions) {
 		this.#url = options.url.replace(/\/+$/, '');
@@ -154,6 +171,14 @@ export class VangoghClient implements VangoghSource, VangoghFiles {
 	/** True after vangogh refused the password, until `resetAuth`. */
 	get loginRejected(): boolean {
 		return this.#rejected;
+	}
+
+	/**
+	 * What vangogh last said to a login: nothing yet (it was never reached, or Canvas has just
+	 * started), accepted, or refused.
+	 */
+	get loginState(): 'unknown' | 'ok' | 'rejected' {
+		return this.#rejected ? 'rejected' : this.#accepted ? 'ok' : 'unknown';
 	}
 
 	/** Allows one more login after a refused password. */
@@ -184,6 +209,7 @@ export class VangoghClient implements VangoghSource, VangoghFiles {
 		if (res.status === 401 || res.status === 403) {
 			await res.body?.cancel();
 			this.#rejected = true;
+			this.#accepted = false;
 			this.#log.error('vangogh rejected the login', { username: this.#username });
 			throw new VangoghAuthError('vangogh rejected the login');
 		}
@@ -199,6 +225,7 @@ export class VangoghClient implements VangoghSource, VangoghFiles {
 			throw new VangoghHttpError(res.status, LOGIN);
 		}
 		this.#currentToken = body.token;
+		this.#accepted = true;
 		return body.token;
 	}
 
@@ -220,6 +247,7 @@ export class VangoghClient implements VangoghSource, VangoghFiles {
 		const attempt = async () => {
 			const token = await this.#ensureToken();
 			const res = await this.#send(path, {
+				method: options.method ?? 'GET',
 				headers: { ...options.headers, authorization: `Bearer ${token}` },
 				signal: options.signal
 			});
@@ -293,21 +321,50 @@ export class VangoghClient implements VangoghSource, VangoghFiles {
 		});
 	}
 
-	async file(address: FileAddress, options: FileOptions = {}): Promise<Response> {
+	/** The address of a file in vangogh. Refuses an address that could reach another route. */
+	#filePath(address: FileAddress): string {
 		validateId(address.productId);
 		validateId(address.downloadType);
 		validateManualUrl(address.manualUrl);
-		const path = [
+		return [
 			'/api/gog/manual-url',
 			encodeURIComponent(address.productId),
 			encodeURIComponent(address.downloadType),
 			segments(address.manualUrl)
 		].join('/');
+	}
+
+	async file(address: FileAddress, options: FileOptions = {}): Promise<Response> {
+		const path = this.#filePath(address);
 		const headers: Record<string, string> = {};
 		if (options.range) {
 			headers.range = options.range;
 			if (options.ifRange) headers['if-range'] = options.ifRange;
 		}
 		return this.#raw(path, { headers, signal: options.signal });
+	}
+
+	/**
+	 * Whether a file is on disk, without fetching it: the name of the file when vangogh has it,
+	 * null when it answers 404. vangogh looks for the file on disk and names it in
+	 * Content-Disposition; without that header the last part of the address is the name.
+	 * An address Canvas refuses to ask about (see `file()`, which refuses it with an error)
+	 * also gives null, without a request: the extra is left out without a word.
+	 * Anything else throws.
+	 */
+	async fileOnDisk(address: FileAddress): Promise<string | null> {
+		let path: string;
+		try {
+			path = this.#filePath(address);
+		} catch (e) {
+			if (e instanceof VangoghHttpError && e.status === 400) return null;
+			throw e;
+		}
+		const res = await this.#raw(path, { method: 'HEAD', signal: AbortSignal.timeout(this.#timeoutMs) });
+		await res.body?.cancel();
+		if (res.status === 404) return null;
+		// The address names the game: it stays out of the message, and so out of the log.
+		if (!res.ok) throw new VangoghHttpError(res.status, '/api/gog/manual-url/…');
+		return nameIn(res.headers.get('content-disposition')) ?? lastPart(address.manualUrl);
 	}
 }

@@ -12,3 +12,8 @@ export function formatSize(bytes: number): string {
 	// Just under a gigabyte rounds up to one.
 	return mb >= 1024 ? '1 GB' : `${mb} MB`;
 }
+
+/** A text that starts with a capital letter. GOG writes many names in lower case: "manual". */
+export function upperFirst(text: string): string {
+	return text.charAt(0).toUpperCase() + text.slice(1);
+}

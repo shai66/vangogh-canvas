@@ -242,6 +242,13 @@
 	height: 18px;
 	color: var(--starlight-dim);
 	font-size: 15px;
+	/* A row with more than fits (all systems, DLC, extras, co-op and multiplayer) lets what
+	   comes last give way: it wraps onto a second line that is never seen. The co-op and
+	   multiplayer marks go first, then the extras; the detail and the filter still have them. */
+	flex-wrap: wrap;
+	align-content: flex-start;
+	row-gap: 18px;
+	overflow: hidden;
 }
 .card-meta .group {
 	display: flex;
@@ -265,6 +272,19 @@
 	font-stretch: 92%;
 	white-space: nowrap;
 	font-variant-numeric: tabular-nums;
+}
+/* The extras: a gift and the number, beside the DLC pill. */
+.card-meta .dlc + .xtr {
+	margin-left: -4px;
+}
+.card-meta .xtr {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	padding: 0 7px 0 6px;
+}
+.card-meta .xtr .ic {
+	font-size: 12px;
 }
 .card-meta .missing {
 	display: flex;
@@ -294,6 +314,14 @@
 }
 .card-genres span + span::before {
 	content: ',\00a0';
+}
+/* Sorted by release year, the year leads the genre line. */
+.card-genres .year {
+	color: var(--starlight-dim);
+	font-variant-numeric: tabular-nums;
+}
+.card-genres .year + span::before {
+	content: '\00a0\00b7\00a0';
 }
 .card-reason {
 	margin-top: 4px;

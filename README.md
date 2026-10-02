@@ -12,7 +12,7 @@ The arrow beside the button downloads the installer for another system.
 
 | The library | A game |
 |---|---|
-| ![The library as a wall of posters, with search, platform filter and sort order](screenshots/library.jpg) | ![A game: the download button, the files for each system, screenshots, description and tags](screenshots/game.jpg) |
+| ![The library as a wall of posters, with search, platform filter and sort order](screenshots/library.jpg) | ![A game: the download button, the files for each system, the extras and the screenshots](screenshots/game.jpg) |
 
 ## Canvas and GOG.com games sharing guidelines
 
@@ -46,6 +46,16 @@ Canvas never passes vangogh's API on to a browser. A browser can only ask
 for an image by a checked id, or for a file that Canvas's own index names.
 The password and the login token of the account are never logged.
 
+## Extras
+
+Canvas shows a game's extras (manuals, soundtracks, artwork and the rest
+of GOG's goodies) when vangogh mirrors them. vangogh does by default.
+`-no-extras`, or the variable `VANGOGH_NO-EXTRAS` with any value at all,
+turns them off, and `false` does not turn them back on: remove the
+variable. After turning them on, `vangogh get-downloads -missing` fetches
+the extras of games synced before, since a sync downloads only what
+changed. Canvas finds the new extras with its next rebuild.
+
 ## Settings
 
 All settings are environment variables.
@@ -56,13 +66,17 @@ All settings are environment variables.
 | `VANGOGH_USERNAME` | The account | required |
 | `VANGOGH_PASSWORD` | Its password | required |
 | `REBUILD_AT` | Time of the daily rebuild, `HH:MM` | `04:30` |
-| `TZ` | Time zone of `REBUILD_AT` | `Europe/Bratislava` |
+| `TZ` | Time zone of `REBUILD_AT` and of the times Canvas shows | `UTC` |
 | `CACHE_DIR` | Folder for the cached index | `/cache` |
 | `PORT` | Port inside the container | `1854` |
 
 The repository's `compose.yml` names two more: `CANVAS_PORT`, the port
 on the host, and `SHUTDOWN_TIMEOUT`, the number of seconds (default `5`)
 that Canvas waits for open connections when it is asked to stop.
+
+`REBUILD_AT` belongs after vangogh's own sync. Canvas can show only what
+vangogh has, and vangogh's API does not say when a sync ran. With vangogh
+syncing at 03:30, the default of 04:30 gives it an hour.
 
 Canvas refuses to start when a required variable is missing, and says which.
 `docker compose` refuses too, before it starts anything. `VANGOGH_URL` must
@@ -76,6 +90,8 @@ not checked. The safe choice is a password without `$` for this account.
 After every deployment, look at `/healthz`. `"login":"ok"` means the
 password arrived as it should. `"login":"rejected"` means vangogh refused
 it: the password is wrong, or a character in it was changed on the way.
+`"login":"unknown"` means vangogh has not answered a login yet: it is not
+reachable from Canvas, or Canvas has just started.
 
 ## Run it
 
@@ -167,10 +183,13 @@ wiki says which permissions they need.
 From the image:
 
 ```bash
-docker compose pull
-docker compose up -d
+docker compose pull canvas
+docker compose up -d canvas
 curl http://127.0.0.1:1854/healthz     # version shows the new version
 ```
+
+Naming the service updates Canvas alone. In the example stack the plain
+commands would also pull and recreate vangogh.
 
 A stack that Portainer builds from the repository, as the repository's
 own `compose.yml` does, updates by a push and a click:

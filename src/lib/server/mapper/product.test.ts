@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { BACKDROP, BANNER, POSTER, SHOT, apiProduct, records } from '../testing/fixtures';
-import { macNoticeOf, mapApiProduct } from './product';
+import { macNoticeOf, mapApiProduct, requirementsOf, storeUrlOf } from './product';
 
 describe('mapApiProduct', () => {
 	const game = mapApiProduct(records.apiProducts['1001']);
@@ -128,6 +128,8 @@ describe('mapApiProduct', () => {
 				backdrop: null,
 				releaseYear: null,
 				macNotice: null,
+				requirements: {},
+				storeUrl: null,
 				requires: [],
 				includes: [],
 				includedIn: []
@@ -260,5 +262,108 @@ describe('mapApiProduct and the Mac notice', () => {
 		expect(mapApiProduct(apiProduct({ title: 'Plain' })).macNotice).toBeNull();
 		expect(mapApiProduct({}).macNotice).toBeNull();
 		expect(mapApiProduct({ additionalRequirements: { html: 'Mac notice: x' } }).macNotice).toBeNull();
+	});
+});
+
+describe('requirementsOf', () => {
+	const of = (requirements: NonNullable<Parameters<typeof apiProduct>[0]['requirements']>, os = Object.keys(requirements)) =>
+		mapApiProduct(apiProduct({ title: 'Game', os, requirements })).requirements;
+
+	it('reads the minimum and the recommended rows of each system, in GOG\'s order, osx as macOS', () => {
+		expect(
+			of({
+				windows: {
+					minimum: [['system', 'System:', 'Windows 10'], ['memory', 'Memory:', '4 GB RAM']],
+					recommended: [['memory', 'Memory:', '8 GB RAM']]
+				},
+				osx: { minimum: [['system', 'System:', 'macOS 12']] }
+			})
+		).toEqual({
+			windows: {
+				minimum: [
+					{ id: 'system', name: 'System', text: 'Windows 10' },
+					{ id: 'memory', name: 'Memory', text: '4 GB RAM' }
+				],
+				recommended: [{ id: 'memory', name: 'Memory', text: '8 GB RAM' }]
+			},
+			macos: { minimum: [{ id: 'system', name: 'System', text: 'macOS 12' }], recommended: [] }
+		});
+	});
+
+	it('leaves out a row without text, and takes away the label GOG repeats in the text', () => {
+		expect(
+			of({
+				windows: {
+					minimum: [
+						['processor', 'Processor:', 'Processor: Quad Core'],
+						['network', 'Network:', ''],
+						['graphics', 'Graphics:', 'graphics:   GTX 970']
+					]
+				}
+			}).windows!.minimum
+		).toEqual([
+			{ id: 'processor', name: 'Processor', text: 'Quad Core' },
+			{ id: 'graphics', name: 'Graphics', text: 'GTX 970' }
+		]);
+	});
+
+	it('names a row of an id it does not know by GOG\'s label, and keeps an unknown row without a label by its id', () => {
+		expect(of({ linux: { minimum: [['vr', 'VR headset:', 'Any'], ['custom', '', 'Something']] } }).linux!.minimum).toEqual([
+			{ id: 'vr', name: 'VR headset', text: 'Any' },
+			{ id: 'custom', name: 'custom', text: 'Something' }
+		]);
+	});
+
+	it('has no entry for a system without rows, and none at all for a game GOG lists none for', () => {
+		expect(of({ windows: { minimum: [['network', 'Network:', '']] } })).toEqual({});
+		expect(mapApiProduct(apiProduct({ title: 'Game' })).requirements).toEqual({});
+	});
+
+	it('reads what it can of an odd record, and never throws', () => {
+		const odd = [
+			null,
+			'windows',
+			{ operatingSystem: { name: 'steamos' }, systemRequirements: [{ type: 'minimum', requirements: [{ id: 'memory', name: 'Memory:', description: '1 GB' }] }] },
+			{ operatingSystem: { name: 'windows' }, systemRequirements: 'none' },
+			{
+				operatingSystem: { name: 'linux' },
+				systemRequirements: [
+					{ type: 'best', requirements: [{ id: 'memory', name: 'Memory:', description: '9 GB' }] },
+					{ type: 'minimum', requirements: [null, { description: 'no id and no name' }, { id: 'memory', name: 'Memory:', description: 42 }, { id: 'other', name: 'Other:', description: 'x'.repeat(5000) }, { id: 'storage', name: 'Storage:', description: '2 GB' }] }
+				]
+			},
+			{ operatingSystem: { name: 'linux' }, systemRequirements: [{ type: 'minimum', requirements: [{ id: 'memory', name: 'Memory:', description: 'second linux' }] }] }
+		];
+		expect(requirementsOf(odd)).toEqual({ linux: { minimum: [{ id: 'storage', name: 'Storage', text: '2 GB' }], recommended: [] } });
+		expect(requirementsOf(undefined)).toEqual({});
+		expect(requirementsOf({ windows: [] })).toEqual({});
+	});
+});
+
+describe('storeUrlOf', () => {
+	it('takes the address of the game\'s page on GOG.com', () => {
+		expect(mapApiProduct(records.apiProducts['1001']).storeUrl).toBe('https://www.gog.com/en/game/the_long_dark_road');
+		expect(storeUrlOf({ href: 'https://www.gog.com/en/game/some_game' })).toBe('https://www.gog.com/en/game/some_game');
+	});
+
+	it.each([
+		[{ href: 'http://www.gog.com/en/game/some_game' }],
+		[{ href: 'https://evil.example/game/some_game' }],
+		[{ href: 'https://www.gog.com.evil.example/game/some_game' }],
+		[{ href: 'https://gog.com/en/game/some_game' }],
+		[{ href: 'https://user:pw@www.gog.com/en/game/some_game' }],
+		[{ href: 'https://www.gog.com:8443/en/game/some_game' }],
+		[{ href: 'javascript:alert(1)' }],
+		[{ href: 'not an address' }],
+		[{ href: 42 }],
+		[{}],
+		[null],
+		['https://www.gog.com/en/game/some_game']
+	])('gives no address for %j', (x) => {
+		expect(storeUrlOf(x)).toBeNull();
+	});
+
+	it('gives no address for a record without one', () => {
+		expect(mapApiProduct(apiProduct({ title: 'Game' })).storeUrl).toBeNull();
 	});
 });

@@ -83,6 +83,29 @@ test.describe('the list', () => {
 		await expect(page).toHaveURL(/\?sort=recent$/);
 	});
 
+	test('sorts by release year, newest first, with the year in front of the genres', async ({ page }) => {
+		await page.goto('/');
+		await page.getByRole('button', { name: 'Release year' }).click();
+		await expect(page).toHaveURL(/\?sort=year$/);
+		// Only The Long Dark Road names a year, 2002. The rest follow A to Z.
+		expect(await titles(page)).toEqual([
+			'The Long Dark Road',
+			'Broken Record',
+			'Expansion Only Game',
+			'Lonely Expansion',
+			'Missing Files Game',
+			LONG_TITLE,
+			'Windows Only Game'
+		]);
+		const road = page.locator('.card', { hasText: 'The Long Dark Road' });
+		await expect(road.locator('.card-genres .year')).toHaveText('2002');
+		await expect(road.locator('.card-genres')).toHaveText('2002Role-playingAdventure');
+		await expect(page.locator('.card', { hasText: 'Windows Only Game' }).locator('.year')).toHaveCount(0);
+
+		await page.getByRole('button', { name: 'A to Z' }).click();
+		await expect(road.locator('.year')).toHaveCount(0);
+	});
+
 	test('sends a security policy that allows no script from elsewhere', async ({ page }) => {
 		const answer = await page.goto('/');
 		const policy = answer?.headers()['content-security-policy'] ?? '';
@@ -414,6 +437,8 @@ test.describe('filters', () => {
 		await page.locator('.os-toggle').getByRole('button', { name: 'Windows' }).click();
 		expect(await places()).toEqual(before);
 		await page.getByRole('button', { name: 'Recently added' }).click();
+		expect(await places()).toEqual(before);
+		await page.getByRole('button', { name: 'Release year' }).click();
 		expect(await places()).toEqual(before);
 		await page.getByRole('button', { name: 'Filters, 1 on' }).click();
 		await expect(page.locator('dialog.filters')).toBeVisible();

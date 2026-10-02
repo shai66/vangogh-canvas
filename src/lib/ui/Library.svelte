@@ -260,7 +260,7 @@
 	{#if view.matches.length > 0}
 		<div class="grid">
 			{#each view.shown as match (match.entry.id)}
-				<Card {match} onopen={open} />
+				<Card {match} showYear={view.sort === 'year'} onopen={open} />
 			{/each}
 		</div>
 	{:else}

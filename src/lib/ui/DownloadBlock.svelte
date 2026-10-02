@@ -2,11 +2,12 @@
 	import { formatSize } from '$lib/format';
 	import {
 		blockKind,
+		buttonForTab,
 		buttonSystems,
 		buttonTarget,
-		discouraged,
 		dlcFor,
 		firstTab,
+		isPrimary,
 		macNote,
 		notePlace,
 		runFile,
@@ -19,6 +20,7 @@
 	import { t } from '$lib/strings';
 	import type { Detail, FileEntry, Os } from '$lib/types';
 	import type { Visitor } from '$lib/visitor';
+	import Extras from './Extras.svelte';
 	import FileList from './FileList.svelte';
 	import Icon from './Icon.svelte';
 	import MacCaution from './MacCaution.svelte';
@@ -28,10 +30,12 @@
 	interface Props {
 		detail: Detail;
 		visitor: Visitor;
+		/** Told the system the file list shows, whenever it changes. The system requirements follow it. */
+		onsystem?: (os: Os | null) => void;
 		/** Tests hand in their own. */
 		starter?: Starter;
 	}
-	let { detail, visitor, starter = browserStarter }: Props = $props();
+	let { detail, visitor, onsystem, starter = browserStarter }: Props = $props();
 
 	const PANEL = 'files-panel';
 
@@ -40,10 +44,14 @@
 	let chosen = $state<Os | null>(null);
 	const tab = $derived(chosen && systems.includes(chosen) ? chosen : firstTab(detail, visitor));
 	const files = $derived(tab ? (detail.downloads[tab] ?? []) : []);
+	$effect(() => {
+		onsystem?.(tab);
+	});
 
 	// The main button downloads for the visitor's own system, until another is picked with
-	// the switch. The pick lives here and nowhere else: a detail that is opened again is a
-	// new block, and starts on the visitor's own system.
+	// the switch or with a tab of the file list: the two follow each other. The pick lives here
+	// and nowhere else: a detail that is opened again is a new block, and starts on the
+	// visitor's own system.
 	const offered = $derived(buttonSystems(detail));
 	let picked = $state<Os | null>(null);
 	const target = $derived(buttonTarget(detail, visitor, picked));
@@ -67,7 +75,7 @@
 	let unreachable = $state(false);
 	let missing = $state<string[]>([]);
 
-	async function start(list: FileEntry[]): Promise<number> {
+	async function start(list: Pick<FileEntry, 'fileId'>[]): Promise<number> {
 		busy = true;
 		unreachable = false;
 		try {
@@ -97,8 +105,15 @@
 		expanded = false;
 	}
 
+	/** A tab of the file list: the list turns, and the button with it, unless only a DLC has files there. */
+	function choose(os: Os) {
+		chosen = os;
+		picked = buttonForTab(detail, os) ?? picked;
+		expanded = false;
+	}
+
 	/** One file: asked first, so that a missing file is said and not a broken download. */
-	async function one(event: MouseEvent, file: FileEntry) {
+	async function one(event: MouseEvent, file: Pick<FileEntry, 'fileId'>) {
 		if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
 		// While other files are being started the link downloads the file itself, unasked.
 		if (busy) return;
@@ -106,11 +121,7 @@
 		await start([file]);
 	}
 
-	// Yellow says "press this": for the visitor's own computer, and once. And not where GOG
-	// itself says that the installer will not work.
-	const primary = $derived(
-		kind === 'mine' && target !== null && started[target] === undefined && !discouraged(note, target)
-	);
+	const primary = $derived(isPrimary(kind, visitor, target, target !== null && started[target] !== undefined, note));
 	// Everything the button can say. All of it is drawn and one is seen, so the button is as
 	// wide as its longest label and keeps that width.
 	const labels = $derived([...offered.map((os) => t.download.button(os)), t.download.again]);
@@ -227,10 +238,7 @@
 				{tab}
 				panel={PANEL}
 				note={version ? t.download.version(version) : null}
-				onselect={(os) => {
-					chosen = os;
-					expanded = false;
-				}}
+				onselect={choose}
 			/>
 			<div id={PANEL} role="tabpanel" aria-labelledby="{PANEL}-tab-{tab}">
 				{#if files.length > 0}
@@ -299,5 +307,10 @@
 				{/if}
 			</div>
 		</div>
+	{/if}
+
+	{#if detail.extras.length > 0}
+		<!-- Extras belong to no system: a panel of their own, which a phone sees too. -->
+		<Extras gameId={detail.id} extras={detail.extras} {missing} ondownload={one} />
 	{/if}
 </div>

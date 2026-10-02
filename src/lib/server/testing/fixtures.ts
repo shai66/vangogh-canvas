@@ -1,6 +1,6 @@
 // Hand-made records in the shapes vangogh returns. Six products cover the
 // rules of spec section 4:
-//   1001  a game for three systems, multi-part on Windows, one DLC, in a pack
+//   1001  a game for three systems, multi-part on Windows, one DLC, in a pack, with extras
 //   1002  a game for Windows only, one file
 //   2002  a DLC whose base game (9999) is not owned
 //   3001  a pack that includes 1001 and has no files of its own
@@ -47,6 +47,10 @@ export interface ApiProductOptions {
 	released?: string;
 	/** The field `additionalRequirements`: HTML with notes of all kinds, GOG's "Mac notice" among them. */
 	additional?: string;
+	/** The address of the game's page on GOG.com, `_links.store.href`. */
+	store?: string;
+	/** GOG's system requirements by system name ("windows", "osx", "linux"): rows of [id, GOG's label, text]. */
+	requirements?: Record<string, { minimum?: [string, string, string][]; recommended?: [string, string, string][] }>;
 	requires?: string[];
 	includes?: string[];
 	includedIn?: string[];
@@ -74,9 +78,22 @@ export function apiProduct(o: ApiProductOptions): unknown {
 			productType: o.type ?? 'GAME',
 			tags: (o.genres ?? []).map((name) => ({ name })),
 			properties: (o.tags ?? []).map((name) => ({ name })),
-			supportedOperatingSystems: (o.os ?? ['windows']).map((name) => ({
-				operatingSystem: { name }
-			})),
+			supportedOperatingSystems: (o.os ?? ['windows']).map((name) => {
+				const wanted = o.requirements?.[name];
+				const rows = (list: [string, string, string][] = []) =>
+					list.map(([id, label, description]) => ({ id, name: label, description }));
+				return {
+					operatingSystem: { name },
+					...(wanted
+						? {
+								systemRequirements: [
+									...(wanted.minimum ? [{ type: 'minimum', description: '', requirements: rows(wanted.minimum) }] : []),
+									...(wanted.recommended ? [{ type: 'recommended', description: '', requirements: rows(wanted.recommended) }] : [])
+								]
+							}
+						: {})
+				};
+			}),
 			developers: (o.developers ?? []).map((name) => ({ name })),
 			publisher: { name: o.publisher ?? '' },
 			features: (o.features ?? []).map((name) => ({ name })),
@@ -94,6 +111,7 @@ export function apiProduct(o: ApiProductOptions): unknown {
 			...(o.backdrop
 				? { galaxyBackgroundImage: { href: `https://images.gog-statics.com/${o.backdrop}.jpg` } }
 				: {}),
+			...(o.store ? { store: { href: o.store } } : {}),
 			requiresGames: links(o.requires),
 			includesGames: links(o.includes),
 			isIncludedInGames: links(o.includedIn)
@@ -106,6 +124,11 @@ export function file(manualUrl: string, name: string, size = '1 GB', version = '
 	return { manualUrl, name, version, date: '', type: 'game', info: 1, size };
 }
 
+/** One of GOG's goodies in a details record, with GOG's word for its kind, such as "manuals". */
+export function extra(manualUrl: string, name: string, type: string, size = '10 MB'): unknown {
+	return { manualUrl, name, type, info: 1, size };
+}
+
 export interface ByOs {
 	windows?: unknown[];
 	mac?: unknown[];
@@ -115,7 +138,7 @@ export interface ByOs {
 export interface DetailsOptions {
 	english?: ByOs;
 	other?: [string, ByOs][];
-	dlcs?: { title: string; english: ByOs }[];
+	dlcs?: { title: string; english: ByOs; extras?: unknown[] }[];
 	extras?: unknown[];
 }
 
@@ -128,7 +151,7 @@ export function details(o: DetailsOptions): unknown {
 		dlcs: (o.dlcs ?? []).map((d) => ({
 			title: d.title,
 			downloads: [['English', d.english]],
-			extras: []
+			extras: d.extras ?? []
 		}))
 	};
 }
@@ -154,6 +177,7 @@ export const records = {
 			banner: BANNER['1001'],
 			backdrop: BACKDROP['1001'],
 			released: '2002-09-27T00:00:00+02:00',
+			store: 'https://www.gog.com/en/game/the_long_dark_road',
 			includedIn: ['3001']
 		}),
 		'1002': apiProduct({
@@ -200,12 +224,21 @@ export const records = {
 				mac: [file(`${road}/en2installer0`, 'The Long Dark Road', '7 GB', '2.1')],
 				linux: [file(`${road}/en3installer0`, 'The Long Dark Road', '7 GB', '2.1')]
 			},
+			extras: [
+				extra(`${road}/en0extra0`, 'manual', 'manuals', '12 MB'),
+				extra(`${road}/en0extra1`, 'original soundtrack', 'audio', '150 MB'),
+				// Listed by GOG, not in the archive.
+				extra(`${road}/en0extra2`, 'artbook', 'artworks', '30 MB'),
+				// A size vangogh reads as nothing: it never downloads it, and Canvas never asks.
+				extra(`${road}/en0extra3`, 'avatars', 'avatars', '0 MB')
+			],
 			dlcs: [
 				{
 					title: 'Road Expansion',
 					english: {
 						windows: [file('/downloads/road_expansion/en1installer0', 'Road Expansion', '500 MB')]
-					}
+					},
+					extras: [extra('/downloads/road_expansion/en0extra0', 'wallpapers', 'wallpapers', '5 MB')]
 				}
 			]
 		}),
@@ -234,5 +267,13 @@ export const records = {
 			'/downloads/windows_only_game/en1installer0': 'setup_windows_only_game_1.0.exe'
 		},
 		'1004': {}
+	} as Record<string, Record<string, string>>,
+	/** The extras vangogh has on disk, by product and address, with the name of the file. vangogh's file names never list them. */
+	extraFiles: {
+		'1001': {
+			[`${road}/en0extra0`]: 'the_long_dark_road_manual.pdf',
+			[`${road}/en0extra1`]: 'the_long_dark_road_ost.zip',
+			'/downloads/road_expansion/en0extra0': 'road_expansion_wallpapers.zip'
+		}
 	} as Record<string, Record<string, string>>
 };

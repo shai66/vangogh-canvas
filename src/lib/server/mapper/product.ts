@@ -1,4 +1,4 @@
-import type { Os } from '../../types';
+import type { Os, RequirementRow, RequirementSet, Requirements } from '../../types';
 import { imageIdFromUrl } from './imageId';
 import { arr, names, obj, str, unique } from './raw';
 import { sanitizeDescription } from './sanitize';
@@ -29,6 +29,8 @@ export interface MappedProduct {
 	backdrop: string | null;
 	releaseYear: number | null;
 	macNotice: string | null;
+	requirements: Requirements;
+	storeUrl: string | null;
 	requires: Related[];
 	includes: Related[];
 	includedIn: Related[];
@@ -121,6 +123,68 @@ export function macNoticeOf(x: unknown): string | null {
 	return null;
 }
 
+/** A text longer than this is not what GOG writes into a row of requirements, and is left out. */
+const MAX_REQUIREMENT = 2_000;
+
+/** A row's text without a leading copy of its own label: "Processor: Quad Core" is "Quad Core". */
+function withoutLabel(text: string, labels: string[]): string {
+	const lower = text.toLowerCase();
+	for (const label of labels) {
+		if (label !== '' && lower.startsWith(`${label.toLowerCase()}:`)) return text.slice(label.length + 1).trim();
+	}
+	return text;
+}
+
+function requirementRows(x: unknown): RequirementRow[] {
+	const rows: RequirementRow[] = [];
+	for (const item of arr(x)) {
+		const row = obj(item);
+		const id = str(row.id).toLowerCase();
+		const name = str(row.name).replace(/\s*:\s*$/, '');
+		const text = withoutLabel(str(row.description).replace(/\s+/g, ' '), [name, id]);
+		if ((id === '' && name === '') || text === '' || text.length > MAX_REQUIREMENT) continue;
+		rows.push({ id, name: name || id, text });
+	}
+	return rows;
+}
+
+/**
+ * GOG's system requirements, per system Canvas knows. The first entry of a system counts. A
+ * system without rows has no entry. Never throws, whatever it is given.
+ */
+export function requirementsOf(systems: unknown): Requirements {
+	const out: Requirements = {};
+	for (const item of arr(systems)) {
+		const system = obj(item);
+		const os = OS_BY_NAME.get(str(obj(system.operatingSystem).name).toLowerCase());
+		if (!os || os in out) continue;
+		const set: RequirementSet = { minimum: [], recommended: [] };
+		for (const entry of arr(system.systemRequirements)) {
+			const group = obj(entry);
+			const type = str(group.type).toLowerCase();
+			if (type === 'minimum' || type === 'recommended') set[type].push(...requirementRows(group.requirements));
+		}
+		if (set.minimum.length > 0 || set.recommended.length > 0) out[os] = set;
+	}
+	return out;
+}
+
+/**
+ * The address of the game's page on GOG.com, `_links.store.href`, or null. Only an `https`
+ * address on the host `www.gog.com`, without userinfo or a port, is taken: nothing else from a record may become a link.
+ */
+export function storeUrlOf(x: unknown): string | null {
+	const href = str(obj(x).href);
+	if (href === '') return null;
+	try {
+		const url = new URL(href);
+		const plain = url.username === '' && url.password === '' && url.port === '';
+		return url.protocol === 'https:' && url.hostname === 'www.gog.com' && plain ? url.href : null;
+	} catch {
+		return null;
+	}
+}
+
 /** Maps a `gog-api-products` record. Never throws, whatever it is given. */
 export function mapApiProduct(raw: unknown): MappedProduct {
 	const root = obj(raw);
@@ -167,6 +231,8 @@ export function mapApiProduct(raw: unknown): MappedProduct {
 		// When the game first came out. `gogReleaseDate`, next to it, is when it came to GOG.
 		releaseYear: yearOf(obj(embedded.product).globalReleaseDate),
 		macNotice: macNoticeOf(root.additionalRequirements),
+		requirements: requirementsOf(embedded.supportedOperatingSystems),
+		storeUrl: storeUrlOf(links.store),
 		requires: related(links.requiresGames),
 		includes: related(links.includesGames),
 		includedIn: related(links.isIncludedInGames)

@@ -57,6 +57,14 @@ export function buttonTarget(detail: Detail, visitor: Visitor, picked: Os | null
 	return offered.find((os) => os === visitor) ?? offered[0] ?? null;
 }
 
+/**
+ * The system a tab of the file list turns the main button to, or null when the tab leaves the
+ * button where it is: the tab of a system for which only a DLC has files.
+ */
+export function buttonForTab(detail: Detail, tab: Os): Os | null {
+	return buttonSystems(detail).includes(tab) ? tab : null;
+}
+
 export function totalBytes(files: FileEntry[]): number {
 	return files.reduce((sum, file) => sum + (Number.isFinite(file.sizeBytes) ? file.sizeBytes : 0), 0);
 }
@@ -131,4 +139,19 @@ export function notePlace(note: MacNote | null, target: Os | null, tab: Os | nul
 /** True while the main button must not be yellow: it is on macOS, and GOG itself says the installer will not work. */
 export function discouraged(note: MacNote | null, target: Os | null): boolean {
 	return note?.kind === 'gog' && target === 'macos';
+}
+
+/**
+ * True while the main button is yellow. Yellow says "press this": only for the visitor's own
+ * computer, until it was pressed for that system, and not where GOG itself says that the
+ * installer will not work. Another system, chosen by a tab or by the switch, gets the quiet button.
+ */
+export function isPrimary(
+	kind: BlockKind,
+	visitor: Visitor,
+	target: Os | null,
+	pressed: boolean,
+	note: MacNote | null
+): boolean {
+	return kind === 'mine' && target !== null && target === visitor && !pressed && !discouraged(note, target);
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { details, file, records } from '../testing/fixtures';
+import { details, extra, file, records } from '../testing/fixtures';
 import { mapDetails } from './downloads';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 
@@ -118,12 +118,44 @@ describe('mapDetails', () => {
 		expect(byOs.linux?.map((f) => f.name)).toEqual(['C']);
 	});
 
+	it('reads the extras of the game and of its DLC that vangogh downloads', () => {
+		expect(mapped.extras).toEqual([
+			{ manualUrl: '/downloads/the_long_dark_road/en0extra0', name: 'manual', kind: 'manuals', sizeText: '12 MB', sizeBytes: 12 * 1024 ** 2 },
+			{ manualUrl: '/downloads/the_long_dark_road/en0extra1', name: 'original soundtrack', kind: 'audio', sizeText: '150 MB', sizeBytes: 150 * 1024 ** 2 },
+			{ manualUrl: '/downloads/the_long_dark_road/en0extra2', name: 'artbook', kind: 'artworks', sizeText: '30 MB', sizeBytes: 30 * 1024 ** 2 },
+			{ manualUrl: '/downloads/road_expansion/en0extra0', name: 'wallpapers', kind: 'wallpapers', sizeText: '5 MB', sizeBytes: 5 * 1024 ** 2 }
+		]);
+	});
+
+	it('takes an extra once, and leaves out one without an address or with a size vangogh does not read', () => {
+		const record = details({
+			extras: [
+				extra('/downloads/g/en0extra0', 'manual', 'Manuals', '1 MB'),
+				extra('/downloads/g/en0extra0', 'manual again', 'manuals', '1 MB'),
+				extra('', 'no address', 'manuals', '1 MB'),
+				extra('/downloads/g/en0extra1', 'odd size', 'audio', '1.5GB'),
+				{ manualUrl: '/downloads/g/en0extra2', name: 42, type: null, size: '2 MB' }
+			],
+			dlcs: [{ title: 'Expansion', english: {}, extras: [extra('/downloads/g/en0extra0', 'same address', 'manuals', '1 MB')] }]
+		});
+		expect(mapDetails(record).extras).toEqual([
+			{ manualUrl: '/downloads/g/en0extra0', name: 'manual', kind: 'manuals', sizeText: '1 MB', sizeBytes: 1024 ** 2 },
+			{ manualUrl: '/downloads/g/en0extra2', name: '', kind: '', sizeText: '2 MB', sizeBytes: 2 * 1024 ** 2 }
+		]);
+	});
+
+	it('has no extras for a record without any, whatever it holds', () => {
+		expect(mapDetails(details({})).extras).toEqual([]);
+		expect(mapDetails({ extras: 'none', dlcs: [null, { extras: [null, 'x'] }] }).extras).toEqual([]);
+	});
+
 	it.each([[null], [undefined], ['text'], [[]], [{}], [{ downloads: 'x', dlcs: {} }], [{ downloads: [['English']] }]])(
 		'survives %j',
 		(raw) => {
 			expect(mapDetails(raw)).toEqual({
 				downloads: { language: null, byOs: {} },
 				dlcs: [],
+				extras: [],
 				offersInstallers: false
 			});
 		}

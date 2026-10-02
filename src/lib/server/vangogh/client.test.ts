@@ -84,6 +84,27 @@ describe('VangoghClient', () => {
 		expect(fake.loginAttempts).toBe(2);
 	});
 
+	it('says unknown before any login, ok after an accepted one, and rejected after a refusal', async () => {
+		const c = client();
+		expect(c.loginState).toBe('unknown');
+		await c.availableProducts();
+		expect(c.loginState).toBe('ok');
+
+		const wrong = client({ password: 'wrong' });
+		await wrong.availableProducts().catch(() => undefined);
+		expect(wrong.loginState).toBe('rejected');
+		// Allowed to try again: nothing is known until vangogh answers.
+		wrong.resetAuth();
+		expect(wrong.loginState).toBe('unknown');
+	});
+
+	it('stays unknown while vangogh cannot be reached', async () => {
+		fake.down = true;
+		const c = client();
+		await c.availableProducts().catch(() => undefined);
+		expect(c.loginState).toBe('unknown');
+	});
+
 	it('reports an unreachable vangogh', async () => {
 		fake.down = true;
 		await expect(client().availableProducts()).rejects.toBeInstanceOf(VangoghUnreachable);
@@ -163,6 +184,57 @@ describe('VangoghClient', () => {
 	it('gives the answer back as it is when a file is missing', async () => {
 		const res = await client().file({ productId: '1002', downloadType: 'installer', manualUrl: '/nope' });
 		expect(res.status).toBe(404);
+	});
+
+	it('asks with HEAD whether a file is on disk, and gives its name', async () => {
+		const name = await client().fileOnDisk({
+			productId: '1001',
+			downloadType: 'extra',
+			manualUrl: '/downloads/the_long_dark_road/en0extra0'
+		});
+		expect(name).toBe('the_long_dark_road_manual.pdf');
+		expect(fake.requests.at(-1)).toBe('HEAD /api/gog/manual-url/1001/extra/downloads/the_long_dark_road/en0extra0');
+	});
+
+	it('gives null for a file that is not on disk', async () => {
+		expect(
+			await client().fileOnDisk({ productId: '1001', downloadType: 'extra', manualUrl: '/downloads/the_long_dark_road/en0extra2' })
+		).toBeNull();
+	});
+
+	it('throws for another answer, without the address in the message', async () => {
+		const stub = async (input: string | URL | Request, init?: RequestInit): Promise<Response> =>
+			String(input).endsWith('/api/auth-user')
+				? new Response(JSON.stringify({ token: 't' }), { status: 200 })
+				: new Response(null, { status: init?.method === 'HEAD' ? 500 : 200 });
+		const c = new VangoghClient({ url: fake.url, username: 'api', password: 'secret', fetch: stub as typeof fetch });
+		const error = await c.fileOnDisk({ productId: '1001', downloadType: 'extra', manualUrl: '/downloads/secret_slug/x' }).catch((e) => e);
+		expect(error).toBeInstanceOf(VangoghHttpError);
+		expect(error.status).toBe(500);
+		expect(String(error.message)).not.toContain('secret_slug');
+	});
+
+	it('takes the last part of the address as the name when vangogh names none', async () => {
+		const stub = async (input: string | URL | Request): Promise<Response> =>
+			String(input).endsWith('/api/auth-user')
+				? new Response(JSON.stringify({ token: 't' }), { status: 200 })
+				: new Response(null, { status: 200 });
+		const c = new VangoghClient({ url: fake.url, username: 'api', password: 'secret', fetch: stub as typeof fetch });
+		expect(await c.fileOnDisk({ productId: '1001', downloadType: 'extra', manualUrl: '/downloads/g/en0extra7' })).toBe('en0extra7');
+	});
+
+	it('answers null for an address with dot segments, before it asks', async () => {
+		const name = await client().fileOnDisk({ productId: '1001', downloadType: 'extra', manualUrl: '/../api/metadata/x' });
+		expect(name).toBeNull();
+		expect(fake.requests.some((r) => r.startsWith('HEAD'))).toBe(false);
+	});
+
+	it('gives up on a check that hangs, after the timeout of JSON calls', async () => {
+		fake.hang = true;
+		const error = await client({ timeoutMs: 100 })
+			.fileOnDisk({ productId: '1001', downloadType: 'extra', manualUrl: '/downloads/the_long_dark_road/en0extra0' })
+			.catch((e) => e);
+		expect(error).toBeInstanceOf(VangoghUnreachable);
 	});
 
 	it('stops a request when its signal is aborted', async () => {

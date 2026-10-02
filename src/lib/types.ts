@@ -20,8 +20,12 @@ export interface ListEntry {
 	poster: string | null;
 	/** Image id of the wide image with the game's logo. It stands in for a missing poster. */
 	banner: string | null;
+	/** The year the game first came out, which is not the year it came to GOG. Null when GOG names none. */
+	releaseYear: number | null;
 	/** Titles of the nested DLC. */
 	dlc: string[];
+	/** GOG's kind of each extra in the archive, such as "manuals", in the order of the panel. Its length is the pill's number. */
+	extraKinds: string[];
 	/** Position in the library list. */
 	order: number;
 	/** False when the record was broken and only title and OS are known. */
@@ -51,6 +55,36 @@ export interface DlcDetail {
 	downloads: Downloads;
 }
 
+/** One of GOG's goodies that is in the archive: a manual, a soundtrack, artwork. */
+export interface ExtraFile {
+	fileId: string;
+	/** As GOG names it, such as "manual (German)". */
+	name: string;
+	/** GOG's word for its kind, such as "manuals". */
+	kind: string;
+	/** Size as GOG gives it, such as "1500 MB". */
+	sizeText: string;
+	sizeBytes: number;
+}
+
+/** One row of system requirements as GOG writes it: id "memory", label "Memory", text "4 GB RAM". */
+export interface RequirementRow {
+	/** GOG's id of the row, in lower case, such as "memory". */
+	id: string;
+	/** GOG's label without its colon, such as "Memory". The interface names known rows in its own words. */
+	name: string;
+	text: string;
+}
+
+/** What GOG says a computer needs to run the game, for one system. Either list may be empty. */
+export interface RequirementSet {
+	minimum: RequirementRow[];
+	recommended: RequirementRow[];
+}
+
+/** By system. A system GOG lists no requirements for has no entry. */
+export type Requirements = Partial<Record<Os, RequirementSet>>;
+
 export interface Detail extends Omit<ListEntry, 'dlc'> {
 	/** Sanitised HTML. */
 	description: string;
@@ -60,14 +94,18 @@ export interface Detail extends Omit<ListEntry, 'dlc'> {
 	screenshots: string[];
 	/** Image id of the wide artwork without the logo, shown behind the head of the detail. */
 	backdrop: string | null;
-	/** The year the game first came out, which is not the year it came to GOG. Null when GOG names none. */
-	releaseYear: number | null;
 	/** What GOG says about the macOS installer of the game ("Mac notice"), as plain text. Null when GOG says nothing. */
 	macNotice: string | null;
+	/** GOG's system requirements. Empty when GOG lists none. */
+	requirements: Requirements;
+	/** The game's page on GOG.com, always an https address on www.gog.com, or null. */
+	storeUrl: string | null;
 	downloads: Downloads;
 	/** Null for English, otherwise the language the downloads are in. */
 	downloadLanguage: string | null;
 	dlc: DlcDetail[];
+	/** The extras in the archive, in the order of the panel. */
+	extras: ExtraFile[];
 	/** For an orphaned DLC: the game it needs. */
 	requires: string | null;
 	/** Titles of owned packs that include the game. */

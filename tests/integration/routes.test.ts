@@ -182,7 +182,7 @@ describe('the pages, as the server draws them', () => {
 	it('shows the year of the original release after the makers', async () => {
 		const { html } = await page('/game/1001');
 		expect(html.match(/<p class="detail-makers"[^>]*>([\s\S]*?)<\/p>/)?.[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()).toBe(
-			'Šťastný Studio, published by Road Works, 2002'
+			'Šťastný Studio, published by Road Works, 2002 · GOG.com'
 		);
 	});
 
@@ -321,6 +321,18 @@ describe('the routes', () => {
 	it('checks a file without sending it', async () => {
 		const res = await fetch(`${base}/download/1001/${await firstFile()}`, { method: 'HEAD' });
 		expect(res.status).toBe(200);
+	});
+
+	it('serves an extra, whole and in part, by the name vangogh gives it', async () => {
+		const detail = (await (await fetch(`${base}/api/games/1001`)).json()) as Detail;
+		expect(detail.extras.map((e) => e.kind)).toEqual(['manuals', 'audio', 'wallpapers']);
+		const manual = detail.extras[0];
+		const whole = await fetch(`${base}/download/1001/${manual.fileId}`);
+		expect(whole.status).toBe(200);
+		expect(whole.headers.get('content-disposition')).toContain('the_long_dark_road_manual.pdf');
+		const part = await fetch(`${base}/download/1001/${manual.fileId}`, { headers: { range: 'bytes=0-6' } });
+		expect(part.status).toBe(206);
+		expect(await part.text()).toBe('content');
 	});
 
 	it('answers 404 for a file that is not in the index', async () => {
@@ -614,7 +626,9 @@ describe('what a browser cannot make Canvas do', () => {
 			'GET /api/metadata/gog-details/',
 			'GET /api/gog/filenames/',
 			'GET /api/gog/image/',
-			'GET /api/gog/manual-url/'
+			'GET /api/gog/manual-url/',
+			// Whether an extra is on disk.
+			'HEAD /api/gog/manual-url/'
 		];
 		expect(fake.requests.length).toBeGreaterThan(0);
 		expect(fake.requests.filter((r) => r.includes('other-record'))).toEqual([]);
@@ -667,6 +681,8 @@ describe('the start', () => {
 			const res = await fetch(`http://127.0.0.1:${port}/api/index`);
 			expect(res.status).toBe(503);
 			expect(await res.json()).toEqual({ error: 'index-not-ready' });
+			// vangogh was never reached: nothing is known of the password yet.
+			expect((await (await fetch(`http://127.0.0.1:${port}/healthz`)).json()).login).toBe('unknown');
 			// Every page says so in plain words, and asks again by itself.
 			for (const path of ['/', '/game/1001', '/?q=road']) {
 				const page = await fetch(`http://127.0.0.1:${port}${path}`);

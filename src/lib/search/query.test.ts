@@ -18,7 +18,9 @@ function entry(over: Partial<ListEntry> & { id: string; title: string }): ListEn
 		coop: false,
 		poster: null,
 		banner: null,
+		releaseYear: null,
 		dlc: [],
+		extraKinds: [],
 		order: 0,
 		complete: true,
 		hasFiles: true,
@@ -140,6 +142,17 @@ describe('query', () => {
 		expect(ids({ sort: 'recent' })).toEqual(['1', '2', '3']);
 	});
 
+	it('sorts by release year, newest first, a game without a year last, and equal years by title', () => {
+		const older = entry({ id: 'o', title: 'Older', releaseYear: 1998 });
+		const newer = entry({ id: 'n', title: 'Newer', releaseYear: 2015 });
+		const same = entry({ id: 's', title: 'The Also', releaseYear: 2015 });
+		const none = entry({ id: 'x', title: 'Aardvark' });
+		const alsoNone = entry({ id: 'y', title: 'Zebra' });
+		const sorted = query([alsoNone, none, older, newer, same], { ...DEFAULT_STATE, sort: 'year' });
+		// "The Also" sorts as "Also", before "Newer"; two games without a year go by title.
+		expect(sorted.map((m) => m.entry.id)).toEqual(['s', 'n', 'o', 'x', 'y']);
+	});
+
 	it('filters by any of the chosen systems', () => {
 		expect(ids({ os: ['linux'] })).toEqual(['2', '3']);
 		expect(ids({ os: ['macos', 'windows'] })).toEqual(['2', '3', '1']);
@@ -253,7 +266,8 @@ describe.skipIf(!existsSync('samples/available-products.json'))('query on the re
 			{
 				availableProducts: async () => read('available-products.json'),
 				metadata: async (type, id) => read(`metadata/${type}/${id}.json`),
-				filenames: async (id) => (read(`filenames/${id}.json`) ?? {}) as Record<string, string>
+				filenames: async (id) => (read(`filenames/${id}.json`) ?? {}) as Record<string, string>,
+				fileOnDisk: async () => null
 			},
 			silentLogger
 		);

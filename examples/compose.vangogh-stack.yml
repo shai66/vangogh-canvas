@@ -61,7 +61,7 @@ services:
       VANGOGH_USERNAME: ${VANGOGH_USERNAME:?set VANGOGH_USERNAME in .env}
       VANGOGH_PASSWORD: ${VANGOGH_PASSWORD:?set VANGOGH_PASSWORD in .env}
       REBUILD_AT: ${REBUILD_AT:-04:30}
-      TZ: ${TZ:-Europe/Bratislava}
+      TZ: ${TZ:-UTC}
     volumes:
       - canvas-cache:/cache
     read_only: true

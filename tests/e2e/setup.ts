@@ -5,7 +5,7 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fixtureData, startFakeVangogh, type FakeData } from '../../src/lib/server/testing/fake-vangogh';
-import { apiProduct, details, file, POSTER } from '../../src/lib/server/testing/fixtures';
+import { apiProduct, details, extra, file, POSTER } from '../../src/lib/server/testing/fixtures';
 
 // The smallest picture a browser shows: one transparent pixel.
 const PIXEL = Buffer.from(
@@ -80,6 +80,142 @@ function macLibrary(): FakeData {
 	};
 }
 
+/**
+ * A library of its own for the extras and the system requirements:
+ *   3101  three systems, co-op and multiplayer, 12 DLC, 24 extras of eight kinds in the archive,
+ *         system requirements for Windows and macOS but not for Linux, first released 2015
+ *   3102  Windows only, two extras, minimum requirements for Windows, first released 1998
+ *   3103  Windows and Linux, no extras, no requirements, no year, no makers, a store address
+ */
+function richLibrary(): FakeData {
+	const keeper = '/downloads/lantern_keeper';
+	const small = '/downloads/small_hours';
+	const quiet = '/downloads/quiet_archive';
+	const filenames: Record<string, Record<string, string>> = {
+		'3101': {
+			[`${keeper}/en1installer0`]: 'setup_lantern_keeper_1.0.exe',
+			[`${keeper}/en2installer0`]: 'lantern_keeper_1.0.pkg',
+			[`${keeper}/en3installer0`]: 'lantern_keeper_1_0.sh'
+		},
+		'3102': { [`${small}/en1installer0`]: 'setup_small_hours_1.0.exe' },
+		'3103': {
+			[`${quiet}/en1installer0`]: 'setup_quiet_archive_1.0.exe',
+			[`${quiet}/en3installer0`]: 'quiet_archive_1_0.sh'
+		}
+	};
+	const files: FakeData['files'] = {};
+	for (const [id, names] of Object.entries(filenames)) {
+		for (const [manualUrl, name] of Object.entries(names)) {
+			files[`${id}/installer/${manualUrl.slice(1)}`] = { name, body: Buffer.from(`content of ${name}`) };
+		}
+	}
+	const onDisk = (id: string, manualUrl: string, name: string) => {
+		files[`${id}/extra/${manualUrl.slice(1)}`] = { name, body: Buffer.from(`content of ${name}`) };
+	};
+
+	// 24 extras of 3101 in the archive: four or two of each kind, the last a kind GOG may add later.
+	const kinds: [string, string, number][] = [
+		['manuals', 'manual', 4],
+		['audio', 'soundtrack', 4],
+		['artworks', 'artwork', 4],
+		['wallpapers', 'wallpaper', 4],
+		['avatars', 'avatars', 2],
+		['video', 'video', 2],
+		['game add-ons', 'add-on', 2],
+		['comic book', 'comic', 2]
+	];
+	const keeperExtras: unknown[] = [];
+	let n = 0;
+	for (const [kind, word, count] of kinds) {
+		for (let i = 1; i <= count; i++) {
+			const manualUrl = `${keeper}/en0extra${n++}`;
+			const name = `${word} ${i}`;
+			keeperExtras.push(extra(manualUrl, name, kind, '12 MB'));
+			onDisk('3101', manualUrl, `lantern_keeper_${name.replace(/\W+/g, '_')}.zip`);
+		}
+	}
+	// Two more that GOG lists and the panel leaves out: one vangogh never downloads, one not in the archive.
+	keeperExtras.push(extra(`${keeper}/en0extra90`, 'empty', 'manuals', '0 MB'));
+	keeperExtras.push(extra(`${keeper}/en0extra91`, 'lost artbook', 'artworks', '40 MB'));
+
+	const smallExtras = [extra(`${small}/en0extra0`, 'manual', 'manuals', '8 MB'), extra(`${small}/en0extra1`, 'soundtrack', 'audio', '90 MB')];
+	onDisk('3102', `${small}/en0extra0`, 'small_hours_manual.pdf');
+	onDisk('3102', `${small}/en0extra1`, 'small_hours_soundtrack.zip');
+
+	return {
+		username: 'api',
+		password: 'secret',
+		library: [
+			{
+				id: '3101',
+				tt: 'Lantern Keeper',
+				os: [1, 2, 3],
+				dlc: Object.fromEntries(Array.from({ length: 12 }, (_, i) => [String(3201 + i), `Keeper Pack ${i + 1}`]))
+			},
+			{ id: '3102', tt: 'Small Hours', os: [1] },
+			{ id: '3103', tt: 'Quiet Archive', os: [1, 3] }
+		],
+		metadata: {
+			'gog-api-products/3101': apiProduct({
+				title: 'Lantern Keeper',
+				os: ['windows', 'osx', 'linux'],
+				genres: ['Adventure'],
+				features: ['Single-player', 'Co-op', 'Multi-player'],
+				released: '2015-03-01T00:00:00+01:00',
+				requirements: {
+					windows: {
+						minimum: [
+							['system', 'System:', 'Windows 10'],
+							['processor', 'Processor:', 'Processor: Dual core 2 GHz'],
+							['memory', 'Memory:', '4 GB RAM'],
+							['network', 'Network:', '']
+						],
+						recommended: [
+							['system', 'System:', 'Windows 11'],
+							['memory', 'Memory:', '8 GB RAM']
+						]
+					},
+					osx: { minimum: [['system', 'System:', 'macOS 12'], ['memory', 'Memory:', '8 GB RAM']] }
+				}
+			}),
+			'gog-details/3101': details({
+				english: {
+					windows: [file(`${keeper}/en1installer0`, 'Lantern Keeper', '1 GB')],
+					mac: [file(`${keeper}/en2installer0`, 'Lantern Keeper', '1 GB')],
+					linux: [file(`${keeper}/en3installer0`, 'Lantern Keeper', '1 GB')]
+				},
+				extras: keeperExtras
+			}),
+			'gog-api-products/3102': apiProduct({
+				title: 'Small Hours',
+				os: ['windows'],
+				genres: ['Puzzle'],
+				released: '1998-05-01T00:00:00+02:00',
+				requirements: { windows: { minimum: [['system', 'System:', 'Windows 98'], ['memory', 'Memory:', '64 MB RAM']] } }
+			}),
+			'gog-details/3102': details({
+				english: { windows: [file(`${small}/en1installer0`, 'Small Hours', '200 MB')] },
+				extras: smallExtras
+			}),
+			'gog-api-products/3103': apiProduct({
+				title: 'Quiet Archive',
+				os: ['windows', 'linux'],
+				genres: ['Strategy'],
+				store: 'https://www.gog.com/en/game/quiet_archive'
+			}),
+			'gog-details/3103': details({
+				english: {
+					windows: [file(`${quiet}/en1installer0`, 'Quiet Archive', '300 MB')],
+					linux: [file(`${quiet}/en3installer0`, 'Quiet Archive', '300 MB')]
+				}
+			})
+		},
+		filenames,
+		images: {},
+		files
+	};
+}
+
 function freePort(): Promise<number> {
 	return new Promise((resolve, reject) => {
 		const server = createServer();
@@ -102,15 +238,19 @@ async function waitFor(url: string, wanted: number, output: () => string): Promi
 }
 
 /**
- * Starts two fake vangoghs and three copies of the built app:
+ * Starts three fake vangoghs and four copies of the built app:
  *   CANVAS_URL        a Canvas with the library of the fixtures
  *   CANVAS_EMPTY_URL  a Canvas whose vangogh is not there, so it has no library yet
  *   CANVAS_MAC_URL    a Canvas with the two games of macLibrary()
+ *   CANVAS_RICH_URL   a Canvas with the three games of richLibrary()
  */
 export default async function setup(): Promise<() => Promise<void>> {
 	if (!existsSync('build/index.js')) throw new Error('run "npm run build" first');
 
 	const data = fixtureData();
+	// No extras in this library: the browser tests of the extras have a library of their own,
+	// and the tests of this one count what the detail of 1001 shows.
+	for (const key of Object.keys(data.files)) if (key.includes('/extra/')) delete data.files[key];
 	// The fixtures' pictures are words. A browser needs real ones.
 	for (const id of Object.keys(data.images)) data.images[id] = { type: 'image/png', body: PIXEL };
 	// 1002 loses its portrait poster in the archive: its wide image has to stand in.
@@ -153,6 +293,7 @@ export default async function setup(): Promise<() => Promise<void>> {
 	};
 	const fake = await startFakeVangogh(data);
 	const macFake = await startFakeVangogh(macLibrary());
+	const richFake = await startFakeVangogh(richLibrary());
 
 	const cache = await mkdtemp(join(tmpdir(), 'canvas-e2e-'));
 	const children: ChildProcess[] = [];
@@ -171,6 +312,7 @@ export default async function setup(): Promise<() => Promise<void>> {
 	const emptyPort = await freePort();
 	const closedPort = await freePort();
 	const macPort = await freePort();
+	const richPort = await freePort();
 	launch({
 		PORT: String(port),
 		VANGOGH_URL: fake.url,
@@ -179,18 +321,22 @@ export default async function setup(): Promise<() => Promise<void>> {
 	});
 	launch({ PORT: String(emptyPort), VANGOGH_URL: `http://127.0.0.1:${closedPort}`, CACHE_DIR: join(cache, 'empty') });
 	launch({ PORT: String(macPort), VANGOGH_URL: macFake.url, CACHE_DIR: join(cache, 'mac'), TZ: 'UTC' });
+	launch({ PORT: String(richPort), VANGOGH_URL: richFake.url, CACHE_DIR: join(cache, 'rich'), TZ: 'UTC' });
 
 	process.env.CANVAS_URL = `http://127.0.0.1:${port}`;
 	process.env.CANVAS_EMPTY_URL = `http://127.0.0.1:${emptyPort}`;
 	process.env.CANVAS_MAC_URL = `http://127.0.0.1:${macPort}`;
+	process.env.CANVAS_RICH_URL = `http://127.0.0.1:${richPort}`;
 	try {
 		await waitFor(`${process.env.CANVAS_URL}/healthz`, 200, () => output);
 		await waitFor(`${process.env.CANVAS_EMPTY_URL}/healthz`, 503, () => output);
 		await waitFor(`${process.env.CANVAS_MAC_URL}/healthz`, 200, () => output);
+		await waitFor(`${process.env.CANVAS_RICH_URL}/healthz`, 200, () => output);
 	} catch (error) {
 		for (const child of children) child.kill('SIGKILL');
 		await fake.close();
 		await macFake.close();
+		await richFake.close();
 		throw error;
 	}
 
@@ -198,6 +344,7 @@ export default async function setup(): Promise<() => Promise<void>> {
 		for (const child of children) child.kill('SIGKILL');
 		await fake.close();
 		await macFake.close();
+		await richFake.close();
 		await rm(cache, { recursive: true, force: true });
 	};
 }

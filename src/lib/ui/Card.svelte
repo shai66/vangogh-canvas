@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { kindCounts } from '$lib/extras';
 	import { genreName } from '$lib/genres';
 	import type { Match } from '$lib/search/query';
 	import { t } from '$lib/strings';
@@ -8,10 +9,12 @@
 
 	interface Props {
 		match: Match;
+		/** True while the list is sorted by release year: the year leads the genre line. */
+		showYear?: boolean;
 		/** Called for a click. The card is a link and works without it. */
 		onopen?: (event: MouseEvent, href: string) => void;
 	}
-	let { match, onopen }: Props = $props();
+	let { match, showYear = false, onopen }: Props = $props();
 
 	const entry = $derived(match.entry);
 	const missing = $derived(entry.complete && !entry.hasFiles);
@@ -71,6 +74,12 @@
 			{#if entry.dlc.length > 0}
 				<span class="dlc" title={entry.dlc.join(', ')}>{t.card.dlc(entry.dlc.length)}</span>
 			{/if}
+			{#if entry.extraKinds.length > 0}
+				<!-- The extras: a gift and the number, in the look of the DLC pill. -->
+				<span class="dlc xtr" title={t.extras.pill(t.extras.kinds(kindCounts(entry.extraKinds)))}>
+					<Icon name="gift" /><span aria-hidden="true">{entry.extraKinds.length}</span><span class="sr">{t.extras.count(entry.extraKinds.length)}</span>
+				</span>
+			{/if}
 			<span class="group people">
 				{#if entry.coop}
 					<span title={t.together.coop}><Icon name="coop" /><span class="sr">{t.together.coop}</span></span>
@@ -84,7 +93,7 @@
 			<div class="card-reason" title={reason}>{reason}</div>
 		{:else}
 			<div class="card-genres" title={entry.genres.map(genreName).join(', ')}>
-				{#each entry.genres as genre (genre)}<span>{genreName(genre)}</span>{/each}
+				{#if showYear && entry.releaseYear}<span class="year">{entry.releaseYear}</span>{/if}{#each entry.genres as genre (genre)}<span>{genreName(genre)}</span>{/each}
 			</div>
 		{/if}
 	</div>

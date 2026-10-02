@@ -39,7 +39,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
 		throw new ConfigError('REBUILD_AT must be a time as HH:MM');
 	}
 
-	const timeZone = value('TZ') || 'Europe/Bratislava';
+	const timeZone = value('TZ') || 'UTC';
 	try {
 		new Intl.DateTimeFormat('en', { timeZone });
 	} catch {

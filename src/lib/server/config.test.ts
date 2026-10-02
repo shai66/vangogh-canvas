@@ -14,7 +14,7 @@ describe('loadConfig', () => {
 			username: 'api',
 			password: 'secret',
 			rebuildAt: '04:30',
-			timeZone: 'Europe/Bratislava',
+			timeZone: 'UTC',
 			customLogo: null,
 			cacheDir: '/cache'
 		});
@@ -29,13 +29,13 @@ describe('loadConfig', () => {
 		const config = loadConfig({
 			...required,
 			REBUILD_AT: '23:05',
-			TZ: 'UTC',
+			TZ: 'Europe/Bratislava',
 			CUSTOM_LOGO: '/logo/vangog.svg',
 			CACHE_DIR: '/tmp/cache'
 		});
 		expect(config).toMatchObject({
 			rebuildAt: '23:05',
-			timeZone: 'UTC',
+			timeZone: 'Europe/Bratislava',
 			customLogo: '/logo/vangog.svg',
 			cacheDir: '/tmp/cache'
 		});

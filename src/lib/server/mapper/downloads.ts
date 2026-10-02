@@ -1,3 +1,4 @@
+import { vangoghDownloads } from '../../extras';
 import { ALL_OS, type Os } from '../../types';
 import { arr, obj, str } from './raw';
 import { parseSize } from './size';
@@ -23,9 +24,20 @@ export interface MappedDlc {
 	downloads: MappedDownloads;
 }
 
+export interface MappedExtra {
+	manualUrl: string;
+	name: string;
+	/** GOG's word for its kind, in lower case, such as "manuals". */
+	kind: string;
+	sizeText: string;
+	sizeBytes: number;
+}
+
 export interface MappedDetails {
 	downloads: MappedDownloads;
 	dlcs: MappedDlc[];
+	/** The extras of the product and of its DLC, nested ones included, once per address, only those vangogh downloads. */
+	extras: MappedExtra[];
 	/**
 	 * True when the record lists at least one installer file of a known system,
 	 * in any language, of the product or of any of its DLC. Extras do not count.
@@ -116,15 +128,31 @@ function collectDlcs(x: unknown, out: MappedDlc[], depth: number): void {
 	}
 }
 
+function collectExtras(x: unknown, out: MappedExtra[], depth: number): void {
+	if (depth > MAX_DEPTH) return;
+	const record = obj(x);
+	for (const item of arr(record.extras)) {
+		const entry = obj(item);
+		const manualUrl = str(entry.manualUrl);
+		const sizeText = str(entry.size);
+		if (manualUrl === '' || !vangoghDownloads(sizeText) || out.some((e) => e.manualUrl === manualUrl)) continue;
+		out.push({ manualUrl, name: str(entry.name), kind: str(entry.type).toLowerCase(), sizeText, sizeBytes: parseSize(sizeText) });
+	}
+	for (const dlc of arr(record.dlcs)) collectExtras(dlc, out, depth + 1);
+}
+
 /** Maps a `gog-details` record. Never throws, whatever it is given. */
 export function mapDetails(raw: unknown): MappedDetails {
 	const root = obj(raw);
 	const dlcs: MappedDlc[] = [];
 	collectDlcs(root.dlcs, dlcs, 0);
+	const extras: MappedExtra[] = [];
+	// The record itself is one level above the DLC, which start at depth 0.
+	collectExtras(root, extras, -1);
 	return {
 		downloads: mapDownloads(root.downloads),
 		dlcs,
-		// The record itself is one level above the DLC, which start at depth 0.
+		extras,
 		offersInstallers: offers(root, -1)
 	};
 }
