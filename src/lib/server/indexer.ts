@@ -9,6 +9,7 @@ import {
 	type Kind,
 	type ListEntry
 } from '../types';
+import { collect, type Member, type PackRecord } from './collections';
 import { INDEX_SCHEMA, type FileTarget, type Index } from './index-types';
 import type { Logger } from './log';
 import { mapDetails, type MappedDetails, type MappedDownloads, type MappedExtra } from './mapper/downloads';
@@ -203,6 +204,73 @@ function countsAsFailed(g: Gathered): boolean {
 	return g.filenamesFailed && !(g.details !== null && !g.details.offersInstallers);
 }
 
+/** What one read of a pack's record gave. */
+interface PackRead {
+	id: string;
+	product: MappedProduct | null;
+	/** True when vangogh failed to answer, not when it has no such record. */
+	failed: boolean;
+}
+
+/**
+ * The records of the packs the entries name: spec, section 4.2. A pack of the library list was
+ * read with it and is not read again. A pack that is not found, is of another type or has no
+ * name is left out. One that vangogh fails to give is left out with a warning, and when that
+ * happens to more than half of them the rebuild fails, as for the games' records. A refused
+ * login stops the rebuild.
+ */
+async function readPacks(source: VangoghSource, gathered: Gathered[], named: Set<string>, log: Logger): Promise<PackRecord[]> {
+	const record = (id: string, name: string, product: MappedProduct): PackRecord => ({
+		id,
+		name,
+		poster: product.poster,
+		storeUrl: product.storeUrl,
+		includes: product.includes.map((r) => r.id)
+	});
+	const packs: PackRecord[] = [];
+	const inLibrary = new Set<string>();
+	for (const g of gathered) {
+		if (g.product?.productType !== 'PACK') continue;
+		inLibrary.add(g.library.id);
+		packs.push(record(g.library.id, g.product.title ?? g.library.title, g.product));
+	}
+
+	const read = await mapLimit(
+		[...named].filter((id) => !inLibrary.has(id)),
+		CONCURRENCY,
+		async (id): Promise<PackRead> => {
+			try {
+				const raw = await source.metadata('gog-api-products', id);
+				return { id, product: raw === null ? null : mapApiProduct(raw), failed: false };
+			} catch (error) {
+				if (error instanceof VangoghAuthError) throw error;
+				log.warn('pack not available', { id, reason: reason(error) });
+				return { id, product: null, failed: true };
+			}
+		}
+	);
+	const failed = read.filter((r) => r.failed).length;
+	if (failed * 2 > read.length) throw new RebuildFailed(`${failed} of ${read.length} packs could not be read`);
+
+	let leftOut = failed;
+	for (const { id, product, failed: lost } of read) {
+		if (lost) continue;
+		if (product === null) {
+			leftOut++;
+			log.info('pack left out of the collections', { id, reason: 'not found' });
+			continue;
+		}
+		if (product.productType !== 'PACK' || product.title === null) {
+			leftOut++;
+			log.info('pack left out of the collections', { id, reason: product.productType !== 'PACK' ? 'not a pack' : 'no name' });
+			continue;
+		}
+		packs.push(record(id, product.title, product));
+	}
+	log.info('packs read', { read: read.length, leftOut });
+	return packs;
+}
+
 /** Builds the index. Spec section 4. */
 export async function buildIndex(
 	source: VangoghSource,
@@ -245,20 +313,13 @@ export async function buildIndex(
 	}
 
 	const owned = new Set(library.map((p) => p.id));
-	const packTitles = new Map<string, string>();
-	const partOf = new Map<string, string[]>();
-	for (const g of gathered) {
-		if (g.product?.productType !== 'PACK') continue;
-		const title = g.product.title ?? g.library.title;
-		packTitles.set(g.library.id, title);
-		for (const game of g.product.includes) {
-			partOf.set(game.id, [...(partOf.get(game.id) ?? []), title]);
-		}
-	}
 
 	const entries: ListEntry[] = [];
 	const details: Record<string, Detail> = {};
 	const files: Record<string, FileTarget> = {};
+	/** The entries as the rules of collections see them, and the packs they name. */
+	const members: Member[] = [];
+	const named = new Set<string>();
 
 	gathered.forEach((g, order) => {
 		const id = g.library.id;
@@ -331,15 +392,14 @@ export async function buildIndex(
 			extraKinds: extras.map((e) => e.kind),
 			order,
 			complete: product !== null,
-			hasFiles: offersFiles(downloads, dlc)
+			hasFiles: offersFiles(downloads, dlc),
+			// Worked out with the collections, once every entry is known.
+			collection: null,
+			series: null,
+			packs: []
 		};
-
-		const packs = [
-			...(partOf.get(id) ?? []),
-			...(product?.includedIn ?? [])
-				.map((r) => packTitles.get(r.id))
-				.filter((t): t is string => t !== undefined)
-		];
+		members.push({ id, title, releaseYear: entry.releaseYear, storeUrl: product?.storeUrl ?? null, series: product?.series ?? null });
+		for (const pack of product?.includedIn ?? []) named.add(pack.id);
 
 		const { dlc: _titles, ...shared } = entry;
 		entries.push(entry);
@@ -357,16 +417,23 @@ export async function buildIndex(
 			downloadLanguage: g.details?.downloads.language ?? null,
 			dlc,
 			extras,
-			requires,
-			partOf: [...new Set(packs)]
+			requires
 		};
 		Object.assign(files, targets);
 	});
 
+	const { collections, of } = collect(members, await readPacks(source, gathered, named, log));
+	for (const entry of entries) {
+		const groups = of.get(entry.id);
+		if (!groups) continue;
+		Object.assign(entry, groups);
+		Object.assign(details[entry.id], groups);
+	}
+
 	const version = createHash('sha256')
-		.update(JSON.stringify([INDEX_SCHEMA, entries, details]))
+		.update(JSON.stringify([INDEX_SCHEMA, entries, details, collections]))
 		.digest('hex')
 		.slice(0, 16);
 
-	return { schema: INDEX_SCHEMA, builtAt: now().toISOString(), version, entries, details, files };
+	return { schema: INDEX_SCHEMA, builtAt: now().toISOString(), version, entries, details, files, collections };
 }

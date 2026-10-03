@@ -18,6 +18,19 @@
 	color: var(--starlight);
 	font-weight: 650;
 }
+/* The collections part holds the room of its widest text whether or not it is shown: both texts share one cell, so the
+   count line wraps the same way with the toggle on or off. */
+.status .of-coll {
+	display: inline-grid;
+}
+.status .of-coll > * {
+	grid-area: 1 / 1;
+	white-space: pre;
+}
+.status .coll-room,
+.status .coll-real.is-off {
+	visibility: hidden;
+}
 .status .active-chip {
 	height: 28px;
 	padding: 0 6px 0 11px;
@@ -127,6 +140,39 @@
 .card:hover .poster::after,
 .card:focus-visible .poster::after {
 	opacity: 1;
+}
+/* A collection's card: the frame of a game's card, with two edges behind its poster, as of more
+   posters under it. They lie in the gap above the card, so the card keeps the size of the others
+   and the grid its rhythm. A thin edge and a short glow in sky blue tell a collection from a game
+   at a glance; they are shadows and take no room. */
+.card.is-collection {
+	position: relative;
+	isolation: isolate;
+}
+.card.is-collection::before,
+.card.is-collection::after {
+	content: '';
+	position: absolute;
+	z-index: -1;
+	top: -4px;
+	left: 7px;
+	right: 7px;
+	height: 12px;
+	border-radius: var(--radius-poster) var(--radius-poster) 0 0;
+	background: var(--night-control);
+	box-shadow: 0 0 0 1px rgb(241 235 218 / 0.06);
+}
+.card.is-collection::after {
+	top: -8px;
+	left: 15px;
+	right: 15px;
+	background: var(--night-raised);
+	z-index: -2;
+}
+.card.is-collection .poster {
+	box-shadow:
+		0 0 0 1px rgb(var(--sky) / 0.55),
+		0 6px 18px -4px rgb(var(--sky) / 0.6);
 }
 /* A game without a portrait poster: its wide image, in the same frame. */
 .poster-wide {
@@ -286,6 +332,20 @@
 .card-meta .xtr .ic {
 	font-size: 12px;
 }
+/* A collection's badge, where a game has its co-op and multiplayer marks: the stack and the
+   number of the games it stands for, in sky blue. */
+.card-meta .coll-pill {
+	margin-left: auto;
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	padding: 0 7px 0 6px;
+	background: rgb(var(--sky) / 0.16);
+	color: rgb(var(--sky));
+}
+.card-meta .coll-pill .ic {
+	font-size: 12px;
+}
 .card-meta .missing {
 	display: flex;
 	align-items: center;
@@ -321,6 +381,13 @@
 	font-variant-numeric: tabular-nums;
 }
 .card-genres .year + span::before {
+	content: '\00a0\00b7\00a0';
+}
+/* A collection's genre line: its kind, then the years of its games. */
+.card-genres .years {
+	font-variant-numeric: tabular-nums;
+}
+.card-genres .kind + .years::before {
 	content: '\00a0\00b7\00a0';
 }
 .card-reason {

@@ -11,6 +11,7 @@ export const load: LayoutServerLoad = ({ request, cookies }) => {
 	return {
 		ready: index !== null,
 		entries: index?.entries ?? [],
+		collections: index?.collections ?? [],
 		builtAt: index?.builtAt ?? null,
 		version: VERSION,
 		timeZone: config.timeZone,

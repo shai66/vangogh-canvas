@@ -12,7 +12,7 @@ import {
 	startFakeVangogh,
 	type FakeVangogh
 } from '../../src/lib/server/testing/fake-vangogh';
-import { POSTER } from '../../src/lib/server/testing/fixtures';
+import { POSTER, apiProduct, productOptions } from '../../src/lib/server/testing/fixtures';
 
 const PASSWORD = 'pa55-w0rd-xyz';
 
@@ -62,7 +62,12 @@ async function waitFor(check: () => Promise<boolean>, what: string): Promise<voi
 
 beforeAll(async () => {
 	if (!existsSync('build/index.js')) throw new Error('run "npm run build" first');
-	fake = await startFakeVangogh({ ...fixtureData(), password: PASSWORD });
+	const data = { ...fixtureData(), password: PASSWORD };
+	// A collection: GOG gives 1001 and 1002 one series. The owned pack 3001, which holds 1001, joins it.
+	for (const id of ['1001', '1002']) {
+		data.metadata[`gog-api-products/${id}`] = apiProduct({ ...productOptions[id], series: { id: 77, name: 'Dusk Saga' } });
+	}
+	fake = await startFakeVangogh(data);
 	cacheDir = await mkdtemp(join(tmpdir(), 'canvas-it-'));
 	const port = await freePort();
 	base = `http://127.0.0.1:${port}`;
@@ -138,6 +143,14 @@ describe('the pages, as the server draws them', () => {
 		expect(cards((await page('/', { cookie: 'canvas-view=%3Cscript%3E|x; other=1' })).html)).toHaveLength(4);
 	});
 
+	it('draws each collection as one card when the address or the cookie has the toggle on', async () => {
+		const grouped = ['Broken Record', 'Dusk Saga', 'Lonely Expansion'];
+		expect(cards((await page('/?view=collections')).html)).toEqual(grouped);
+		expect(cards((await page('/', { cookie: 'canvas-view=||collections' })).html)).toEqual(grouped);
+		// A cookie of 0.8.0 has it off.
+		expect(cards((await page('/', { cookie: 'canvas-view=|title' })).html)).toHaveLength(4);
+	});
+
 	it('shows what the visitor typed as text', async () => {
 		const evil = '<img src=x onerror=alert(1)>';
 		const { html } = await page(`/?q=${encodeURIComponent(evil)}`);
@@ -158,6 +171,31 @@ describe('the pages, as the server draws them', () => {
 		expect(res.status).toBe(200);
 		expect(html).toContain('This game is not in the library.');
 		expect(cards(html)).toHaveLength(4);
+	});
+
+	it('draws a collection with its sheet over the list, and the title of the page names it', async () => {
+		const { res, html } = await page('/collection/s77');
+		expect(res.status).toBe(200);
+		expect(html).toContain('<title>Dusk Saga | Canvas for vangogh</title>');
+		expect(html).toContain('<b>Road Trilogy</b>');
+		// The list behind it, then the two games on the sheet.
+		expect(cards(html)).toEqual([
+			'Broken Record',
+			'Lonely Expansion',
+			'The Long Dark Road',
+			'Windows Only Game',
+			'The Long Dark Road',
+			'Windows Only Game'
+		]);
+	});
+
+	it('draws the list with a note for a collection that is not in the library', async () => {
+		for (const path of ['/collection/p424242', '/collection/nonsense']) {
+			const { res, html } = await page(path);
+			expect(res.status).toBe(200);
+			expect(html).toContain('This collection is not in the library.');
+			expect(cards(html)).toHaveLength(4);
+		}
 	});
 
 	it('gives the name of the system the visitor sits at to the download block', async () => {
@@ -226,7 +264,7 @@ describe('the routes', () => {
 		expect(res.status).toBe(200);
 		const body = (await res.json()) as IndexPayload;
 		expect(body.entries.map((e) => e.id)).toEqual(['1001', '1002', '2002', '1003']);
-		expect(Object.keys(body).sort()).toEqual(['builtAt', 'entries', 'version']);
+		expect(Object.keys(body).sort()).toEqual(['builtAt', 'collections', 'entries', 'version']);
 		expect(res.headers.get('etag')).toBe(`"${body.version}"`);
 
 		const again = await fetch(`${base}/api/index`, {
@@ -260,7 +298,25 @@ describe('the routes', () => {
 		const detail = (await res.json()) as Detail;
 		expect(detail.title).toBe('The Long Dark Road');
 		expect(detail.downloads.windows).toHaveLength(3);
-		expect(detail.partOf).toEqual(['Road Trilogy']);
+		expect(detail).not.toHaveProperty('partOf');
+		expect(detail).toMatchObject({ collection: 's77', series: 'Dusk Saga', packs: ['Road Trilogy'] });
+	});
+
+	it('serves the collections with the list', async () => {
+		const body = (await (await fetch(`${base}/api/index`)).json()) as IndexPayload;
+		expect(body.collections).toEqual([
+			{
+				id: 's77',
+				kind: 'series',
+				name: 'Dusk Saga',
+				poster: null,
+				total: null,
+				storeUrl: null,
+				joined: [{ kind: 'pack', name: 'Road Trilogy' }],
+				games: ['1001', '1002']
+			}
+		]);
+		expect(body.entries.find((e) => e.id === '1002')).toMatchObject({ collection: 's77', series: 'Dusk Saga', packs: [] });
 	});
 
 	it('answers 404 for a game that is not in the library', async () => {

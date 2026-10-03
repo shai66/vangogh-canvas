@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { genreName } from '$lib/genres';
 	import { t } from '$lib/strings';
-	import type { Detail, Os } from '$lib/types';
+	import type { Collection, Detail, ListEntry, Os } from '$lib/types';
 	import type { Visitor } from '$lib/visitor';
 	import DownloadBlock from './DownloadBlock.svelte';
 	import Icon from './Icon.svelte';
@@ -10,6 +10,7 @@
 	import Poster from './Poster.svelte';
 	import Requirements from './Requirements.svelte';
 	import Screenshots from './Screenshots.svelte';
+	import Shelf from './Shelf.svelte';
 
 	interface Props {
 		detail: Detail;
@@ -17,8 +18,16 @@
 		onclose: () => void;
 		/** A tag was chosen: the list is searched for it. */
 		ontag: (tag: string) => void;
+		/** The game's collection, or null. */
+		collection?: Collection | null;
+		/** Its games in the list, oldest first. */
+		collectionGames?: ListEntry[];
+		/** True when the game was opened from the open row of its collection: the row starts open. */
+		shelfOpen?: boolean;
+		/** Another game of the row was clicked: it opens in place of this one. */
+		onswap?: (event: MouseEvent, href: string) => void;
 	}
-	let { detail, visitor, onclose, ontag }: Props = $props();
+	let { detail, visitor, onclose, ontag, collection = null, collectionGames = [], shelfOpen = false, onswap = () => {} }: Props = $props();
 
 	const developers = $derived(detail.developers.join(', '));
 	const hasMakers = $derived(developers !== '' || detail.publisher !== '');
@@ -88,12 +97,13 @@
 			{#if detail.kind === 'orphaned-dlc'}
 				<p class="relation">{t.detail.orphan(detail.requires)}</p>
 			{/if}
-			{#if detail.partOf.length > 0}
-				<p class="relation">{t.detail.partOf} <b>{detail.partOf.join(', ')}</b></p>
-			{/if}
 		</div>
 		<div class="dl-slot"><DownloadBlock {detail} {visitor} onsystem={blockShows} /></div>
 	</div>
+
+	{#if collection}
+		<Shelf {collection} games={collectionGames} here={detail.id} open={shelfOpen} onopen={onswap} />
+	{/if}
 
 	<Screenshots screenshots={detail.screenshots} />
 

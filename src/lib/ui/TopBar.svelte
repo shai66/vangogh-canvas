@@ -64,6 +64,9 @@
 			</button>
 		{/each}
 	</div>
+	<button class="view-toggle" type="button" aria-pressed={view.grouped} aria-label={t.bar.collections} title={t.bar.collectionsTitle} onclick={() => view.toggleGrouped()}>
+		<Icon name="stack" /><span class="label">{t.bar.collections}</span>
+	</button>
 	<button
 		class="filter-button"
 		class:is-active={view.filterCount > 0}

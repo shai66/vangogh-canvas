@@ -17,9 +17,11 @@ export interface ViewState {
 	genres: string[];
 	together: Together[];
 	sort: Sort;
+	/** True while the list shows each collection as one card: `?view=collections`. */
+	grouped: boolean;
 }
 
-export const DEFAULT_STATE: ViewState = { q: '', os: [], genres: [], together: [], sort: 'title' };
+export const DEFAULT_STATE: ViewState = { q: '', os: [], genres: [], together: [], sort: 'title', grouped: false };
 
 const MAX_QUERY = 200;
 
@@ -37,7 +39,8 @@ export function parseState(params: URLSearchParams): ViewState {
 		together: values(params, 'play', true).filter((v): v is Together =>
 			(ALL_TOGETHER as readonly string[]).includes(v)
 		),
-		sort: parseSort(params.get('sort'))
+		sort: parseSort(params.get('sort')),
+		grouped: params.get('view') === 'collections'
 	};
 }
 
@@ -49,5 +52,6 @@ export function toParams(state: ViewState): URLSearchParams {
 	for (const genre of state.genres) params.append('genre', genre);
 	if (state.together.length > 0) params.set('play', state.together.join(','));
 	if (state.sort !== 'title') params.set('sort', state.sort);
+	if (state.grouped) params.set('view', 'collections');
 	return params;
 }

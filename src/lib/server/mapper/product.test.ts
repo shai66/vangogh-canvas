@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { BACKDROP, BANNER, POSTER, SHOT, apiProduct, records } from '../testing/fixtures';
-import { macNoticeOf, mapApiProduct, requirementsOf, storeUrlOf } from './product';
+import { macNoticeOf, mapApiProduct, requirementsOf, seriesOf, storeUrlOf } from './product';
 
 describe('mapApiProduct', () => {
 	const game = mapApiProduct(records.apiProducts['1001']);
@@ -22,6 +22,11 @@ describe('mapApiProduct', () => {
 	it('reads the images as ids', () => {
 		expect(game.poster).toBe(POSTER['1001']);
 		expect(game.screenshots).toEqual([SHOT.one, SHOT.two]);
+	});
+
+	it('reads the series of the record, and null without one', () => {
+		expect(mapApiProduct(apiProduct({ title: 'Dusk One', series: { id: 77, name: 'Dusk' } })).series).toEqual({ id: '77', name: 'Dusk' });
+		expect(game.series).toBeNull();
 	});
 
 	it('reads the two wide images as ids', () => {
@@ -130,6 +135,7 @@ describe('mapApiProduct', () => {
 				macNotice: null,
 				requirements: {},
 				storeUrl: null,
+				series: null,
 				requires: [],
 				includes: [],
 				includedIn: []
@@ -365,5 +371,33 @@ describe('storeUrlOf', () => {
 
 	it('gives no address for a record without one', () => {
 		expect(mapApiProduct(apiProduct({ title: 'Game' })).storeUrl).toBeNull();
+	});
+});
+
+describe('seriesOf', () => {
+	it("reads GOG's series, with the id as digits", () => {
+		expect(seriesOf({ id: 1207658691, name: 'Dusk' })).toEqual({ id: '1207658691', name: 'Dusk' });
+		expect(seriesOf({ id: '42', name: '  Dusk ' })).toEqual({ id: '42', name: 'Dusk' });
+	});
+
+	it('gives null for a missing field, a missing name, or an id that is not a whole number above 0', () => {
+		const odd = [
+			undefined,
+			null,
+			'Dusk',
+			[],
+			{},
+			{ id: 1 },
+			{ name: 'Dusk' },
+			{ id: 1.5, name: 'Dusk' },
+			{ id: -3, name: 'Dusk' },
+			{ id: 0, name: 'Dusk' },
+			{ id: 'x1', name: 'Dusk' },
+			{ id: '../1', name: 'Dusk' },
+			{ id: Number.MAX_SAFE_INTEGER + 2, name: 'Dusk' },
+			{ id: 1, name: 7 },
+			{ id: 1, name: '   ' }
+		];
+		for (const x of odd) expect(seriesOf(x)).toBeNull();
 	});
 });

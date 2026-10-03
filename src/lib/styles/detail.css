@@ -238,6 +238,137 @@
 	font-weight: 600;
 }
 
+/* A collection in a game's detail: one line that opens a row of posters, every game of it in the
+   library, oldest first. This game is marked and is no link. */
+.coll-shelf {
+	margin-top: 36px;
+}
+/* The line: the mark, the name, what it is and an arrow. Pointing at it lights the arrow and the
+   name; nothing moves. Once open the arrow is hidden, in its room. On a phone the line wraps. */
+.shelf-line {
+	display: inline-flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 2px 10px;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: inherit;
+	font: inherit;
+	text-align: left;
+}
+/* Open, the line is a span: the small type of a heading's other spans is not for it. */
+.section-title .shelf-line {
+	font-size: inherit;
+	font-weight: inherit;
+	color: inherit;
+}
+.shelf-line b {
+	font-weight: inherit;
+}
+.shelf-line > .ic {
+	align-self: center;
+	font-size: 16px;
+}
+.shelf-line .caret {
+	margin-left: -4px;
+	font-size: 14px;
+	color: var(--starlight-faint);
+}
+button.shelf-line:hover .caret,
+button.shelf-line:focus-visible .caret {
+	color: var(--starlight);
+}
+button.shelf-line:hover b {
+	text-decoration: underline;
+	text-decoration-color: var(--night-edge);
+	text-underline-offset: 3px;
+}
+.coll-shelf.is-open .shelf-line .caret {
+	visibility: hidden;
+}
+/* The row has the arrows of the screenshots, in the room of its side padding, at the middle of the
+   posters: a poster 128 px wide is 180 px high and starts 4 px down. */
+.shelf-wrap {
+	position: relative;
+}
+.shelf-wrap > .shots-arrow {
+	top: 94px;
+}
+.shelf {
+	display: flex;
+	gap: 16px;
+	overflow-x: auto;
+	scroll-snap-type: x proximity;
+	scroll-padding: 0 44px;
+	padding: 4px 44px 6px;
+	scrollbar-width: none;
+}
+.shelf::-webkit-scrollbar {
+	display: none;
+}
+.shelf-card {
+	flex: none;
+	width: 128px;
+	scroll-snap-align: start;
+}
+.shelf-card .t {
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	overflow: hidden;
+	/* Two lines always, so a short title does not make its card shorter than the others. */
+	min-height: calc(2 * 1.3em);
+	margin-top: 8px;
+	font-size: 13.5px;
+	line-height: 1.3;
+	font-weight: 600;
+}
+.shelf-card .y {
+	display: block;
+	min-height: 1.45em;
+	margin-top: 2px;
+	font-size: 12.5px;
+	line-height: 1.45;
+	color: var(--starlight-faint);
+	font-variant-numeric: tabular-nums;
+}
+.shelf-card.is-here .poster::after {
+	opacity: 1;
+	box-shadow: inset 0 0 0 2px var(--accent);
+}
+.shelf-card.is-here .y {
+	color: var(--accent);
+}
+
+/* A collection's sheet: the head of a game's detail and, where a game has its download, the
+   games of the collection as the cards of the list. */
+.detail-head.coll-head {
+	padding-bottom: 52px;
+}
+/* The series and packs joined into the collection, quietly, under what it is. */
+.coll-joined {
+	margin-top: 6px;
+	font-size: 14px;
+	color: var(--starlight-faint);
+}
+.coll-joined b {
+	color: var(--starlight-dim);
+	font-weight: 550;
+}
+.coll-body {
+	grid-column: 2;
+	min-width: 0;
+	margin-top: 30px;
+}
+.coll-body .section-title {
+	padding: 0;
+}
+.grid.coll-grid {
+	grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+	padding: 4px 0 0;
+}
+
 /* Screenshots */
 .shots-wrap {
 	position: relative;

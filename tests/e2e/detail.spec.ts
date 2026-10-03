@@ -28,7 +28,8 @@ test.describe('the game detail', () => {
 		await expect(page).toHaveTitle('The Long Dark Road | Canvas for vangogh');
 		await expect(detail.locator('h1')).toHaveText('The Long Dark Road');
 		await expect(detail.locator('.detail-makers')).toHaveText('Šťastný Studio, published by Road Works, 2002 · GOG.com');
-		await expect(detail.locator('.relation')).toHaveText('Part of Road Trilogy');
+		// The line "Part of" is gone since 0.9.0: an owned pack is a collection like any other.
+		await expect(detail.locator('.relation')).toHaveCount(0);
 		// The list is still there, behind the sheet.
 		await expect(page.locator('.card')).toHaveCount(1);
 
@@ -273,7 +274,7 @@ test.describe('the game detail', () => {
 		await expect(page).toHaveURL(/\/\?q=Turn-Based&os=linux$/);
 		await expect(page.locator('.os-toggle').getByRole('button', { name: 'Linux' })).toHaveAttribute('aria-pressed', 'true');
 		// Two games have the tag, and one of them is for Linux.
-		await expect(page.locator('.count-text')).toHaveText('1 of 7 games');
+		await expect(page.locator('.count-text')).toHaveText('1 of 7 games', { useInnerText: true });
 	});
 
 	test('shows the screenshots that load, and one of them larger', async ({ page }) => {

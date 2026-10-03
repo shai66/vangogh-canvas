@@ -18,10 +18,19 @@
 	.brand span {
 		display: block;
 	}
+	/* The toggle "Collections" stands beside the search box, as its mark alone, so the first row
+	   keeps its three parts: the box leaves it 44 px and the gap. */
 	.search {
 		order: 5;
-		flex-basis: 100%;
+		flex-basis: calc(100% - 54px);
 		max-width: none;
+	}
+	.view-toggle {
+		order: 6;
+		width: 44px;
+		height: 44px;
+		padding: 0;
+		justify-content: center;
 	}
 	.search .key {
 		display: none;
@@ -29,7 +38,8 @@
 	.bar-spacer {
 		display: none;
 	}
-	.filter-button .label {
+	.filter-button .label,
+	.view-toggle .label {
 		display: none;
 	}
 	.grid {
@@ -67,6 +77,17 @@
 	.detail-head .dl-list {
 		margin-top: 18px;
 	}
+	/* A collection's sheet: the picture stays beside the name, and the games take the whole width under them. */
+	.detail-head.coll-head {
+		padding-bottom: 48px;
+	}
+	.coll-body {
+		grid-column: 1 / -1;
+		margin-top: 24px;
+	}
+	.grid.coll-grid {
+		grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+	}
 	/* A narrow window of a computer: the menu of the switch fits into it, with
 	   "This computer" on a line of its own. */
 	.menu {
@@ -93,12 +114,17 @@
 		display: none;
 	}
 	.section-title,
-	.shots {
+	.shots,
+	.shelf {
 		padding-left: 16px;
 		padding-right: 16px;
 	}
-	.shots {
+	.shots,
+	.shelf {
 		scroll-padding: 0 16px;
+	}
+	.shelf-card {
+		width: 104px;
 	}
 	.shots-arrow {
 		display: none;

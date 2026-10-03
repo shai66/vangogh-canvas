@@ -67,7 +67,9 @@ function detail(over: Partial<Detail> = {}): Detail {
 		extraKinds: [],
 		extras: [],
 		requires: null,
-		partOf: [],
+		collection: null,
+		series: null,
+		packs: [],
 		...over
 	};
 }

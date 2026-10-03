@@ -6,10 +6,16 @@ import { upperFirst } from './format';
 import type { GenreGroup } from './genres';
 import type { MatchField } from './search/query';
 import type { Together } from './search/state';
-import type { Os } from './types';
+import type { CollectionKind, JoinedGroup, Os } from './types';
 import type { Visitor } from './visitor';
 
 const plural = (n: number, one: string, many: string): string => (n === 1 ? `1 ${one}` : `${n} ${many}`);
+
+/** A piece of a text with words in bold: the plain words, then the bold ones. A component draws the bold ones as <b>. */
+export interface TextPart {
+	plain: string;
+	bold: string;
+}
 
 /** "Windows", "Windows and Linux", "Windows, macOS and Linux". */
 function list(items: string[]): string {
@@ -17,6 +23,9 @@ function list(items: string[]): string {
 }
 
 const osName: Record<Os, string> = { windows: 'Windows', macos: 'macOS', linux: 'Linux' };
+
+/** What a collection is, as the card, the sheet and the row name it. */
+const COLLECTION_KIND: Record<CollectionKind, string> = { series: 'Series', pack: 'Pack', collection: 'Collection' };
 
 /** The names the kinds of extras are shown by, by GOG's word. Their order is in src/lib/extras.ts. */
 const EXTRA_KIND_NAMES = new Map<string, string>([
@@ -55,6 +64,7 @@ export const t = {
 	nameSuffix: 'for vangogh',
 	pageTitle: 'Canvas for vangogh',
 	gameTitle: (title: string) => `${title} | Canvas for vangogh`,
+	collectionTitle: (name: string) => `${name} | Canvas for vangogh`,
 
 	osName,
 	together: { multiplayer: 'Multiplayer', coop: 'Co-op' } satisfies Record<Together, string>,
@@ -67,7 +77,9 @@ export const t = {
 		platforms: 'Show games for',
 		onlyFor: (os: Os) => `Only games for ${osName[os]}`,
 		filters: 'Filters',
-		filtersOn: (n: number) => `Filters, ${n} on`
+		filtersOn: (n: number) => `Filters, ${n} on`,
+		collections: 'Collections',
+		collectionsTitle: 'Show each collection as one card'
 	},
 
 	count: {
@@ -80,7 +92,13 @@ export const t = {
 		sorted: 'Sorted',
 		sortTitle: 'A to Z',
 		sortRecent: 'Recently added',
-		sortYear: 'Release year'
+		sortYear: 'Release year',
+		/** Between the count of games and the count of collections: "138 games · 17 collections". */
+		separator: ' · ',
+		/** Follows the number of collections. */
+		collections: (n: number) => (n === 1 ? 'collection' : 'collections'),
+		/** The room the collections part of the count line keeps, three digits wide in tabular figures. */
+		room: ' · 000 collections'
 	},
 
 	card: {
@@ -90,6 +108,8 @@ export const t = {
 		orphan: 'DLC, base game not owned',
 		reason: {
 			dlc: (value: string) => `contains: ${value}`,
+			series: (value: string) => `series: ${value}`,
+			pack: (value: string) => `pack: ${value}`,
 			genre: (value: string) => `genre: ${value}`,
 			tag: (value: string) => `tag: ${value}`,
 			developer: (value: string) => `by ${value}`,
@@ -122,7 +142,6 @@ export const t = {
 		publishedBy: 'published by',
 		orphan: (base: string | null) =>
 			base ? `This is DLC. It needs ${base}, which is not in the library.` : 'This is DLC. Its base game is not in the library.',
-		partOf: 'Part of',
 		screenshots: 'Screenshots',
 		earlier: 'Earlier screenshots',
 		more: 'More screenshots',
@@ -159,6 +178,48 @@ export const t = {
 		/** What a screen reader hears for the pill. */
 		count: (n: number) => plural(n, 'extra', 'extras'),
 		pill: (kinds: string) => `Extras: ${kinds}`
+	},
+
+	collections: {
+		kind: COLLECTION_KIND,
+		/** What a screen reader hears for a collection's badge. */
+		games: (n: number) => plural(n, 'game', 'games'),
+		/** The tooltip of a collection's badge: "Pack of 5 games: A, B, C, D, E". */
+		pill: (kind: CollectionKind, titles: string[]) => `${COLLECTION_KIND[kind]} of ${plural(titles.length, 'game', 'games')}: ${titles.join(', ')}`,
+		/** The years of a collection's games: "1991–1997", or one year. */
+		years: (first: number, last: number) => (first === last ? String(first) : `${first}–${last}`),
+		/** What a collection is, on its sheet: "**Pack** of 4 games on GOG, 3 in your library, **1991–1997**". */
+		what: (kind: CollectionKind, total: number | null, inLibrary: number, years: string): TextPart[] => {
+			const parts: TextPart[] = [{ plain: '', bold: COLLECTION_KIND[kind] }];
+			if (kind === 'pack' && total !== null) {
+				const held = total > inLibrary ? `${inLibrary} in your library` : 'all in your library';
+				parts.push({ plain: ` of ${total} games on GOG, ${held}`, bold: '' });
+			} else {
+				parts.push({ plain: `, ${plural(inLibrary, 'game', 'games')} in your library`, bold: '' });
+			}
+			if (years) parts.push({ plain: ', ', bold: years });
+			return parts;
+		},
+		/** The series and packs joined into a collection: "With the games of GOG's pack **X** and series **Y**." */
+		joined: (groups: JoinedGroup[]): TextPart[] =>
+			groups.length === 0
+				? []
+				: [
+						...groups.map((g, i) => ({
+							plain: `${i === 0 ? "With the games of GOG's " : i === groups.length - 1 ? ' and ' : ', '}${g.kind} `,
+							bold: g.name
+						})),
+						{ plain: '.', bold: '' }
+					],
+		storeTitle: 'This pack on GOG.com, in a new tab',
+		gamesTitle: 'Games in your library',
+		gamesNote: (n: number) => `${n}, oldest first`,
+		/** The folded line in a game's detail, after the collection's name: "Pack, 5 games in your library". */
+		shelf: (kind: CollectionKind, n: number) => `${COLLECTION_KIND[kind]}, ${plural(n, 'game', 'games')} in your library`,
+		/** Under this game's poster in the row: "This game · 1998". */
+		here: (year: number | null) => (year ? `This game · ${year}` : 'This game'),
+		earlier: 'Earlier games',
+		more: 'More games'
 	},
 
 	download: {
@@ -231,6 +292,7 @@ export const t = {
 	},
 
 	notInLibrary: 'This game is not in the library.',
+	collectionNotInLibrary: 'This collection is not in the library.',
 
 	error: {
 		notFoundTitle: 'This page does not exist',

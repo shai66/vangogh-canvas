@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { createLogger } from './log';
 import { RebuildFailed, buildIndex, fileId } from './indexer';
-import { apiProduct, details, extra, file, records } from './testing/fixtures';
+import { apiProduct, details, extra, file, POSTER, records } from './testing/fixtures';
 import {
 	VangoghAuthError,
 	VangoghHttpError,
@@ -40,7 +40,7 @@ describe('buildIndex', () => {
 			['2002', 'orphaned-dlc'],
 			['1003', 'game']
 		]);
-		expect(index.schema).toBe(5);
+		expect(index.schema).toBe(6);
 		expect(index.builtAt).toBe('2026-09-29T02:30:00.000Z');
 	});
 
@@ -69,7 +69,10 @@ describe('buildIndex', () => {
 			extraKinds: ['manuals', 'audio', 'wallpapers'],
 			order: 0,
 			complete: true,
-			hasFiles: true
+			hasFiles: true,
+			collection: null,
+			series: null,
+			packs: ['Road Trilogy']
 		});
 	});
 
@@ -388,10 +391,13 @@ describe('buildIndex', () => {
 		expect(index.entries.map((e) => e.id)).toEqual(['1001', '1002', '1003']);
 	});
 
-	it('names the packs a game is part of', async () => {
+	it('hands the packs of a game to its entry, and no partOf to its detail', async () => {
 		const index = await buildIndex(source(), logger().log);
-		expect(index.details['1001'].partOf).toEqual(['Road Trilogy']);
-		expect(index.details['1002'].partOf).toEqual([]);
+		expect(index.details['1001']).not.toHaveProperty('partOf');
+		// The owned pack holds 1001 alone: it counts, and a pack of one game is no collection.
+		expect(index.entries[0]).toMatchObject({ collection: null, series: null, packs: ['Road Trilogy'] });
+		expect(index.entries[1]).toMatchObject({ collection: null, series: null, packs: [] });
+		expect(index.collections).toEqual([]);
 	});
 
 	it('lists a pack that has files of its own', async () => {
@@ -908,6 +914,146 @@ describe('buildIndex', () => {
 	});
 });
 
+describe('buildIndex and collections', () => {
+	const at = 'https://www.gog.com/en/game';
+	const dusk = { id: 77, name: 'Dusk' };
+	/**
+	 * Four games: three of the series Dusk, two of them also in the pack 6900, which GOG sells them
+	 * as; a fourth in a series of one, in a shop bundle of four games, and in 6902, which vangogh
+	 * does not have.
+	 */
+	const products: Record<string, unknown> = {
+		'6001': apiProduct({ title: 'Dusk One', released: '1996-01-01T00:00:00+01:00', series: dusk, store: `${at}/dusk_double`, includedIn: ['6900'] }),
+		'6002': apiProduct({ title: 'Dusk Two', released: '1998-01-01T00:00:00+01:00', series: dusk, store: `${at}/dusk_double`, includedIn: ['6900'] }),
+		'6003': apiProduct({ title: 'Dusk Three', released: '2001-01-01T00:00:00+01:00', series: dusk }),
+		'6004': apiProduct({ title: 'Lone Game', series: { id: 78, name: 'Lone' }, includedIn: ['6901', '6902'] }),
+		'6900': apiProduct({ title: 'Dusk Double', type: 'PACK', poster: POSTER['1001'], store: `${at}/dusk_double`, includes: ['6001', '6002'] }),
+		'6901': apiProduct({ title: 'Big Bundle', type: 'PACK', includes: ['6004', '6801', '6802', '6803'] })
+	};
+	const list = ['6001', '6002', '6003', '6004'].map((id) => ({ id, tt: `T${id}`, os: [1] }));
+
+	interface Memory {
+		list?: unknown[];
+		/** Records that replace or add to the ones above. A null is a record vangogh does not have. */
+		records?: Record<string, unknown>;
+		fail?: Record<string, Error>;
+		/** Every product record asked for, in order. */
+		asked?: string[];
+	}
+	/** A vangogh with the product records above and no details: every game is listed, without files. */
+	function memory(m: Memory = {}): VangoghSource {
+		return {
+			availableProducts: async () => m.list ?? list,
+			metadata: async (type, id) => {
+				if (type !== 'gog-api-products') return null;
+				m.asked?.push(id);
+				const failure = m.fail?.[id];
+				if (failure) throw failure;
+				const all = { ...products, ...m.records };
+				return Object.hasOwn(all, id) ? all[id] : null;
+			},
+			filenames: async () => ({}),
+			fileOnDisk: async () => null
+		};
+	}
+
+	it('works out the collections from the series and the packs the entries name', async () => {
+		const index = await buildIndex(memory(), logger().log);
+		expect(index.collections).toEqual([
+			{
+				id: 's77',
+				kind: 'series',
+				name: 'Dusk',
+				poster: null,
+				total: null,
+				storeUrl: null,
+				joined: [{ kind: 'pack', name: 'Dusk Double' }],
+				games: ['6001', '6002', '6003']
+			}
+		]);
+		const entry = (id: string) => index.entries.find((e) => e.id === id);
+		expect(entry('6001')).toMatchObject({ collection: 's77', series: 'Dusk', packs: ['Dusk Double'] });
+		expect(entry('6003')).toMatchObject({ collection: 's77', series: 'Dusk', packs: [] });
+		// A series of one and a shop bundle make no collection; the series still names the game.
+		expect(entry('6004')).toMatchObject({ collection: null, series: 'Lone', packs: [] });
+		expect(index.details['6002']).toMatchObject({ collection: 's77', series: 'Dusk', packs: ['Dusk Double'] });
+	});
+
+	it('reads each named pack once, a pack of the library list not again, and none that a product left out names', async () => {
+		const asked: string[] = [];
+		const index = await buildIndex(
+			memory({
+				asked,
+				list: [...list, { id: '6905', tt: 'Owned Pair', os: [1] }, { id: '6006', tt: 'Dusk DLC', os: [1] }],
+				records: {
+					// An owned pack without files of its own: left out of the list, and read with the library.
+					'6905': apiProduct({ title: 'Owned Pair', type: 'PACK', includes: ['6003', '6004'] }),
+					'6003': apiProduct({ title: 'Dusk Three', released: '2001-01-01T00:00:00+01:00', series: dusk, includedIn: ['6905'] }),
+					// A DLC nested under its game is no entry, so the pack it names is not read.
+					'6006': apiProduct({ title: 'Dusk DLC', type: 'DLC', requires: ['6001'], includedIn: ['6950'] })
+				}
+			}),
+			logger().log
+		);
+		expect(asked.filter((id) => id === '6905')).toHaveLength(1);
+		expect(asked.filter((id) => id === '6900')).toHaveLength(1);
+		expect(asked).not.toContain('6950');
+		expect(index.entries.map((e) => e.id)).not.toContain('6905');
+		// The owned pack joins 6004 to the series.
+		expect(index.collections[0]).toMatchObject({ id: 's77', kind: 'collection', games: ['6001', '6002', '6003', '6004'] });
+	});
+
+	it('leaves out a pack that is not found, of another type or without a name, and says so', async () => {
+		const { lines, log } = logger();
+		const index = await buildIndex(
+			memory({
+				records: {
+					'6004': apiProduct({ title: 'Lone Game', includedIn: ['6902', '6903', '6904'] }),
+					'6903': apiProduct({ title: 'Not A Pack', includes: ['6004', '6003'] }),
+					'6904': apiProduct({ title: '', type: 'PACK', includes: ['6004', '6003'] })
+				}
+			}),
+			log
+		);
+		const leftOut = lines.filter((l) => l.includes('pack left out of the collections'));
+		expect(leftOut.find((l) => l.includes('id=6902'))).toContain('reason="not found"');
+		expect(leftOut.find((l) => l.includes('id=6903'))).toContain('reason="not a pack"');
+		expect(leftOut.find((l) => l.includes('id=6904'))).toContain('reason="no name"');
+		expect(lines.some((l) => l.includes('packs read') && l.includes('read=4') && l.includes('leftOut=3'))).toBe(true);
+		expect(index.collections.map((c) => c.id)).toEqual(['s77']);
+	});
+
+	it('leaves out a pack that cannot be read, with a warning, and builds the rest', async () => {
+		const { lines, log } = logger();
+		const index = await buildIndex(memory({ fail: { '6901': new VangoghHttpError(500, '/api/metadata/gog-api-products/6901') } }), log);
+		expect(lines.some((l) => l.includes(' WARN ') && l.includes('pack not available') && l.includes('id=6901'))).toBe(true);
+		expect(index.collections.map((c) => c.id)).toEqual(['s77']);
+	});
+
+	it('fails when more than half of the packs cannot be read, and not when exactly half', async () => {
+		const gone = new VangoghUnreachable();
+		await expect(buildIndex(memory({ fail: { '6900': gone, '6901': gone } }), logger().log)).rejects.toThrow('2 of 3 packs could not be read');
+		// A fourth pack to read: two of four is half.
+		const records = { '6003': apiProduct({ title: 'Dusk Three', released: '2001-01-01T00:00:00+01:00', series: dusk, includedIn: ['6903'] }) };
+		const index = await buildIndex(memory({ records, fail: { '6900': gone, '6901': gone } }), logger().log);
+		expect(index.entries).toHaveLength(4);
+	});
+
+	it('passes a rejected login during the reads of the packs on as it is', async () => {
+		await expect(
+			buildIndex(memory({ fail: { '6900': new VangoghAuthError('vangogh rejected the login') } }), logger().log)
+		).rejects.toBeInstanceOf(VangoghAuthError);
+	});
+
+	it('gives another version when a collection changes', async () => {
+		const one = await buildIndex(memory(), logger().log);
+		const renamed = apiProduct({ title: 'Dusk Pair', type: 'PACK', store: `${at}/dusk_double`, includes: ['6001', '6002'] });
+		const two = await buildIndex(memory({ records: { '6900': renamed } }), logger().log);
+		expect(two.collections[0].joined).toEqual([{ kind: 'pack', name: 'Dusk Pair' }]);
+		expect(two.version).not.toBe(one.version);
+	});
+});
+
 describe('fileId', () => {
 	it('is stable, short and tells files apart', () => {
 		expect(fileId('/downloads/a/en1installer0')).toBe(fileId('/downloads/a/en1installer0'));
@@ -957,7 +1103,7 @@ describe.skipIf(!existsSync('samples/available-products.json'))('buildIndex on t
 			lines.filter((l) => l.includes('dlc is nested')).map((l) => /id=(\S+)/.exec(l)?.[1] ?? '')
 		);
 		const packsOut = new Set(
-			lines.filter((l) => l.includes('pack left out')).map((l) => /id=(\S+)/.exec(l)?.[1] ?? '')
+			lines.filter((l) => l.includes('pack left out of the list')).map((l) => /id=(\S+)/.exec(l)?.[1] ?? '')
 		);
 		const gogOffersNone = new Set(
 			lines
@@ -1019,5 +1165,21 @@ describe.skipIf(!existsSync('samples/available-products.json'))('buildIndex on t
 
 		expect(games.length).toBeGreaterThan(0);
 		expect(mismatched).toEqual([]);
+	});
+
+	it('works out collections in which each game is in one at most, and each holds two or more', async () => {
+		// The packs' records, where the samples have them (samples/packs/, captured 2026-10-03).
+		const withPacks: VangoghSource = {
+			...samples,
+			metadata: async (type, id) => read(`metadata/${type}/${id}.json`) ?? (type === 'gog-api-products' ? read(`packs/${id}.json`) : null)
+		};
+		const index = await buildIndex(withPacks, logger().log);
+		const games = index.collections.flatMap((c) => c.games);
+		expect(new Set(games).size).toBe(games.length);
+		for (const c of index.collections) expect(c.games.length).toBeGreaterThanOrEqual(2);
+		for (const e of index.entries) {
+			if (e.collection !== null) expect(index.collections.find((c) => c.id === e.collection)?.games).toContain(e.id);
+		}
+		console.log(`${index.collections.length} collections holding ${games.length} of ${index.entries.length} entries`);
 	});
 });

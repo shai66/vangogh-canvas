@@ -23,6 +23,9 @@ function entry(id: number, over: Partial<ListEntry> = {}): ListEntry {
 		order: id,
 		complete: true,
 		hasFiles: true,
+		collection: null,
+		series: null,
+		packs: [],
 		...over
 	};
 }
@@ -42,7 +45,7 @@ describe('View', () => {
 	it('starts from the view it is given and reports nothing', () => {
 		const { view: v, reported } = view({ os: ['linux'], sort: 'recent' });
 		expect(v.state).toEqual({ ...DEFAULT_STATE, os: ['linux'], sort: 'recent' });
-		expect(v.matches.map((m) => m.entry.id)).toEqual(['200']);
+		expect(v.cards.map((c) => c.key)).toEqual(['200']);
 		expect(reported).toEqual([]);
 	});
 
@@ -64,7 +67,7 @@ describe('View', () => {
 		v.more();
 		v.setQuery('game 00');
 		expect(v.limit).toBe(BATCH);
-		expect(v.matches).toHaveLength(10);
+		expect(v.cards).toHaveLength(10);
 		expect(reported.at(-1)).toMatchObject({ q: 'game 00' });
 		v.toggleOs('linux');
 		v.toggleGenre('Strategy');
@@ -76,9 +79,10 @@ describe('View', () => {
 			os: ['linux'],
 			genres: ['Strategy'],
 			together: ['coop'],
-			sort: 'recent'
+			sort: 'recent',
+			grouped: false
 		});
-		expect(v.matches).toEqual([]);
+		expect(v.cards).toEqual([]);
 	});
 
 	it('switches a filter off when it is chosen a second time', () => {
@@ -87,6 +91,30 @@ describe('View', () => {
 		v.toggleOs('macos');
 		v.toggleOs('linux');
 		expect(v.os).toEqual(['macos']);
+	});
+
+	it('switches the collections toggle, reports it, and keeps it when the filters or the search are cleared', () => {
+		const { view: v, reported } = view();
+		v.toggleGrouped();
+		expect(v.grouped).toBe(true);
+		expect(reported.at(-1)).toMatchObject({ grouped: true });
+		v.toggleOs('linux');
+		v.setQuery('x');
+		v.clearFilters();
+		v.clearAll();
+		expect(v.state).toEqual({ ...DEFAULT_STATE, grouped: true });
+		v.toggleGrouped();
+		expect(v.grouped).toBe(false);
+	});
+
+	it('shows a collection as one card while the toggle is on, and counts the games its card stands for', () => {
+		const games = [entry(1, { collection: 's1' }), entry(2, { collection: 's1' }), entry(3)];
+		const dusk = { id: 's1', kind: 'series' as const, name: 'Dusk', poster: null, total: null, storeUrl: null, joined: [], games: ['1', '2'] };
+		const v = new View(() => games, DEFAULT_STATE, () => {}, () => [dusk]);
+		expect([v.cards.length, v.games, v.collectionCount]).toEqual([3, 3, 0]);
+		v.toggleGrouped();
+		expect(v.cards.map((c) => c.key)).toEqual(['s1', '3']);
+		expect([v.games, v.collectionCount]).toEqual([3, 1]);
 	});
 
 	it('counts the filters, and knows when the list is narrowed', () => {
@@ -129,7 +157,7 @@ describe('View', () => {
 	it('takes a view from the address without reporting it', () => {
 		const { view: v, reported } = view();
 		v.read({ ...DEFAULT_STATE, q: 'linux' });
-		expect(v.matches.map((m) => m.entry.id)).toEqual(['200']);
+		expect(v.cards.map((c) => c.key)).toEqual(['200']);
 		expect(reported).toEqual([]);
 	});
 

@@ -1,9 +1,9 @@
 import { genreGroup, genreName, type GenreGroup } from '$lib/genres';
 import type { ListEntry } from '$lib/types';
-import type { ViewState } from './state';
+import type { Sort, ViewState } from './state';
 import { normalize, sortKey, words } from './text';
 
-export type MatchField = 'dlc' | 'genre' | 'tag' | 'developer' | 'publisher';
+export type MatchField = 'dlc' | 'series' | 'pack' | 'genre' | 'tag' | 'developer' | 'publisher';
 
 export interface MatchReason {
 	field: MatchField;
@@ -19,6 +19,9 @@ export interface Match {
 function candidates(entry: ListEntry): MatchReason[] {
 	return [
 		...entry.dlc.map((value) => ({ field: 'dlc' as const, value })),
+		// Spec, section 9: every series, also one of a single game, and the packs that count.
+		...(entry.series ? [{ field: 'series' as const, value: entry.series }] : []),
+		...entry.packs.map((value) => ({ field: 'pack' as const, value })),
 		...entry.genres.map((value) => ({ field: 'genre' as const, value })),
 		// A genre is also found by the name it is shown by: "first" finds FPP.
 		...entry.genres
@@ -49,8 +52,8 @@ export function matchEntry(entry: ListEntry, wanted: string[]): Match | null {
 	return { entry, reason };
 }
 
-/** The entries to show for a view: filtered, searched and sorted. */
-export function query(entries: ListEntry[], state: ViewState): Match[] {
+/** The entries to show for a view: filtered, searched and, unless `sorted` is false, sorted. */
+export function query(entries: ListEntry[], state: ViewState, sorted = true): Match[] {
 	const wanted = words(state.q);
 	// Genre, setting and style are three questions: any chosen value within one
 	// is enough, and every one that was asked must hold.
@@ -71,24 +74,39 @@ export function query(entries: ListEntry[], state: ViewState): Match[] {
 		const match = matchEntry(entry, wanted);
 		if (match) matches.push(match);
 	}
-	if (state.sort === 'recent') {
-		// The library list is newest first.
-		return matches.sort((a, b) => a.entry.order - b.entry.order);
-	}
-	const keys = new Map(matches.map((m) => [m, sortKey(m.entry.title)]));
-	const byTitle = (a: Match, b: Match) => keys.get(a)!.localeCompare(keys.get(b)!, 'en', { numeric: true });
-	if (state.sort === 'year') {
-		// Newest first, as "Recently added". A game without a year comes last, and equal years go by title.
-		return matches.sort((a, b) => {
-			const ya = a.entry.releaseYear;
-			const yb = b.entry.releaseYear;
+	return sorted ? sortBy(matches, state.sort, (m) => m.entry) : matches;
+}
+
+/** What a card of the list is sorted by. */
+export interface SortKeys {
+	title: string;
+	/** The position in the library list, which is newest first. */
+	order: number;
+	releaseYear: number | null;
+}
+
+/**
+ * Sorts in place by the order of the view. "A to Z": by title, without a leading "The".
+ * "Recently added": the newest purchase first. "Release year": newest first, as "Recently
+ * added"; no year comes last, and equal years go by title.
+ */
+export function sortBy<T>(items: T[], sort: Sort, keysOf: (item: T) => SortKeys): T[] {
+	const keys = new Map(items.map((item) => [item, keysOf(item)]));
+	const of = (item: T) => keys.get(item)!;
+	if (sort === 'recent') return items.sort((a, b) => of(a).order - of(b).order);
+	const titles = new Map(items.map((item) => [item, sortKey(of(item).title)]));
+	const byTitle = (a: T, b: T) => titles.get(a)!.localeCompare(titles.get(b)!, 'en', { numeric: true });
+	if (sort === 'year') {
+		return items.sort((a, b) => {
+			const ya = of(a).releaseYear;
+			const yb = of(b).releaseYear;
 			if (ya === yb) return byTitle(a, b);
 			if (ya == null) return 1;
 			if (yb == null) return -1;
 			return yb - ya;
 		});
 	}
-	return matches.sort(byTitle);
+	return items.sort(byTitle);
 }
 
 /** Every genre of the library, for the filter. */

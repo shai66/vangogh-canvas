@@ -5,6 +5,34 @@ export const ALL_OS: readonly Os[] = ['windows', 'macos', 'linux'];
 
 export type Kind = 'game' | 'orphaned-dlc';
 
+/** What a collection is: one of GOG's series, a pack GOG sells, or series and packs joined. */
+export type CollectionKind = 'series' | 'pack' | 'collection';
+
+/** A series or a pack that was joined into a collection another one leads. */
+export interface JoinedGroup {
+	kind: 'series' | 'pack';
+	name: string;
+}
+
+/** Games of the library that GOG groups by a series, a pack, or both joined. Spec, section 4.3. */
+export interface Collection {
+	/** "s" and GOG's series id, or "p" and the pack's product id: the lead's. */
+	id: string;
+	kind: CollectionKind;
+	/** GOG's name of the lead, as GOG writes it. */
+	name: string;
+	/** Image id of the lead pack's poster. Null for a series, which has none. */
+	poster: string | null;
+	/** For a lead pack: the number of its games on GOG, those of packs inside it included. Null for a series. */
+	total: number | null;
+	/** The lead pack's page on GOG.com when GOG sells the games only as that pack, otherwise null. */
+	storeUrl: string | null;
+	/** The other series and packs joined in, the largest first. */
+	joined: JoinedGroup[];
+	/** Ids of its list entries, oldest first. Two or more. */
+	games: string[];
+}
+
 export interface ListEntry {
 	id: string;
 	title: string;
@@ -32,6 +60,12 @@ export interface ListEntry {
 	complete: boolean;
 	/** True when at least one file can be downloaded, the product's own or one of its DLC's. */
 	hasFiles: boolean;
+	/** The id of the collection the entry is in, or null. */
+	collection: string | null;
+	/** The name of GOG's series of the game, also a series of one. For search. */
+	series: string | null;
+	/** The names of the packs that count and hold the game, A to Z. For search. */
+	packs: string[];
 }
 
 export interface FileEntry {
@@ -108,8 +142,6 @@ export interface Detail extends Omit<ListEntry, 'dlc'> {
 	extras: ExtraFile[];
 	/** For an orphaned DLC: the game it needs. */
 	requires: string | null;
-	/** Titles of owned packs that include the game. */
-	partOf: string[];
 }
 
 /** The body of GET /api/index. */
@@ -117,4 +149,6 @@ export interface IndexPayload {
 	builtAt: string;
 	version: string;
 	entries: ListEntry[];
+	/** Every collection, by name. */
+	collections: Collection[];
 }

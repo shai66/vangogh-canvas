@@ -16,7 +16,16 @@ describe('parseState', () => {
 
 	it('gives the defaults for an empty address', () => {
 		expect(parse('')).toEqual(DEFAULT_STATE);
-		expect(DEFAULT_STATE).toEqual({ q: '', os: [], genres: [], together: [], sort: 'title' });
+		expect(DEFAULT_STATE).toEqual({ q: '', os: [], genres: [], together: [], sort: 'title', grouped: false });
+	});
+
+	it('reads and writes the collections toggle, and takes any other view as off', () => {
+		expect(parse('view=collections').grouped).toBe(true);
+		expect(parse('view=games').grouped).toBe(false);
+		expect(parse('view=Collections').grouped).toBe(false);
+		expect(parse('').grouped).toBe(false);
+		expect(toParams({ ...DEFAULT_STATE, grouped: true }).toString()).toBe('view=collections');
+		expect(toParams(DEFAULT_STATE).toString()).toBe('');
 	});
 
 	it('reads the example of the spec', () => {
@@ -25,7 +34,8 @@ describe('parseState', () => {
 			os: ['linux'],
 			genres: ['strategy'],
 			together: [],
-			sort: 'recent'
+			sort: 'recent',
+			grouped: false
 		});
 	});
 
@@ -49,7 +59,8 @@ describe('parseState', () => {
 			os: ['linux'],
 			genres: [],
 			together: [],
-			sort: 'title'
+			sort: 'title',
+			grouped: false
 		});
 	});
 
@@ -69,11 +80,12 @@ describe('toParams', () => {
 			os: ['linux', 'macos'] as const,
 			genres: ['Role-playing', 'Strategy'],
 			together: ['coop', 'multiplayer'] as const,
-			sort: 'recent' as const
+			sort: 'recent' as const,
+			grouped: true
 		};
 		const params = toParams({ ...state, os: [...state.os], together: [...state.together] });
 		expect(params.toString()).toBe(
-			'q=witch+wild&os=linux%2Cmacos&genre=Role-playing&genre=Strategy&play=coop%2Cmultiplayer&sort=recent'
+			'q=witch+wild&os=linux%2Cmacos&genre=Role-playing&genre=Strategy&play=coop%2Cmultiplayer&sort=recent&view=collections'
 		);
 		expect(parseState(params)).toEqual({ ...state, os: [...state.os], together: [...state.together] });
 	});

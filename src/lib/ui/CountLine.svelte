@@ -17,10 +17,15 @@
 	<!-- Read out when the list changes, politely: after the visitor stops typing. -->
 	<span class="count-text" role="status">
 		{#if view.narrowed}
-			<strong>{view.matches.length}</strong> {t.count.ofTotal(view.total)}
+			<strong>{view.games}</strong> {t.count.ofTotal(view.total)}
 		{:else}
 			<strong>{view.total}</strong> {t.count.games(view.total)}
 		{/if}
+		<!-- The collections part always keeps its room (a sizer of three digits, never seen), so switching the toggle moves nothing; its words show only while collections are shown. -->
+		<span class="of-coll" aria-hidden={!view.grouped}>
+			<span class="coll-real" class:is-off={!view.grouped}>{t.count.separator}<strong>{view.collectionCount}</strong> {t.count.collections(view.collectionCount)}</span>
+			<span class="coll-room" aria-hidden="true">{t.count.room}</span>
+		</span>
 	</span>
 	{#each chips as chip (chip.key)}
 		<button class="chip active-chip" type="button" title={t.count.removeFilter(chip.label)} onclick={chip.remove}>

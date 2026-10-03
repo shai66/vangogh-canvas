@@ -161,7 +161,9 @@
 	background: var(--accent);
 	color: var(--accent-ink);
 }
-.filter-button {
+/* The toggle "Collections" has the look of the Filters button, and of a chosen chip while it is on. */
+.filter-button,
+.view-toggle {
 	flex: none;
 	height: 40px;
 	padding: 0 14px;
@@ -173,11 +175,19 @@
 	background: var(--night-raised);
 	font-weight: 550;
 }
-.filter-button:hover {
+.filter-button:hover,
+.view-toggle:hover {
 	background: var(--night-control);
 }
-.filter-button .ic {
+.filter-button .ic,
+.view-toggle .ic {
 	font-size: 17px;
+}
+.view-toggle[aria-pressed='true'],
+.view-toggle[aria-pressed='true']:hover {
+	border-color: var(--accent);
+	background: var(--accent-wash);
+	color: var(--accent);
 }
 .filter-button {
 	position: relative;

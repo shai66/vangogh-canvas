@@ -9,10 +9,16 @@ Open it in a browser and you see the library. A click on a poster opens the
 game: one button downloads the installer for the computer you sit at, part
 by part if it has parts, and the page says which file to open afterwards.
 The arrow beside the button downloads the installer for another system.
+GOG's series and packs can be shown as collections: one card each, with a
+sheet that lists their games.
 
-| The library | A game |
+| The library, with collections | A collection |
 |---|---|
-| ![The library as a wall of posters, with search, platform filter and sort order](screenshots/library.jpg) | ![A game: the download button, the files for each system, the extras and the screenshots](screenshots/game.jpg) |
+| ![The library as a wall of posters, with search, platform filter, the Collections toggle and sort order; each collection is one card with a blue glow and the number of its games](screenshots/library.jpg) | ![A collection's sheet: the pack's picture, what it is, and its games oldest first](screenshots/collection.jpg) |
+
+| A game | A game in a collection |
+|---|---|
+| ![A game: the download button, the files for each system, the extras, its collection folded to one line, and the screenshots](screenshots/game.jpg) | ![A game with its collection opened as a row of posters, this game marked](screenshots/game-collection.jpg) |
 
 ## Canvas and GOG.com games sharing guidelines
 
@@ -218,15 +224,15 @@ browser can resume it afterwards.
 
 ## What the browser keeps
 
-One cookie, `canvas-view`. It holds the platform filter and the sort order,
-so that the list comes back as it was left. A link to the library without
-parameters (the logo, "Go to the library", closing a game that was opened by
-its address) shows the list with this platform filter and sort order.
-The cookie changes only when the visitor changes the platform filter or the
-sort order, and only the half that was changed. A shared link, a search and
-the other filters do not touch it. Canvas itself stores nothing about its
-visitors. Search and filters are in
-the address of the page, so a view can be sent to someone as a link.
+One cookie, `canvas-view`. It holds the platform filter, the sort order and
+whether collections are shown, so that the list comes back as it was left.
+A link to the library without parameters (the logo, "Go to the library",
+closing a game that was opened by its address) shows the list with these
+settings. The cookie changes only when the visitor changes one of them, and
+only the part that was changed. A shared link, a search and the other
+filters do not touch it. Canvas itself stores nothing about its visitors.
+Search, filters and the collections toggle are in the address of the page,
+so a view can be sent to someone as a link.
 
 ## Look after it
 
@@ -250,9 +256,10 @@ sends it from a page of another site, so a web page cannot start rebuilds.
 
 | Route | Returns |
 |---|---|
-| `GET /` | The library. `?q=`, `?os=`, `?genre=`, `?play=` and `?sort=recent` choose the view. |
+| `GET /` | The library. `?q=`, `?os=`, `?genre=`, `?play=`, `?sort=recent` or `?sort=year`, and `?view=collections` choose the view. |
 | `GET /game/{id}` | The library with that game open |
-| `GET /api/index` | Every game of the list. The header `x-built-at` tells the time of the last rebuild, on a `304` too. |
+| `GET /collection/{id}` | The library with that collection's sheet open |
+| `GET /api/index` | Every game of the list, and the collections. The header `x-built-at` tells the time of the last rebuild, on a `304` too. |
 | `GET /api/games/{id}` | One game in full |
 | `GET /img/{imageId}` | A poster or a screenshot |
 | `GET /download/{gameId}/{fileId}` | An installer file, resumable |

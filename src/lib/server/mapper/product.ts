@@ -10,6 +10,13 @@ export interface Related {
 	title: string | null;
 }
 
+/** GOG's series of a product. */
+export interface Series {
+	/** A whole number above 0, as digits. */
+	id: string;
+	name: string;
+}
+
 export interface MappedProduct {
 	title: string | null;
 	productType: ProductType;
@@ -31,6 +38,7 @@ export interface MappedProduct {
 	macNotice: string | null;
 	requirements: Requirements;
 	storeUrl: string | null;
+	series: Series | null;
 	requires: Related[];
 	includes: Related[];
 	includedIn: Related[];
@@ -185,6 +193,20 @@ export function storeUrlOf(x: unknown): string | null {
 	}
 }
 
+/** GOG's series of a product, `_embedded.series`, or null. Its id must be a whole number above 0. Never throws. */
+export function seriesOf(x: unknown): Series | null {
+	const series = obj(x);
+	const raw = series.id;
+	const id =
+		typeof raw === 'number' && Number.isSafeInteger(raw) && raw > 0
+			? String(raw)
+			: typeof raw === 'string' && /^[1-9]\d{0,15}$/.test(raw.trim())
+				? raw.trim()
+				: null;
+	const name = str(series.name);
+	return id !== null && name !== '' ? { id, name } : null;
+}
+
 /** Maps a `gog-api-products` record. Never throws, whatever it is given. */
 export function mapApiProduct(raw: unknown): MappedProduct {
 	const root = obj(raw);
@@ -233,6 +255,7 @@ export function mapApiProduct(raw: unknown): MappedProduct {
 		macNotice: macNoticeOf(root.additionalRequirements),
 		requirements: requirementsOf(embedded.supportedOperatingSystems),
 		storeUrl: storeUrlOf(links.store),
+		series: seriesOf(embedded.series),
 		requires: related(links.requiresGames),
 		includes: related(links.includesGames),
 		includedIn: related(links.isIncludedInGames)

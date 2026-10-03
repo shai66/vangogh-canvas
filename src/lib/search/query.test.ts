@@ -24,6 +24,9 @@ function entry(over: Partial<ListEntry> & { id: string; title: string }): ListEn
 		order: 0,
 		complete: true,
 		hasFiles: true,
+		collection: null,
+		series: null,
+		packs: [],
 		...over
 	};
 }
@@ -96,6 +99,21 @@ describe('matchEntry', () => {
 	it('names the publisher when nothing else holds the word', () => {
 		const game = entry({ id: '9', title: 'X', publisher: 'Small Press' });
 		expect(matchEntry(game, ['press'])?.reason).toEqual({ field: 'publisher', value: 'Small Press' });
+	});
+
+	it('finds a game by its series and its packs, after its DLC and before its genres, and names them', () => {
+		const game = entry({
+			id: '9',
+			title: 'Dusk One',
+			series: 'Thornwick Mysteries',
+			packs: ['Parallax Racing Trilogy'],
+			dlc: ['Thornwick Map Pack'],
+			genres: ['Racing']
+		});
+		expect(matchEntry(game, ['mysteries'])?.reason).toEqual({ field: 'series', value: 'Thornwick Mysteries' });
+		expect(matchEntry(game, ['parallax'])?.reason).toEqual({ field: 'pack', value: 'Parallax Racing Trilogy' });
+		expect(matchEntry(game, ['thornwick'])?.reason).toEqual({ field: 'dlc', value: 'Thornwick Map Pack' });
+		expect(matchEntry(game, ['racing'])?.reason).toEqual({ field: 'pack', value: 'Parallax Racing Trilogy' });
 	});
 
 	it('gives no reason when the title holds every word', () => {

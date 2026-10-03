@@ -1,6 +1,6 @@
-import { query, type Match } from './search/query';
+import { cards, type ListCard } from './search/cards';
 import type { Sort, Together, ViewState } from './search/state';
-import type { ListEntry, Os } from './types';
+import type { Collection, ListEntry, Os } from './types';
 
 /** Cards are drawn in batches of this many while scrolling. */
 export const BATCH = 42;
@@ -25,13 +25,19 @@ export class View {
 	genres = $state<string[]>([]);
 	together = $state<Together[]>([]);
 	sort = $state<Sort>('title');
+	/** True while each collection is one card. */
+	grouped = $state(false);
 	/** How many cards are drawn. */
 	limit = $state(BATCH);
 
-	/** The entries that answer the view, in its order. */
-	readonly matches: Match[];
-	/** The matches that are drawn. */
-	readonly shown: Match[];
+	/** The cards that answer the view, in its order: games, and collections while the toggle is on. */
+	readonly cards: ListCard[];
+	/** The cards that are drawn. */
+	readonly shown: ListCard[];
+	/** How many games the cards stand for: a collection's card counts its games. */
+	readonly games: number;
+	/** How many of the cards are collections. */
+	readonly collectionCount: number;
 	/** The size of the whole library. */
 	readonly total: number;
 	/** How many filter values are switched on. The search is not a filter. */
@@ -41,23 +47,26 @@ export class View {
 
 	#changed: (state: ViewState, before: ViewState) => void;
 
-	/** `entries` is a function, so that a newer list is picked up when the page data changes. */
+	/** `entries` and `collections` are functions, so that newer ones are picked up when the page data changes. */
 	constructor(
 		entries: () => ListEntry[],
 		initial: ViewState,
-		changed: (state: ViewState, before: ViewState) => void = () => {}
+		changed: (state: ViewState, before: ViewState) => void = () => {},
+		collections: () => Collection[] = () => []
 	) {
 		this.#changed = changed;
 		this.#set(initial);
-		this.matches = $derived(query(entries(), this.state));
-		this.shown = $derived(this.matches.slice(0, this.limit));
+		this.cards = $derived(cards(entries(), collections(), this.state));
+		this.shown = $derived(this.cards.slice(0, this.limit));
+		this.games = $derived(this.cards.reduce((n, card) => n + (card.kind === 'collection' ? card.games.length : 1), 0));
+		this.collectionCount = $derived(this.cards.filter((card) => card.kind === 'collection').length);
 		this.total = $derived(entries().length);
 		this.filterCount = $derived(this.os.length + this.genres.length + this.together.length);
 		this.narrowed = $derived(this.filterCount > 0 || this.q.trim() !== '');
 	}
 
 	get state(): ViewState {
-		return { q: this.q, os: this.os, genres: this.genres, together: this.together, sort: this.sort };
+		return { q: this.q, os: this.os, genres: this.genres, together: this.together, sort: this.sort, grouped: this.grouped };
 	}
 
 	#set(state: ViewState): void {
@@ -66,6 +75,7 @@ export class View {
 		this.genres = [...state.genres];
 		this.together = [...state.together];
 		this.sort = state.sort;
+		this.grouped = state.grouped;
 		this.limit = BATCH;
 	}
 
@@ -81,7 +91,7 @@ export class View {
 	}
 
 	more(): void {
-		if (this.limit < this.matches.length) this.limit += BATCH;
+		if (this.limit < this.cards.length) this.limit += BATCH;
 	}
 
 	setQuery(q: string): void {
@@ -98,6 +108,10 @@ export class View {
 	}
 	setSort(sort: Sort): void {
 		this.#apply({ sort });
+	}
+	/** The toggle "Collections". Clearing the search and the filters leaves it as it is. */
+	toggleGrouped(): void {
+		this.#apply({ grouped: !this.grouped });
 	}
 	/** Leaves the search alone. */
 	clearFilters(): void {

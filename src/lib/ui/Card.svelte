@@ -5,6 +5,7 @@
 	import { t } from '$lib/strings';
 	import Icon from './Icon.svelte';
 	import Poster from './Poster.svelte';
+	import { restTitle, runTitle } from './title-run';
 	import WarnSign from './WarnSign.svelte';
 
 	interface Props {
@@ -26,19 +27,8 @@
 	});
 
 	let title: HTMLElement;
-	const still = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-	/** A title that does not fit runs slowly to its end and back while the card is pointed at or focused. */
-	function run() {
-		const over = title.scrollWidth - title.clientWidth;
-		if (over <= 0 || still() || title.classList.contains('is-running')) return;
-		title.style.setProperty('--run', `${-over - 4}px`);
-		title.style.setProperty('--run-time', `${Math.max(5, over / 14 + 4)}s`);
-		title.classList.add('is-running');
-	}
-	function rest() {
-		title.classList.remove('is-running');
-	}
+	const run = () => runTitle(title);
+	const rest = () => restTitle(title);
 </script>
 
 <a

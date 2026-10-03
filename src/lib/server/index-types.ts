@@ -1,8 +1,8 @@
-import type { Detail, ListEntry } from '../types';
+import type { Collection, Detail, ListEntry } from '../types';
 import type { DownloadType } from './vangogh/client';
 
-/** Raised when the shape of the cached index changes. 5: the year in the list, the extras and the system requirements. */
-export const INDEX_SCHEMA = 5;
+/** Raised when the shape of the cached index changes. 6: the collections. */
+export const INDEX_SCHEMA = 6;
 
 /** Where a file is in vangogh. Never sent to the browser. */
 export interface FileTarget {
@@ -20,4 +20,6 @@ export interface Index {
 	details: Record<string, Detail>;
 	/** Keyed by `<gameId>/<fileId>`. */
 	files: Record<string, FileTarget>;
+	/** Every collection, by name. */
+	collections: Collection[];
 }

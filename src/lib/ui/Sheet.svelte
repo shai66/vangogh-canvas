@@ -8,9 +8,11 @@
 		onclose: () => void;
 		class?: string;
 		label: string;
+		/** What the sheet shows. When it changes while the sheet is open, the sheet starts at its top again and the focus goes into the new content. */
+		view?: string;
 		children: Snippet;
 	}
-	let { open, onclose, class: kind = '', label, children }: Props = $props();
+	let { open, onclose, class: kind = '', label, view = '', children }: Props = $props();
 
 	let dialog: HTMLDialogElement;
 	let locked = false;
@@ -40,6 +42,16 @@
 
 	$effect(() => () => {
 		if (locked) unlockPage();
+	});
+
+	// svelte-ignore state_referenced_locally
+	let shownView = view;
+	$effect(() => {
+		if (view === shownView) return;
+		shownView = view;
+		if (!dialog.open) return;
+		dialog.scrollTop = 0;
+		dialog.querySelector<HTMLElement>('[autofocus]')?.focus({ preventScroll: true });
 	});
 </script>
 

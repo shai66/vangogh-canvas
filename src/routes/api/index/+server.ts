@@ -17,7 +17,8 @@ export const GET: RequestHandler = ({ request }) => {
 	const body: IndexPayload = {
 		builtAt: index.builtAt,
 		version: index.version,
-		entries: index.entries
+		entries: index.entries,
+		collections: index.collections
 	};
 	return json(body, { headers });
 };

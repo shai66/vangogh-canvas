@@ -3,6 +3,7 @@
 	import Icon from './Icon.svelte';
 	import Picture from './Picture.svelte';
 	import Sheet from './Sheet.svelte';
+	import { Strip } from './strip.svelte';
 
 	let { screenshots }: { screenshots: string[] } = $props();
 
@@ -10,21 +11,11 @@
 	let failed = $state<string[]>([]);
 	const shots = $derived(screenshots.filter((id) => !failed.includes(id)));
 
-	let strip = $state<HTMLElement>();
-	let atStart = $state(true);
-	let atEnd = $state(false);
-	function measure() {
-		if (!strip) return;
-		atStart = strip.scrollLeft < 8;
-		atEnd = strip.scrollLeft + strip.clientWidth > strip.scrollWidth - 8;
-	}
+	const strip = new Strip();
 	$effect(() => {
 		shots;
-		measure();
+		strip.measure();
 	});
-	function move(direction: number) {
-		strip?.scrollBy({ left: direction * strip.clientWidth * 0.8, behavior: 'smooth' });
-	}
 
 	/** The screenshot in the larger view, or null. */
 	let large = $state<number | null>(null);
@@ -36,18 +27,18 @@
 {#if shots.length > 0}
 	<div class="shots-wrap">
 		<h2 class="section-title">{t.detail.screenshots} <span>{shots.length}</span></h2>
-		<button class="shots-arrow prev" type="button" disabled={atStart} onclick={() => move(-1)}>
+		<button class="shots-arrow prev" type="button" disabled={strip.atStart} onclick={() => strip.move(-1)}>
 			<Icon name="left" /><span class="sr">{t.detail.earlier}</span>
 		</button>
-		<div class="shots" bind:this={strip} onscroll={measure}>
+		<div class="shots" bind:this={strip.node} onscroll={strip.measure}>
 			{#each shots as id, position (id)}
 				<button class="shot" type="button" onclick={() => (large = position)}>
-					<Picture {id} onfail={() => (failed = [...failed, id])} onshow={measure} />
+					<Picture {id} onfail={() => (failed = [...failed, id])} onshow={strip.measure} />
 					<span class="sr">{t.detail.larger(position + 1)}</span>
 				</button>
 			{/each}
 		</div>
-		<button class="shots-arrow next" type="button" disabled={atEnd} onclick={() => move(1)}>
+		<button class="shots-arrow next" type="button" disabled={strip.atEnd} onclick={() => strip.move(1)}>
 			<Icon name="right" /><span class="sr">{t.detail.more}</span>
 		</button>
 	</div>

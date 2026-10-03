@@ -17,7 +17,8 @@ function isIndex(x: unknown): x is Index {
 		typeof x.builtAt === 'string' &&
 		Array.isArray(x.entries) &&
 		isRecord(x.details) &&
-		isRecord(x.files)
+		isRecord(x.files) &&
+		Array.isArray(x.collections)
 	);
 }
 

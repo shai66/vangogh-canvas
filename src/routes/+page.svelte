@@ -6,6 +6,7 @@
 
 <Library
 	entries={data.entries}
+	collections={data.collections}
 	builtAt={data.builtAt}
 	version={data.version}
 	timeZone={data.timeZone}

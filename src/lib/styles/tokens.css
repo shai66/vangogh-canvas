@@ -21,6 +21,9 @@
 	/* Geranium red: something is wrong. */
 	--danger: #f0553f;
 	--danger-wash: rgb(240 85 63 / 0.14);
+	/* Sky blue, the light blue of the sky's swirls: "this is a collection". Three numbers, as it
+	   is always used with an opacity: rgb(var(--sky) / 0.6). */
+	--sky: 111 160 255;
 
 	--radius-poster: 6px;
 	--radius-control: 9px;

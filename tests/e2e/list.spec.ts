@@ -17,7 +17,7 @@ test.describe('the list', () => {
 	test('shows every entry, A to Z, with what is known of each', async ({ page }) => {
 		await page.goto('/');
 		await expect(page).toHaveTitle('Canvas for vangogh');
-		await expect(page.locator('.count-text')).toHaveText('7 games');
+		await expect(page.locator('.count-text')).toHaveText('7 games', { useInnerText: true });
 		expect(await titles(page)).toEqual([
 			'Broken Record',
 			'Expansion Only Game',
@@ -159,7 +159,7 @@ test.describe('search', () => {
 	test('filters while typing, and says why an entry matched', async ({ page }) => {
 		await page.goto('/');
 		await page.getByLabel('Search the library').fill('expansion');
-		await expect(page.locator('.count-text')).toHaveText('3 of 7 games');
+		await expect(page.locator('.count-text')).toHaveText('3 of 7 games', { useInnerText: true });
 		expect(await titles(page)).toEqual(['Expansion Only Game', 'Lonely Expansion', 'The Long Dark Road']);
 		await expect(page.locator('.card', { hasText: 'The Long Dark Road' }).locator('.card-reason')).toHaveText('contains: Road Expansion');
 		await expect(page).toHaveURL(/\?q=expansion$/);
@@ -177,7 +177,7 @@ test.describe('search', () => {
 		await expect(page.locator('.empty h2')).toHaveText('No game matches');
 		await expect(page.locator('.empty p')).toHaveText('Nothing in the library matches “zzzz” with the filters that are on.');
 		await page.getByRole('button', { name: 'Clear search and filters' }).click();
-		await expect(page.locator('.count-text')).toHaveText('7 games');
+		await expect(page.locator('.count-text')).toHaveText('7 games', { useInnerText: true });
 		await expect(page).toHaveURL(/\/$/);
 	});
 
@@ -190,7 +190,7 @@ test.describe('search', () => {
 		await expect(box).toHaveValue('road');
 		await page.keyboard.press('Escape');
 		await expect(box).toHaveValue('');
-		await expect(page.locator('.count-text')).toHaveText('7 games');
+		await expect(page.locator('.count-text')).toHaveText('7 games', { useInnerText: true });
 	});
 
 	test('shows one cross in the search box, its own: the browser draws none beside it', async ({ page }) => {
@@ -286,7 +286,7 @@ test.describe('filters', () => {
 		await expect(page).toHaveURL(/\?genre=Strategy&play=coop$/);
 		await expect(page.locator('.active-chip')).toHaveText(['Co-opRemove the filter Co-op', 'StrategyRemove the filter Strategy']);
 		await page.getByRole('button', { name: 'Remove the filter Co-op' }).click();
-		await expect(page.locator('.count-text')).toHaveText('2 of 7 games');
+		await expect(page.locator('.count-text')).toHaveText('2 of 7 games', { useInnerText: true });
 	});
 
 	test('need a genre and a setting to hold both', async ({ page }) => {
@@ -294,7 +294,7 @@ test.describe('filters', () => {
 		await page.goto('/?genre=Strategy&genre=Fantasy');
 		await expect(page.locator('.empty h2')).toBeVisible();
 		await page.goto('/?genre=Strategy&genre=Adventure');
-		await expect(page.locator('.count-text')).toHaveText('3 of 7 games');
+		await expect(page.locator('.count-text')).toHaveText('3 of 7 games', { useInnerText: true });
 	});
 
 	test('are remembered for the platform and the order, and an address wins over them', async ({ page }) => {

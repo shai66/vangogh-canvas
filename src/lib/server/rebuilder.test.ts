@@ -4,12 +4,13 @@ import { createLogger, silentLogger } from './log';
 import { Rebuilder } from './rebuilder';
 
 const index: Index = {
-	schema: 5,
+	schema: 6,
 	builtAt: '2026-09-29T02:30:00.000Z',
 	version: 'v1',
 	entries: [],
 	details: {},
-	files: {}
+	files: {},
+	collections: []
 };
 
 function setup(build: () => Promise<Index> = async () => index) {

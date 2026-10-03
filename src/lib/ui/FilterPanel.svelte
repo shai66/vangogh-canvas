@@ -90,6 +90,6 @@
 	</div>
 	<div class="filters-foot">
 		<button class="btn" type="button" onclick={() => view.clearFilters()}>{t.filters.clear}</button>
-		<button class="btn btn-primary" type="button" onclick={onclose}>{t.filters.show(view.matches.length)}</button>
+		<button class="btn btn-primary" type="button" onclick={onclose}>{t.filters.show(view.games)}</button>
 	</div>
 </Sheet>

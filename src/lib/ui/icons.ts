@@ -54,6 +54,7 @@ import runSvg from '@phosphor-icons/core/fill/play-circle-fill.svg?raw';
 import searchSvg from '@phosphor-icons/core/regular/magnifying-glass.svg?raw';
 import shieldChevronSvg from '@phosphor-icons/core/regular/shield-chevron.svg?raw';
 import skullSvg from '@phosphor-icons/core/regular/skull.svg?raw';
+import stackSvg from '@phosphor-icons/core/regular/stack.svg?raw';
 import stairsSvg from '@phosphor-icons/core/regular/stairs.svg?raw';
 import steeringWheelSvg from '@phosphor-icons/core/regular/steering-wheel.svg?raw';
 import strategySvg from '@phosphor-icons/core/regular/strategy.svg?raw';
@@ -131,7 +132,8 @@ export const ICONS = {
 	userCircle: inner(userCircleSvg),
 	filmStrip: inner(filmStripSvg),
 	package: inner(packageSvg),
-	external: inner(arrowUpRightSvg)
+	external: inner(arrowUpRightSvg),
+	stack: inner(stackSvg)
 } as const;
 
 export type IconName = keyof typeof ICONS;

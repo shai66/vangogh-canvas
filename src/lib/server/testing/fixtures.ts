@@ -49,6 +49,8 @@ export interface ApiProductOptions {
 	additional?: string;
 	/** The address of the game's page on GOG.com, `_links.store.href`. */
 	store?: string;
+	/** GOG's series of the product, `_embedded.series`: a numeric id and a name. */
+	series?: { id: number; name: string };
 	/** GOG's system requirements by system name ("windows", "osx", "linux"): rows of [id, GOG's label, text]. */
 	requirements?: Record<string, { minimum?: [string, string, string][]; recommended?: [string, string, string][] }>;
 	requires?: string[];
@@ -76,6 +78,7 @@ export function apiProduct(o: ApiProductOptions): unknown {
 					: {})
 			},
 			productType: o.type ?? 'GAME',
+			...(o.series ? { series: o.series } : {}),
 			tags: (o.genres ?? []).map((name) => ({ name })),
 			properties: (o.tags ?? []).map((name) => ({ name })),
 			supportedOperatingSystems: (o.os ?? ['windows']).map((name) => {
@@ -158,59 +161,61 @@ export function details(o: DetailsOptions): unknown {
 
 const road = '/downloads/the_long_dark_road';
 
+/** The options of each product record, for a test that needs one of them with a change. */
+export const productOptions: Record<string, ApiProductOptions> = {
+	'1001': {
+		title: 'The Long Dark Road',
+		genres: ['Role-playing', 'Adventure'],
+		tags: ['Atmospheric', 'Story Rich', 'Turn-Based'],
+		os: ['windows', 'osx', 'linux'],
+		developers: ['Šťastný Studio'],
+		publisher: 'Road Works',
+		features: ['Single-player', 'Multi-player', 'Co-op', 'Achievements'],
+		languages: ['en', 'sk'],
+		description: '<p>A <b>long</b> road.</p><script>alert(1)</script><img src="x" onerror="alert(1)">',
+		screenshots: [SHOT.one, SHOT.two],
+		poster: POSTER['1001'],
+		banner: BANNER['1001'],
+		backdrop: BACKDROP['1001'],
+		released: '2002-09-27T00:00:00+02:00',
+		store: 'https://www.gog.com/en/game/the_long_dark_road',
+		includedIn: ['3001']
+	},
+	'1002': {
+		title: 'Windows Only Game',
+		genres: ['Strategy'],
+		tags: ['Turn-Based'],
+		os: ['windows'],
+		developers: ['Small Team'],
+		publisher: 'Small Team',
+		features: ['Single-player'],
+		poster: POSTER['1002'],
+		banner: BANNER['1002']
+	},
+	'2002': {
+		title: 'Lonely Expansion',
+		type: 'DLC',
+		genres: ['Strategy'],
+		os: ['windows'],
+		poster: POSTER['2002'],
+		requires: ['9999']
+	},
+	'3001': {
+		title: 'Road Trilogy',
+		type: 'PACK',
+		os: ['windows', 'osx', 'linux'],
+		includes: ['1001']
+	},
+	'1004': {
+		title: 'Goodie Collection',
+		genres: ['Action'],
+		poster: POSTER['1004']
+	}
+};
+
 export const records = {
 	library,
-	apiProducts: {
-		'1001': apiProduct({
-			title: 'The Long Dark Road',
-			genres: ['Role-playing', 'Adventure'],
-			tags: ['Atmospheric', 'Story Rich', 'Turn-Based'],
-			os: ['windows', 'osx', 'linux'],
-			developers: ['Šťastný Studio'],
-			publisher: 'Road Works',
-			features: ['Single-player', 'Multi-player', 'Co-op', 'Achievements'],
-			languages: ['en', 'sk'],
-			description:
-				'<p>A <b>long</b> road.</p><script>alert(1)</script><img src="x" onerror="alert(1)">',
-			screenshots: [SHOT.one, SHOT.two],
-			poster: POSTER['1001'],
-			banner: BANNER['1001'],
-			backdrop: BACKDROP['1001'],
-			released: '2002-09-27T00:00:00+02:00',
-			store: 'https://www.gog.com/en/game/the_long_dark_road',
-			includedIn: ['3001']
-		}),
-		'1002': apiProduct({
-			title: 'Windows Only Game',
-			genres: ['Strategy'],
-			tags: ['Turn-Based'],
-			os: ['windows'],
-			developers: ['Small Team'],
-			publisher: 'Small Team',
-			features: ['Single-player'],
-			poster: POSTER['1002'],
-			banner: BANNER['1002']
-		}),
-		'2002': apiProduct({
-			title: 'Lonely Expansion',
-			type: 'DLC',
-			genres: ['Strategy'],
-			os: ['windows'],
-			poster: POSTER['2002'],
-			requires: ['9999']
-		}),
-		'3001': apiProduct({
-			title: 'Road Trilogy',
-			type: 'PACK',
-			os: ['windows', 'osx', 'linux'],
-			includes: ['1001']
-		}),
-		'1004': apiProduct({
-			title: 'Goodie Collection',
-			genres: ['Action'],
-			poster: POSTER['1004']
-		})
-	} as Record<string, unknown>,
+	apiProducts: Object.fromEntries(Object.entries(productOptions).map(([id, o]) => [id, apiProduct(o)])) as Record<string, unknown>,
 	details: {
 		'1001': details({
 			other: [['Deutsch', { windows: [file(`${road}/de1installer0`, 'German build')] }]],

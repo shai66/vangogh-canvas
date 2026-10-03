@@ -2,13 +2,16 @@
 	import { afterNavigate, beforeNavigate, goto, preloadData, pushState, replaceState } from '$app/navigation';
 	import { page } from '$app/state';
 	import { browser } from '$app/environment';
+	import { gamesOf } from '$lib/collections';
 	import { nextRemembered, recall, rememberedCookie, type Remembered } from '$lib/remember';
 	import { DEFAULT_STATE, parseState, toParams, type ViewState } from '$lib/search/state';
 	import { t } from '$lib/strings';
-	import type { Detail, ListEntry } from '$lib/types';
+	import type { Collection, Detail, ListEntry } from '$lib/types';
 	import { View } from '$lib/view.svelte';
 	import { detectVisitor, type Visitor } from '$lib/visitor';
 	import Card from './Card.svelte';
+	import CollectionCard from './CollectionCard.svelte';
+	import CollectionView from './CollectionView.svelte';
 	import CountLine from './CountLine.svelte';
 	import DetailView from './Detail.svelte';
 	import FilterPanel from './FilterPanel.svelte';
@@ -19,6 +22,8 @@
 
 	interface Props {
 		entries: ListEntry[];
+		/** The collections of the library. */
+		collections: Collection[];
 		builtAt: string | null;
 		version: string;
 		timeZone: string;
@@ -27,12 +32,27 @@
 		remembered: Remembered;
 		/** The game of the address, when the page was opened at `/game/{id}`. */
 		linked?: Detail | null;
-		/** True when the address names a game that is not in the library. */
-		unknown?: boolean;
+		/** The collection of the address, when the page was opened at `/collection/{id}`. */
+		linkedCollection?: Collection | null;
+		/** Set when the address names a game or a collection that is not in the library. */
+		unknown?: 'game' | 'collection' | null;
 	}
-	let { entries, builtAt, version, timeZone, visitor: guessed, remembered, linked = null, unknown = false }: Props = $props();
+	let {
+		entries,
+		collections,
+		builtAt,
+		version,
+		timeZone,
+		visitor: guessed,
+		remembered,
+		linked = null,
+		linkedCollection = null,
+		unknown = null
+	}: Props = $props();
 
 	const onList = () => page.url.pathname === '/';
+	/** True while a detail or a collection's sheet, opened by a click, lies over the list. */
+	const covered = () => page.state.detail !== undefined || page.state.collection !== undefined;
 	const address = (state: ViewState) => {
 		const params = toParams(state).toString();
 		return params ? `/?${params}` : '/';
@@ -62,7 +82,7 @@
 		clearTimeout(pending);
 		pending = undefined;
 		const target = address(view.state);
-		if (!onList() || page.state.detail || target === page.url.pathname + page.url.search) return Promise.resolve();
+		if (!onList() || covered() || target === page.url.pathname + page.url.search) return Promise.resolve();
 		writing = target;
 		// A newer write or another navigation overtakes it: that is fine.
 		return goto(target, { replaceState: true, keepFocus: true, noScroll: true }).catch(() => {});
@@ -74,26 +94,30 @@
 		(state, before) => {
 			clearTimeout(pending);
 			pending = setTimeout(write, PAUSE);
-			// Remembered is what the visitor sets: the platform filter and the order. A search
+			// Remembered is what the visitor sets: the platform filter, the order and the collections toggle. A search
 			// does not change it, nor does a view that came from an address.
 			const next = nextRemembered(recall(document.cookie), before, state);
 			if (next) document.cookie = rememberedCookie(next);
-		}
+		},
+		() => collections
 	);
+
+	/** The entries by id: a collection's card shows its oldest game's picture when it has none of its own. */
+	const byId = $derived(new Map(entries.map((e) => [e.id, e])));
 
 	// What leaves the list writes its address first, when the pause has not ended yet,
 	// so that the entry left behind says what the list showed.
 	beforeNavigate((navigation) => {
 		// A detail that is left by a navigation keeps the list under it, for the way back to it.
 		// The address of its entry can be older than that list.
-		if (page.state.detail && navigation.type !== 'popstate' && page.state.list !== address(view.state)) {
+		if (covered() && navigation.type !== 'popstate' && page.state.list !== address(view.state)) {
 			replaceState('', { ...page.state, list: address(view.state) });
 		}
 		if (pending === undefined) return;
 		clearTimeout(pending);
 		pending = undefined;
 		// On Back and Forward the entry has been left already.
-		if (navigation.type === 'popstate' || !onList() || page.state.detail) return;
+		if (navigation.type === 'popstate' || !onList() || covered()) return;
 		const to = navigation.to?.url;
 		if (navigation.type === 'link' && !navigation.willUnload && to) {
 			navigation.cancel();
@@ -115,7 +139,7 @@
 		if (navigation.type === 'enter') {
 			// What was remembered is now shown: say so in the address.
 			if (to.search === '') write();
-		} else if (page.state.detail && page.state.list) {
+		} else if (covered() && page.state.list) {
 			// Back to a detail: the list under it is the one the visitor last saw there.
 			follow(new URL(page.state.list, location.href));
 		} else {
@@ -144,6 +168,27 @@
 	// ---------- The game detail ----------
 
 	const detail = $derived(page.state.detail ?? linked);
+	/** The collection whose sheet is open. A game opened from it takes its place. */
+	const collection = $derived.by(() => {
+		if (page.state.detail) return null;
+		const id = page.state.collection;
+		if (id !== undefined) return collections.find((c) => c.id === id) ?? null;
+		if (linkedCollection) return linkedCollection;
+		// Back onto the entry of a sheet that came by its address is a shallow popstate (same navigation index as the list's
+		// entry): the list's route stays mounted with an empty state, and only the address says which sheet.
+		const named = /^\/collection\/([^/]+)$/.exec(page.url.pathname);
+		if (!named) return null;
+		let namedId: string;
+		try {
+			namedId = decodeURIComponent(named[1]);
+		} catch {
+			// A malformed % sequence in the address names no collection.
+			return null;
+		}
+		return collections.find((c) => c.id === namedId) ?? null;
+	});
+	/** The collection of the open game, for its row of posters. */
+	const detailCollection = $derived(detail?.collection ? (collections.find((c) => c.id === detail.collection) ?? null) : null);
 
 	let opening = false;
 	let closing = false;
@@ -157,7 +202,7 @@
 	// the detail back could not be written, and it goes; the address and the list agree.
 	let over = false;
 	$effect(() => {
-		const shown = page.state.detail !== undefined;
+		const shown = covered();
 		if (!shown) closed();
 		if (over && !shown && location.pathname === '/') {
 			clearTimeout(pending);
@@ -167,9 +212,13 @@
 		over = shown;
 	});
 
+	/** A plain left click, without a modifier key: the ones a browser would not open elsewhere. */
+	const isPlainClick = (event: MouseEvent): boolean =>
+		event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
+
 	/** A plain click opens the detail over the list, without leaving it. Anything else is a normal link. */
 	async function open(event: MouseEvent, href: string) {
-		if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+		if (!isPlainClick(event)) return;
 		event.preventDefault();
 		// One opening at a time, and none over a detail that is already open.
 		if (opening || page.state.detail) return;
@@ -179,7 +228,11 @@
 			await write();
 			const result = await preloadData(href);
 			if (result.type === 'loaded' && result.status === 200 && result.data.detail) {
-				if (!page.state.detail) pushState(href, { detail: result.data.detail as Detail, list: address(view.state) });
+				if (!page.state.detail) {
+					// From a collection's sheet the game takes the sheet's place, and closing it goes past the sheet to the list.
+					const back = page.state.collection !== undefined ? 2 : collection !== null ? 0 : 1;
+					pushState(href, { detail: result.data.detail as Detail, list: page.state.list ?? address(view.state), back });
+				}
 			} else {
 				await goto(href);
 			}
@@ -191,21 +244,68 @@
 		}
 	}
 
+	/** A plain click on a collection's card opens its sheet over the list. What it shows is in the page already. */
+	async function openCollection(event: MouseEvent, id: string) {
+		if (!isPlainClick(event)) return;
+		event.preventDefault();
+		if (opening || covered()) return;
+		opening = true;
+		try {
+			// The entry of the list says what the list shows before the sheet goes over it.
+			await write();
+			if (!covered()) pushState(`/collection/${encodeURIComponent(id)}`, { collection: id, list: address(view.state) });
+		} finally {
+			opening = false;
+		}
+	}
+
 	function close() {
-		// Opened over the list: going back closes it and the list is where it was.
-		if (page.state.detail) {
-			// A second press before the first has taken effect would go back out of the list.
-			if (closing) return;
+		// A second press before the first has taken effect would go back out of the list.
+		if (closing) return;
+		const back = page.state.detail ? (page.state.back ?? 1) : page.state.collection !== undefined ? 1 : 0;
+		if (back > 0) {
+			// Opened over the list, perhaps from a collection's sheet: going back that far shows the list where it was.
 			closing = true;
 			// Released by the navigation, and by the clock should the navigation never happen.
 			closingTimer = setTimeout(closed, 1500);
-			history.back();
+			history.go(-back);
+		} else if (page.state.detail) {
+			// Opened over a page that came by its address: the list takes the detail's place, and Back shows that page again.
+			goto(page.state.list ?? '/', { replaceState: true });
 		} else goto('/');
 	}
 
-	/** A tag is searched for in the whole library. The platform filter and the order are the visitor's settings: they stay. */
+	/** Another game of the open collection's row opens in place of this one, with its row open. */
+	async function swap(event: MouseEvent, href: string) {
+		if (!isPlainClick(event)) return;
+		event.preventDefault();
+		if (opening) return;
+		opening = true;
+		try {
+			const result = await preloadData(href);
+			if (result.type === 'loaded' && result.status === 200 && result.data.detail) {
+				// It takes this game's place in the history: closing still shows the list, and Back closes it.
+				const shallow = page.state.detail !== undefined;
+				replaceState(href, {
+					detail: result.data.detail as Detail,
+					list: page.state.list ?? address(view.state),
+					back: shallow ? (page.state.back ?? 1) : 0,
+					shelf: true
+				});
+			} else {
+				await goto(href);
+			}
+		} catch {
+			// The network is gone: an ordinary navigation shows what the browser can.
+			location.href = href;
+		} finally {
+			opening = false;
+		}
+	}
+
+	/** A tag is searched for in the whole library. The platform filter, the order and the toggle are the visitor's settings: they stay. */
 	function searchTag(tag: string) {
-		goto(address({ ...DEFAULT_STATE, os: view.os, sort: view.sort, q: tag }));
+		goto(address({ ...DEFAULT_STATE, os: view.os, sort: view.sort, grouped: view.grouped, q: tag }));
 	}
 
 	// ---------- The rest of the page ----------
@@ -234,12 +334,12 @@
 		if (sentinel.getBoundingClientRect().top < window.innerHeight + 900) view.more();
 	});
 
-	// The note about an unknown game goes away by itself.
+	// The note about an unknown game or collection goes away by itself.
 	// svelte-ignore state_referenced_locally
 	let note = $state(unknown);
 	$effect(() => {
 		if (!note) return;
-		const timer = setTimeout(() => (note = false), 8000);
+		const timer = setTimeout(() => (note = null), 8000);
 		return () => clearTimeout(timer);
 	});
 </script>
@@ -247,20 +347,24 @@
 <svelte:window onkeydown={keydown} />
 
 <svelte:head>
-	<title>{detail ? t.gameTitle(detail.title) : t.pageTitle}</title>
+	<title>{detail ? t.gameTitle(detail.title) : collection ? t.collectionTitle(collection.name) : t.pageTitle}</title>
 </svelte:head>
 
 <TopBar bind:this={bar} {view} onfilters={() => (filtersOpen = true)} />
 
 <main>
 	{#if note}
-		<div class="toast" role="status"><Icon name="info" /><span>{t.notInLibrary}</span></div>
+		<div class="toast" role="status"><Icon name="info" /><span>{note === 'collection' ? t.collectionNotInLibrary : t.notInLibrary}</span></div>
 	{/if}
 	<CountLine {view} />
-	{#if view.matches.length > 0}
+	{#if view.cards.length > 0}
 		<div class="grid">
-			{#each view.shown as match (match.entry.id)}
-				<Card {match} showYear={view.sort === 'year'} onopen={open} />
+			{#each view.shown as card (card.key)}
+				{#if card.kind === 'game'}
+					<Card match={card} showYear={view.sort === 'year'} onopen={open} />
+				{:else}
+					<CollectionCard {card} oldest={byId.get(card.collection.games[0])} onopen={openCollection} />
+				{/if}
 			{/each}
 		</div>
 	{:else}
@@ -277,10 +381,30 @@
 
 <FilterPanel open={filtersOpen} onclose={() => (filtersOpen = false)} {view} {entries} />
 
-<Sheet open={detail !== null} onclose={close} class="detail" label={detail?.title ?? ''}>
+<!-- One sheet for a game and a collection: a game opened from a collection takes its place without the sheet closing. -->
+<Sheet
+	open={detail !== null || collection !== null}
+	onclose={close}
+	class="detail"
+	label={detail?.title ?? collection?.name ?? ''}
+	view={detail ? `game/${detail.id}` : collection ? `collection/${collection.id}` : ''}
+>
 	{#if detail}
 		{#key detail.id}
-			<DetailView {detail} {visitor} onclose={close} ontag={searchTag} />
+			<DetailView
+				{detail}
+				{visitor}
+				onclose={close}
+				ontag={searchTag}
+				collection={detailCollection}
+				collectionGames={detailCollection ? gamesOf(detailCollection, entries) : []}
+				shelfOpen={page.state.shelf ?? false}
+				onswap={swap}
+			/>
+		{/key}
+	{:else if collection}
+		{#key collection.id}
+			<CollectionView {collection} games={gamesOf(collection, entries)} onclose={close} onopen={open} />
 		{/key}
 	{/if}
 </Sheet>

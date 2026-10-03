@@ -216,6 +216,114 @@ function richLibrary(): FakeData {
 	};
 }
 
+/** The image id of an invented product's picture: its id, sixteen times. */
+export const pictureOf = (id: string): string => id.repeat(16);
+
+/**
+ * A library of its own for the collections, with invented series and packs. In the order of
+ * purchase, newest first:
+ *   4117          Night Ferry, 2015, of no collection
+ *   4103          Saltwater Detectives, 2001, Windows and macOS, of GOG's series "Thornwick Mysteries" (500)
+ *   4115          Lanterns of Orrin, 1999, of the series "Orrin Tales" (501) of one game, and of a
+ *                 pack, 4898, that vangogh does not have
+ *   4116          Quiet Harbour, 2012, Linux only, of the shop bundle 4805 of ten games
+ *   4104, 4105    Helix Drift, 2004, and Copper Rally 88, 1988: the pack 4802 "Parallax Racing
+ *                 Trilogy", of three games on GOG, which GOG sells them as. Its poster is not in
+ *                 the archive.
+ *   4101, 4102    Thornwick Mysteries, 1996, Windows and Linux, and Thornwick Mysteries 2, 1998:
+ *                 the series 500, and the pack 4801 "Thornwick Double Feature", which GOG sells
+ *                 them as. The series leads.
+ *   4106 to 4114  Lantern Coast: Chapter 1 to 9, 2010 to 2018: the pack 4803 "Lantern Coast
+ *                 Saga" holds the first seven and the pack 4804 "Lantern Coast: Season Two",
+ *                 which holds the last two.
+ * The collections: Lantern Coast Saga (9 games), Parallax Racing Trilogy (2), Thornwick Mysteries (3).
+ */
+function collectionLibrary(): FakeData {
+	const at = 'https://www.gog.com/en/game';
+	const thornwick = { id: 500, name: 'Thornwick Mysteries' };
+	type System = 'windows' | 'osx' | 'linux';
+	interface Game {
+		id: string;
+		title: string;
+		year: number;
+		os?: System[];
+		series?: { id: number; name: string };
+		store?: string;
+		includedIn?: string[];
+	}
+	const chapters: Game[] = Array.from({ length: 9 }, (_, i) => ({
+		id: String(4106 + i),
+		title: `Lantern Coast: Chapter ${i + 1}`,
+		year: 2010 + i,
+		includedIn: [i < 7 ? '4803' : '4804']
+	}));
+	const games: Game[] = [
+		{ id: '4117', title: 'Night Ferry', year: 2015 },
+		{ id: '4103', title: 'Saltwater Detectives', year: 2001, os: ['windows', 'osx'], series: thornwick },
+		{ id: '4115', title: 'Lanterns of Orrin', year: 1999, series: { id: 501, name: 'Orrin Tales' }, includedIn: ['4898'] },
+		{ id: '4116', title: 'Quiet Harbour', year: 2012, os: ['linux'], includedIn: ['4805'] },
+		{ id: '4104', title: 'Helix Drift', year: 2004, store: `${at}/parallax_racing_trilogy`, includedIn: ['4802'] },
+		{ id: '4105', title: 'Copper Rally 88', year: 1988, store: `${at}/parallax_racing_trilogy`, includedIn: ['4802'] },
+		{ id: '4101', title: 'Thornwick Mysteries', year: 1996, os: ['windows', 'linux'], series: thornwick, store: `${at}/thornwick_double_feature`, includedIn: ['4801'] },
+		{ id: '4102', title: 'Thornwick Mysteries 2', year: 1998, series: thornwick, store: `${at}/thornwick_double_feature`, includedIn: ['4801'] },
+		...chapters
+	];
+	const number: Record<System, number> = { windows: 1, osx: 2, linux: 3 };
+	const metadata: Record<string, unknown> = {};
+	const filenames: Record<string, Record<string, string>> = {};
+	const files: FakeData['files'] = {};
+	const images: FakeData['images'] = {};
+	for (const g of games) {
+		const os = g.os ?? ['windows'];
+		const path = `/downloads/game_${g.id}`;
+		metadata[`gog-api-products/${g.id}`] = apiProduct({
+			title: g.title,
+			os,
+			genres: ['Adventure'],
+			poster: pictureOf(g.id),
+			released: `${g.year}-06-01T00:00:00+02:00`,
+			series: g.series,
+			store: g.store,
+			includedIn: g.includedIn
+		});
+		metadata[`gog-details/${g.id}`] = details({
+			english: Object.fromEntries(os.map((o) => [o === 'osx' ? 'mac' : o, [file(`${path}/en${number[o]}installer0`, g.title, '100 MB')]]))
+		});
+		filenames[g.id] = Object.fromEntries(os.map((o) => [`${path}/en${number[o]}installer0`, `setup_${g.id}_${o}.bin`]));
+		for (const o of os) {
+			files[`${g.id}/installer${path}/en${number[o]}installer0`] = { name: `setup_${g.id}_${o}.bin`, body: Buffer.from(`content of ${g.title}`) };
+		}
+		images[pictureOf(g.id)] = { type: 'image/png', body: PIXEL };
+	}
+	metadata['gog-api-products/4801'] = apiProduct({ title: 'Thornwick Double Feature', type: 'PACK', poster: pictureOf('4801'), store: `${at}/thornwick_double_feature`, includes: ['4101', '4102'] });
+	// The archive lacks this poster: the card shows the oldest game's.
+	metadata['gog-api-products/4802'] = apiProduct({ title: 'Parallax Racing Trilogy', type: 'PACK', poster: pictureOf('4802'), store: `${at}/parallax_racing_trilogy`, includes: ['4104', '4105', '4199'] });
+	metadata['gog-api-products/4803'] = apiProduct({
+		title: 'Lantern Coast Saga',
+		type: 'PACK',
+		poster: pictureOf('4803'),
+		store: `${at}/lantern_coast_saga`,
+		includes: [...chapters.slice(0, 7).map((g) => g.id), '4804']
+	});
+	metadata['gog-api-products/4804'] = apiProduct({ title: 'Lantern Coast: Season Two', type: 'PACK', includes: ['4113', '4114'] });
+	metadata['gog-api-products/4805'] = apiProduct({
+		title: 'Everything Bundle',
+		type: 'PACK',
+		includes: ['4116', '4104', ...Array.from({ length: 8 }, (_, i) => String(4190 + i))]
+	});
+	images[pictureOf('4801')] = { type: 'image/png', body: PIXEL };
+	images[pictureOf('4803')] = { type: 'image/png', body: PIXEL };
+	return {
+		username: 'api',
+		password: 'secret',
+		library: games.map((g) => ({ id: g.id, tt: g.title, os: (g.os ?? ['windows']).map((o) => number[o]) })),
+		metadata,
+		filenames,
+		images,
+		files
+	};
+}
+
 function freePort(): Promise<number> {
 	return new Promise((resolve, reject) => {
 		const server = createServer();
@@ -243,6 +351,7 @@ async function waitFor(url: string, wanted: number, output: () => string): Promi
  *   CANVAS_EMPTY_URL  a Canvas whose vangogh is not there, so it has no library yet
  *   CANVAS_MAC_URL    a Canvas with the two games of macLibrary()
  *   CANVAS_RICH_URL   a Canvas with the three games of richLibrary()
+ *   CANVAS_COLLECTIONS_URL  a Canvas with the seventeen games of collectionLibrary()
  */
 export default async function setup(): Promise<() => Promise<void>> {
 	if (!existsSync('build/index.js')) throw new Error('run "npm run build" first');
@@ -294,6 +403,7 @@ export default async function setup(): Promise<() => Promise<void>> {
 	const fake = await startFakeVangogh(data);
 	const macFake = await startFakeVangogh(macLibrary());
 	const richFake = await startFakeVangogh(richLibrary());
+	const collectionsFake = await startFakeVangogh(collectionLibrary());
 
 	const cache = await mkdtemp(join(tmpdir(), 'canvas-e2e-'));
 	const children: ChildProcess[] = [];
@@ -313,6 +423,7 @@ export default async function setup(): Promise<() => Promise<void>> {
 	const closedPort = await freePort();
 	const macPort = await freePort();
 	const richPort = await freePort();
+	const collectionsPort = await freePort();
 	launch({
 		PORT: String(port),
 		VANGOGH_URL: fake.url,
@@ -322,21 +433,25 @@ export default async function setup(): Promise<() => Promise<void>> {
 	launch({ PORT: String(emptyPort), VANGOGH_URL: `http://127.0.0.1:${closedPort}`, CACHE_DIR: join(cache, 'empty') });
 	launch({ PORT: String(macPort), VANGOGH_URL: macFake.url, CACHE_DIR: join(cache, 'mac'), TZ: 'UTC' });
 	launch({ PORT: String(richPort), VANGOGH_URL: richFake.url, CACHE_DIR: join(cache, 'rich'), TZ: 'UTC' });
+	launch({ PORT: String(collectionsPort), VANGOGH_URL: collectionsFake.url, CACHE_DIR: join(cache, 'collections'), TZ: 'UTC' });
 
 	process.env.CANVAS_URL = `http://127.0.0.1:${port}`;
 	process.env.CANVAS_EMPTY_URL = `http://127.0.0.1:${emptyPort}`;
 	process.env.CANVAS_MAC_URL = `http://127.0.0.1:${macPort}`;
 	process.env.CANVAS_RICH_URL = `http://127.0.0.1:${richPort}`;
+	process.env.CANVAS_COLLECTIONS_URL = `http://127.0.0.1:${collectionsPort}`;
 	try {
 		await waitFor(`${process.env.CANVAS_URL}/healthz`, 200, () => output);
 		await waitFor(`${process.env.CANVAS_EMPTY_URL}/healthz`, 503, () => output);
 		await waitFor(`${process.env.CANVAS_MAC_URL}/healthz`, 200, () => output);
 		await waitFor(`${process.env.CANVAS_RICH_URL}/healthz`, 200, () => output);
+		await waitFor(`${process.env.CANVAS_COLLECTIONS_URL}/healthz`, 200, () => output);
 	} catch (error) {
 		for (const child of children) child.kill('SIGKILL');
 		await fake.close();
 		await macFake.close();
 		await richFake.close();
+		await collectionsFake.close();
 		throw error;
 	}
 
@@ -345,6 +460,7 @@ export default async function setup(): Promise<() => Promise<void>> {
 		await fake.close();
 		await macFake.close();
 		await richFake.close();
+		await collectionsFake.close();
 		await rm(cache, { recursive: true, force: true });
 	};
 }
