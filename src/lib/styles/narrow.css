@@ -197,6 +197,15 @@
 	.side .chip {
 		padding: 0 14px;
 	}
+	/* The way into the library at a glance is 28 px high: a finger reaches 42. */
+	.status .glance-count {
+		position: relative;
+	}
+	.status .glance-count::after {
+		content: '';
+		position: absolute;
+		inset: -7px 0;
+	}
 	/* Drawn as text: a finger reaches 40 px or more. */
 	.link-button {
 		position: relative;

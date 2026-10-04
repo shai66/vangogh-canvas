@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { request as httpRequest } from 'node:http';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -196,6 +196,35 @@ describe('the pages, as the server draws them', () => {
 			expect(html).toContain('This collection is not in the library.');
 			expect(cards(html)).toHaveLength(4);
 		}
+	});
+
+	it('draws the library at a glance over the list, and the title of the page names it', async () => {
+		const { res, html } = await page('/glance');
+		expect(res.status).toBe(200);
+		expect(html).toContain('<title>Library at a glance | Canvas for vangogh</title>');
+		expect(html).toContain('>Library at a glance</h1>');
+		expect(cards(html)).toHaveLength(4);
+	});
+
+	it('adds up the files in the archive, and counts the systems, the decades and the genres', async () => {
+		const { html } = await page('/glance');
+		const text = html.replace(/<!--.*?-->/gs, '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+		// 1001 holds 1 MB, 4 GB and 3.5 GB for Windows, its DLC 500 MB, 7 GB each for macOS and Linux, and three
+		// extras of 167 MB; 1002 holds 300 MB. Its patch and the extras that are not on disk do not count.
+		expect(text).toContain('about 22 GB');
+		expect(text).toContain('Windows 8.3 GB');
+		expect(text).toContain('macOS 7 GB');
+		expect(text).toContain('Linux 7 GB');
+		expect(text).toContain('Extras 167 MB');
+		expect(text).toContain('Windows 4 macOS 1 Linux 1');
+		expect(text).toContain('of their first release, 3 without a year');
+		expect(text).toContain('1 2000s');
+		expect(text).toContain('Strategy 2 Adventure 1 Role-playing 1');
+	});
+
+	it('leaves the cached index as it was: its schema is still 6', async () => {
+		const cached = JSON.parse(await readFile(join(cacheDir, 'index.json'), 'utf8')) as { schema: number };
+		expect(cached.schema).toBe(6);
 	});
 
 	it('gives the name of the system the visitor sits at to the download block', async () => {

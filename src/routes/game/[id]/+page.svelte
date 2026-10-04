@@ -8,6 +8,7 @@
 <Library
 	entries={data.entries}
 	collections={data.collections}
+	glance={data.glance}
 	builtAt={data.builtAt}
 	version={data.version}
 	timeZone={data.timeZone}

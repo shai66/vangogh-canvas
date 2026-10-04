@@ -27,7 +27,7 @@ dialog::backdrop {
 .filters[open] {
 	display: flex;
 	flex-direction: column;
-	animation: sheet-in 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+	animation: sheet-in 200ms var(--ease-out);
 }
 @keyframes sheet-in {
 	from {

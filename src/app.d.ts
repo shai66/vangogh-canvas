@@ -18,6 +18,8 @@ declare global {
 			back?: 0 | 1 | 2;
 			/** True for a game opened from the open row of its collection: its row starts open. */
 			shelf?: boolean;
+			/** Set while the library at a glance lies over the list, opened by a click on the count. */
+			glance?: true;
 		}
 	}
 }

@@ -3,9 +3,15 @@ import { formatSize, upperFirst } from './format';
 
 const MB = 1024 ** 2;
 const GB = 1024 ** 3;
+const TB = 1024 ** 4;
 
 describe('formatSize', () => {
 	it.each([
+		[12 * TB, '12 TB'],
+		[1.25 * TB, '1.3 TB'],
+		[TB, '1 TB'],
+		[TB - 1, '1 TB'],
+		[1023 * GB, '1023 GB'],
 		[38 * GB, '38 GB'],
 		[2.5 * GB, '2.5 GB'],
 		[1 * GB, '1 GB'],

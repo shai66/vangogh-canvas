@@ -6,7 +6,7 @@
 	import { nextRemembered, recall, rememberedCookie, type Remembered } from '$lib/remember';
 	import { DEFAULT_STATE, parseState, toParams, type ViewState } from '$lib/search/state';
 	import { t } from '$lib/strings';
-	import type { Collection, Detail, ListEntry } from '$lib/types';
+	import type { Collection, Detail, Glance, ListEntry } from '$lib/types';
 	import { View } from '$lib/view.svelte';
 	import { detectVisitor, type Visitor } from '$lib/visitor';
 	import Card from './Card.svelte';
@@ -16,6 +16,7 @@
 	import DetailView from './Detail.svelte';
 	import FilterPanel from './FilterPanel.svelte';
 	import Foot from './Foot.svelte';
+	import GlanceView from './GlanceView.svelte';
 	import Icon from './Icon.svelte';
 	import Sheet from './Sheet.svelte';
 	import TopBar from './TopBar.svelte';
@@ -24,6 +25,8 @@
 		entries: ListEntry[];
 		/** The collections of the library. */
 		collections: Collection[];
+		/** The library at a glance, worked out by the server from the index. */
+		glance: Glance | null;
 		builtAt: string | null;
 		version: string;
 		timeZone: string;
@@ -34,12 +37,15 @@
 		linked?: Detail | null;
 		/** The collection of the address, when the page was opened at `/collection/{id}`. */
 		linkedCollection?: Collection | null;
+		/** True when the page was opened at `/glance`. */
+		linkedGlance?: boolean;
 		/** Set when the address names a game or a collection that is not in the library. */
 		unknown?: 'game' | 'collection' | null;
 	}
 	let {
 		entries,
 		collections,
+		glance,
 		builtAt,
 		version,
 		timeZone,
@@ -47,12 +53,13 @@
 		remembered,
 		linked = null,
 		linkedCollection = null,
+		linkedGlance = false,
 		unknown = null
 	}: Props = $props();
 
 	const onList = () => page.url.pathname === '/';
-	/** True while a detail or a collection's sheet, opened by a click, lies over the list. */
-	const covered = () => page.state.detail !== undefined || page.state.collection !== undefined;
+	/** True while a detail, a collection's sheet or the library at a glance, opened by a click, lies over the list. */
+	const covered = () => page.state.detail !== undefined || page.state.collection !== undefined || page.state.glance === true;
 	const address = (state: ViewState) => {
 		const params = toParams(state).toString();
 		return params ? `/?${params}` : '/';
@@ -189,6 +196,15 @@
 	});
 	/** The collection of the open game, for its row of posters. */
 	const detailCollection = $derived(detail?.collection ? (collections.find((c) => c.id === detail.collection) ?? null) : null);
+	/**
+	 * True while the library at a glance lies over the list: opened by a click, or by its address. Back onto the entry
+	 * of a sheet that came by its address is a shallow popstate: only the address says so, as for a collection.
+	 */
+	const glanceOpen = $derived(
+		!page.state.detail &&
+			page.state.collection === undefined &&
+			(page.state.glance === true || linkedGlance || page.url.pathname === '/glance')
+	);
 
 	let opening = false;
 	let closing = false;
@@ -259,10 +275,27 @@
 		}
 	}
 
+	/** A plain click on the count opens the library at a glance over the list. What it shows is in the page already. */
+	async function openGlance(event: MouseEvent) {
+		// Without the numbers there is no sheet to lay over the list: the link goes to /glance as a link does.
+		if (!glance) return;
+		if (!isPlainClick(event)) return;
+		event.preventDefault();
+		if (opening || covered()) return;
+		opening = true;
+		try {
+			// The entry of the list says what the list shows before the sheet goes over it.
+			await write();
+			if (!covered()) pushState('/glance', { glance: true, list: address(view.state) });
+		} finally {
+			opening = false;
+		}
+	}
+
 	function close() {
 		// A second press before the first has taken effect would go back out of the list.
 		if (closing) return;
-		const back = page.state.detail ? (page.state.back ?? 1) : page.state.collection !== undefined ? 1 : 0;
+		const back = page.state.detail ? (page.state.back ?? 1) : page.state.collection !== undefined || page.state.glance ? 1 : 0;
 		if (back > 0) {
 			// Opened over the list, perhaps from a collection's sheet: going back that far shows the list where it was.
 			closing = true;
@@ -347,7 +380,7 @@
 <svelte:window onkeydown={keydown} />
 
 <svelte:head>
-	<title>{detail ? t.gameTitle(detail.title) : collection ? t.collectionTitle(collection.name) : t.pageTitle}</title>
+	<title>{detail ? t.gameTitle(detail.title) : collection ? t.collectionTitle(collection.name) : glanceOpen ? t.glanceTitle : t.pageTitle}</title>
 </svelte:head>
 
 <TopBar bind:this={bar} {view} onfilters={() => (filtersOpen = true)} />
@@ -356,7 +389,7 @@
 	{#if note}
 		<div class="toast" role="status"><Icon name="info" /><span>{note === 'collection' ? t.collectionNotInLibrary : t.notInLibrary}</span></div>
 	{/if}
-	<CountLine {view} />
+	<CountLine {view} onglance={openGlance} />
 	{#if view.cards.length > 0}
 		<div class="grid">
 			{#each view.shown as card (card.key)}
@@ -381,13 +414,13 @@
 
 <FilterPanel open={filtersOpen} onclose={() => (filtersOpen = false)} {view} {entries} />
 
-<!-- One sheet for a game and a collection: a game opened from a collection takes its place without the sheet closing. -->
+<!-- One sheet for a game, a collection and the library at a glance: a game opened from a collection takes its place without the sheet closing. -->
 <Sheet
-	open={detail !== null || collection !== null}
+	open={detail !== null || collection !== null || (glanceOpen && glance !== null)}
 	onclose={close}
 	class="detail"
-	label={detail?.title ?? collection?.name ?? ''}
-	view={detail ? `game/${detail.id}` : collection ? `collection/${collection.id}` : ''}
+	label={detail?.title ?? collection?.name ?? (glanceOpen ? t.glance.title : '')}
+	view={detail ? `game/${detail.id}` : collection ? `collection/${collection.id}` : glanceOpen ? 'glance' : ''}
 >
 	{#if detail}
 		{#key detail.id}
@@ -406,5 +439,7 @@
 		{#key collection.id}
 			<CollectionView {collection} games={gamesOf(collection, entries)} onclose={close} onopen={open} />
 		{/key}
+	{:else if glanceOpen && glance}
+		<GlanceView {glance} games={entries.length} collections={collections.length} {builtAt} {timeZone} onclose={close} />
 	{/if}
 </Sheet>

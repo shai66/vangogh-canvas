@@ -449,3 +449,15 @@ test.describe('filters', () => {
 		expect(await places()).toEqual(before);
 	});
 });
+
+test.describe('the motion of the page', () => {
+	test('the number on Filters grows into place with the one curve of the page', async ({ page }) => {
+		await page.goto('/');
+		await page.locator('.os-toggle button').first().click();
+		const motion = await page.locator('.filter-button .count').evaluate((node) => {
+			const style = getComputedStyle(node);
+			return [style.animationName, style.animationTimingFunction, style.animationDuration];
+		});
+		expect(motion).toEqual(['count-in', 'cubic-bezier(0.2, 0.8, 0.2, 1)', '0.18s']);
+	});
+});

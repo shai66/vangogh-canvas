@@ -65,6 +65,7 @@ export const t = {
 	pageTitle: 'Canvas for vangogh',
 	gameTitle: (title: string) => `${title} | Canvas for vangogh`,
 	collectionTitle: (name: string) => `${name} | Canvas for vangogh`,
+	glanceTitle: 'Library at a glance | Canvas for vangogh',
 
 	osName,
 	together: { multiplayer: 'Multiplayer', coop: 'Co-op' } satisfies Record<Together, string>,
@@ -274,6 +275,45 @@ export const t = {
 		dlcText: (hasButton: boolean) =>
 			`${hasButton ? 'The button above downloads the game only. ' : ''}DLC is installed after the game.`,
 		dlcAll: 'Download all DLC'
+	},
+
+	glance: {
+		/** The title of the way in, shown on hover. */
+		open: 'Library at a glance',
+		/** Ends the name of the way in, after the count it shows: "135 games: Library at a glance". Visually hidden. */
+		inLink: ': Library at a glance',
+		title: 'Library at a glance',
+		/** The line under the title: "135 games, 22 collections · as of 4 October, 04:30", the numbers in bold. */
+		head: (games: number, collections: number, when: string | null): TextPart[] => [
+			{ plain: '', bold: plural(games, 'game', 'games') },
+			...(collections > 0
+				? [
+						{ plain: ', ', bold: String(collections) },
+						{ plain: ` ${collections === 1 ? 'collection' : 'collections'}`, bold: '' }
+					]
+				: []),
+			...(when ? [{ plain: ` · as of ${when}`, bold: '' }] : [])
+		],
+		space: 'Space in the archive',
+		/** Before the total: "about 856 GB". GOG rounds every size. */
+		about: 'about',
+		spaceNote: "GOG's sizes of the files in the archive, added up: installers, DLC and extras. The space on the disk can differ a little.",
+		extras: 'Extras',
+		systems: 'Systems',
+		systemsNote: 'games for each',
+		decades: 'Games by decade',
+		decadesNote: (noYear: number) => `of their first release${noYear > 0 ? `, ${noYear} without a year` : ''}`,
+		decade: (decade: number) => `${decade}s`,
+		noYears: 'No year is known.',
+		genres: 'Genres',
+		genresNote: (n: number) => (n === 1 ? 'the most common' : `the ${n} most common`),
+		noGenres: 'No genre is known.',
+		/** The titles of the rows, shown on hover. */
+		sizeRow: (system: string, size: string) => `${system}: installers and DLC, ${size}`,
+		extrasRow: (size: string) => `Extras: manuals, soundtracks, artwork and the rest, ${size}`,
+		systemRow: (n: number, games: number, system: string) => `${n} of ${plural(games, 'game', 'games')} for ${system}`,
+		decadeRow: (n: number, decade: number) => `${plural(n, 'game', 'games')} from the ${decade}s`,
+		genreRow: (n: number, games: number, genre: string) => `${n} of ${plural(games, 'game', 'games')}: ${genre}`
 	},
 
 	foot: {

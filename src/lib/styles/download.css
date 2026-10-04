@@ -433,7 +433,7 @@
 	display: flex;
 	font-size: 18px;
 	color: var(--starlight-dim);
-	transition: rotate 0.15s ease;
+	transition: rotate 150ms var(--ease-out);
 }
 .extras.is-open .extras-head .caret {
 	rotate: 180deg;

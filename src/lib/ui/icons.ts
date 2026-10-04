@@ -10,6 +10,7 @@ import boxingGloveSvg from '@phosphor-icons/core/regular/boxing-glove.svg?raw';
 import campfireSvg from '@phosphor-icons/core/regular/campfire.svg?raw';
 import cardsSvg from '@phosphor-icons/core/regular/cards.svg?raw';
 import castleTurretSvg from '@phosphor-icons/core/regular/castle-turret.svg?raw';
+import chartBarSvg from '@phosphor-icons/core/regular/chart-bar.svg?raw';
 import chartLineUpSvg from '@phosphor-icons/core/regular/chart-line-up.svg?raw';
 import checkSvg from '@phosphor-icons/core/regular/check.svg?raw';
 import citySvg from '@phosphor-icons/core/regular/city.svg?raw';
@@ -103,6 +104,7 @@ export const ICONS = {
 	eye: inner(eyeSvg),
 	castleTurret: inner(castleTurretSvg),
 	ghost: inner(ghostSvg),
+	chartBar: inner(chartBarSvg),
 	chartLineUp: inner(chartLineUpSvg),
 	city: inner(citySvg),
 	globeHemisphereWest: inner(globeHemisphereWestSvg),

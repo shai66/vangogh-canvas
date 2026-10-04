@@ -1,4 +1,5 @@
 import { getApp } from '$lib/server/app';
+import { glanceFor } from '$lib/server/glance';
 import { parseRemembered, REMEMBER_COOKIE } from '$lib/remember';
 import { VERSION } from '$lib/version';
 import { detectVisitor } from '$lib/visitor';
@@ -12,6 +13,8 @@ export const load: LayoutServerLoad = ({ request, cookies }) => {
 		ready: index !== null,
 		entries: index?.entries ?? [],
 		collections: index?.collections ?? [],
+		// Worked out once per index, from the details on the server: the page gets the numbers only.
+		glance: index ? glanceFor(index) : null,
 		builtAt: index?.builtAt ?? null,
 		version: VERSION,
 		timeZone: config.timeZone,

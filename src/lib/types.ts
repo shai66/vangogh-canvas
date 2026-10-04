@@ -152,3 +152,19 @@ export interface IndexPayload {
 	/** Every collection, by name. */
 	collections: Collection[];
 }
+
+/** The library at a glance, worked out by the server from the index. Spec 0.9.1, section 4.2. */
+export interface Glance {
+	/** Bytes of the files in the archive by system, installers and DLC. */
+	bytes: Record<Os, number>;
+	/** Bytes of the extras in the archive. */
+	extrasBytes: number;
+	/** Entries GOG lists for each system, as the platform filter counts them. */
+	systems: Record<Os, number>;
+	/** [decade, games] from the first decade with a game to the last: [[1990, 38], [2000, 41]]. */
+	decades: [number, number][];
+	/** Entries without a year. */
+	noYear: number;
+	/** The most common genres of the group "genre", most first: [['Action', 48]]. */
+	genres: [string, number][];
+}

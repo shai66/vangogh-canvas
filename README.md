@@ -10,7 +10,9 @@ game: one button downloads the installer for the computer you sit at, part
 by part if it has parts, and the page says which file to open afterwards.
 The arrow beside the button downloads the installer for another system.
 GOG's series and packs can be shown as collections: one card each, with a
-sheet that lists their games.
+sheet that lists their games. The count of games opens the library at a
+glance: the space the archive takes, per system and for the extras, and the
+games by system, decade and genre.
 
 | The library, with collections | A collection |
 |---|---|

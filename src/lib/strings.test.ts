@@ -24,6 +24,28 @@ describe('the strings', () => {
 		expect(t.filters.show(0)).toBe('Show 0 games');
 	});
 
+	it('write the head of the library at a glance, the numbers in bold', () => {
+		const text = (parts: { plain: string; bold: string }[]) => parts.map((p) => p.plain + p.bold).join('');
+		expect(text(t.glance.head(135, 22, '4 October, 04:30'))).toBe('135 games, 22 collections · as of 4 October, 04:30');
+		expect(text(t.glance.head(1, 1, null))).toBe('1 game, 1 collection');
+		expect(text(t.glance.head(4, 0, '4 October, 04:30'))).toBe('4 games · as of 4 October, 04:30');
+		expect(t.glance.head(135, 22, null).map((p) => p.bold).filter(Boolean)).toEqual(['135 games', '22']);
+		expect(t.glanceTitle).toBe('Library at a glance | Canvas for vangogh');
+	});
+
+	it('write the panels of the library at a glance', () => {
+		expect(t.glance.decadesNote(0)).toBe('of their first release');
+		expect(t.glance.decadesNote(5)).toBe('of their first release, 5 without a year');
+		expect(t.glance.decade(1990)).toBe('1990s');
+		expect(t.glance.genresNote(6)).toBe('the 6 most common');
+		expect(t.glance.genresNote(1)).toBe('the most common');
+		expect(t.glance.sizeRow('Linux', '71.8 GB')).toBe('Linux: installers and DLC, 71.8 GB');
+		expect(t.glance.extrasRow('40.8 GB')).toBe('Extras: manuals, soundtracks, artwork and the rest, 40.8 GB');
+		expect(t.glance.systemRow(30, 135, 'Linux')).toBe('30 of 135 games for Linux');
+		expect(t.glance.decadeRow(1, 1980)).toBe('1 game from the 1980s');
+		expect(t.glance.genreRow(48, 135, 'Action')).toBe('48 of 135 games: Action');
+	});
+
 	it('name the systems a game exists for', () => {
 		expect(t.download.notForText(['windows'])).toBe('This game exists for Windows. The files are listed below.');
 		expect(t.download.notForText(['windows', 'linux'])).toBe(

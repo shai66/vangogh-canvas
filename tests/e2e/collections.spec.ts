@@ -83,7 +83,9 @@ test.describe('the collections in the list', () => {
 		await expect(card).toHaveClass(/is-collection/);
 		const edges = await card.evaluate((node) => [getComputedStyle(node, '::before').top, getComputedStyle(node, '::after').top]);
 		expect(edges).toEqual(['-4px', '-8px']);
-		expect(await card.locator('.poster').evaluate((node) => getComputedStyle(node).boxShadow)).toContain('rgba(111, 160, 255, 0.6)');
+		expect(await card.locator('.poster').evaluate((node) => getComputedStyle(node).boxShadow)).toBe(
+			'rgba(111, 160, 255, 0.5) 0px 0px 0px 1px, rgba(111, 160, 255, 0.32) 0px 5px 14px -6px'
+		);
 		const pill = card.locator('.coll-pill');
 		await expect(pill.locator('span[aria-hidden="true"]')).toHaveText('3');
 		await expect(pill.locator('.sr')).toHaveText('3 games');

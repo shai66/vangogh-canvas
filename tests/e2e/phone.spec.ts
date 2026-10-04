@@ -53,6 +53,7 @@ test.describe('on a phone, what a finger uses is high enough', () => {
 
 		const sort = page.locator('.sort button');
 		for (let i = 0; i < (await sort.count()); i++) expect.soft((await reach(page, sort.nth(i))).height, `sort ${i}`).toBeGreaterThanOrEqual(40);
+		expect.soft((await reach(page, page.locator('.status .glance-count'))).height).toBeGreaterThanOrEqual(40);
 
 		await toggles.first().click();
 		await expect(page.locator('.status .active-chip').first()).toBeVisible();

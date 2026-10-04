@@ -30,7 +30,7 @@
 		0 40px 120px rgb(0 0 0 / 0.7);
 }
 .detail[open] .detail-inner {
-	animation: detail-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+	animation: detail-in 220ms var(--ease-out);
 }
 @keyframes detail-in {
 	from {
@@ -85,7 +85,7 @@
 	object-position: 58% 20%;
 	display: block;
 	opacity: 0.5;
-	transition: opacity 400ms ease-out;
+	transition: opacity 400ms var(--ease-out);
 }
 .backdrop img.is-waiting {
 	opacity: 0;

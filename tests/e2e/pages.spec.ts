@@ -4,7 +4,7 @@ test.describe('when there is no library yet', () => {
 	test.use({ baseURL: process.env.CANVAS_EMPTY_URL });
 
 	test('says that the library is being prepared, on every address', async ({ page }) => {
-		for (const path of ['/', '/game/1001', '/?q=road']) {
+		for (const path of ['/', '/game/1001', '/?q=road', '/glance']) {
 			await page.goto(path);
 			await expect(page.locator('h1')).toHaveText('The library is being prepared');
 			await expect(page.locator('.card')).toHaveCount(0);
