@@ -1,4 +1,4 @@
-# vangogh and Canvas in one stack. Tested with vangogh v1.2.18; other
+# vangogh and Canvas in one stack. Tested with vangogh v1.2.19; other
 # versions were not checked.
 #
 # 1. Copy this file into a folder of its own as compose.yml, and put the

@@ -16,11 +16,11 @@ games by system, decade and genre.
 
 | The library, with collections | A collection |
 |---|---|
-| ![The library as a wall of posters, with search, platform filter, the Collections toggle and sort order; each collection is one card with a blue glow and the number of its games](screenshots/library.jpg) | ![A collection's sheet: the pack's picture, what it is, and its games oldest first](screenshots/collection.jpg) |
+| ![The library as a wall of posters, with search, platform filter, the Collections toggle and sort order; the count of games opens the library at a glance; each collection is one card with a blue glow and the number of its games](screenshots/library.jpg) | ![A collection's sheet: the pack's picture, what it is, and its games oldest first](screenshots/collection.jpg) |
 
-| A game | A game in a collection |
+| A game | The library at a glance |
 |---|---|
-| ![A game: the download button, the files for each system, the extras, its collection folded to one line, and the screenshots](screenshots/game.jpg) | ![A game with its collection opened as a row of posters, this game marked](screenshots/game-collection.jpg) |
+| ![A game: the download button, the files for each system, the extras, its collection folded to one line, and the screenshots](screenshots/game.jpg) | ![The library at a glance: the space the archive takes, in total, per system and for the extras, and the games by system, decade and genre](screenshots/glance.jpg) |
 
 ## Canvas and GOG.com games sharing guidelines
 
@@ -31,7 +31,7 @@ Like GOG.com and vangogh, it trusts you not to abuse this.
 ## What it needs
 
 - A running vangogh that Canvas can reach over HTTP. Canvas was tested
-  with vangogh 1.2.18; other versions were not checked.
+  with vangogh 1.2.19; other versions were not checked.
 - A vangogh account of role `user`. Create it on the host of vangogh:
 
   ```bash
@@ -78,9 +78,10 @@ All settings are environment variables.
 | `CACHE_DIR` | Folder for the cached index | `/cache` |
 | `PORT` | Port inside the container | `1854` |
 
-The repository's `compose.yml` names two more: `CANVAS_PORT`, the port
-on the host, and `SHUTDOWN_TIMEOUT`, the number of seconds (default `5`)
-that Canvas waits for open connections when it is asked to stop.
+The repository's `compose.yml` and the example stack name `CANVAS_PORT`,
+the port on the host. The repository's `compose.yml` also names
+`SHUTDOWN_TIMEOUT`, the number of seconds (default `5`) that Canvas waits
+for open connections when it is asked to stop.
 
 `REBUILD_AT` belongs after vangogh's own sync. Canvas can show only what
 vangogh has, and vangogh's API does not say when a sync ran. With vangogh
@@ -301,6 +302,10 @@ are TypeScript run by Node directly, which needs Node 22.18 or newer.
 node --env-file=.env scripts/capture-samples.ts
 node scripts/inspect-samples.ts
 ```
+
+`npm run screenshots -- name=address …` takes the pictures of this README
+from a running Canvas, one `screenshots/<name>.jpg` per address, and
+refuses when that Canvas runs another version than `package.json`.
 
 ## How it is built
 
