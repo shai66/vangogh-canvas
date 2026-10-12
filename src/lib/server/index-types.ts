@@ -2,7 +2,7 @@ import type { Collection, Detail, ListEntry } from '../types';
 import type { DownloadType } from './vangogh/client';
 
 /** Raised when the shape of the cached index changes. 6: the collections. */
-export const INDEX_SCHEMA = 6;
+export const INDEX_SCHEMA = 7;
 
 /** Where a file is in vangogh. Never sent to the browser. */
 export interface FileTarget {

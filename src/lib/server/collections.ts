@@ -18,6 +18,8 @@ export interface PackRecord {
 	name: string;
 	poster: string | null;
 	storeUrl: string | null;
+	/** GOG's series of the pack, which a pack of one game lends to its game (rule 4). */
+	series: { id: string; name: string } | null;
 	/** Product ids of everything the pack includes: games, and perhaps packs. */
 	includes: string[];
 }
@@ -97,18 +99,28 @@ export function collect(members: Member[], packs: PackRecord[]): Collected {
 		groupsOf.get(id)?.push(group.key);
 	};
 
+	// Rule 4: a game without a series takes the series of a pack that holds only that game. Two
+	// such packs with different series: the first in the indexer's order wins; none at home has two.
+	const gamesOfPack = new Map([...known.values()].map((pack) => [pack, gamesOf(pack, known)]));
+	const seriesOf = new Map(members.map((m) => [m.id, m.series]));
+	for (const [pack, games] of gamesOfPack) {
+		if (!pack.series || games.size !== 1) continue;
+		const [id] = games;
+		if (seriesOf.get(id) === null) seriesOf.set(id, pack.series);
+	}
+
 	for (const member of members) {
-		if (!member.series) continue;
-		const key = `s${member.series.id}`;
+		const series = seriesOf.get(member.id);
+		if (!series) continue;
+		const key = `s${series.id}`;
 		let group = groups.get(key);
 		if (!group) {
-			group = { key, kind: 'series', name: member.series.name, poster: null, total: null, storeUrl: null, soldAs: false, members: new Set() };
+			group = { key, kind: 'series', name: series.name, poster: null, total: null, storeUrl: null, soldAs: false, members: new Set() };
 			groups.set(key, group);
 		}
 		add(member.id, group);
 	}
-	for (const pack of known.values()) {
-		const games = gamesOf(pack, known);
+	for (const [pack, games] of gamesOfPack) {
 		const held = [...games].filter((id) => byId.has(id));
 		// Rule 2: the library holds at least half of its games. Shop bundles stay out.
 		if (held.length === 0 || held.length * 2 < games.size) continue;
@@ -191,7 +203,7 @@ export function collect(members: Member[], packs: PackRecord[]): Collected {
 		const names = (groupsOf.get(member.id) ?? []).filter((key) => key.startsWith('p')).map((key) => groups.get(key)?.name ?? '');
 		of.set(member.id, {
 			collection: collectionOf.get(member.id) ?? null,
-			series: member.series?.name ?? null,
+			series: seriesOf.get(member.id)?.name ?? null,
 			packs: [...new Set(names)].sort(byName)
 		});
 	}

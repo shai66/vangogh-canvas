@@ -7,7 +7,7 @@ import { createLogger } from './log';
 import { IndexStore } from './store';
 
 const index: Index = {
-	schema: 6,
+	schema: 7,
 	builtAt: '2026-09-29T02:30:00.000Z',
 	version: '0123456789abcdef',
 	entries: [],

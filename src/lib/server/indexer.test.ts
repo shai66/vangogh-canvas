@@ -40,7 +40,7 @@ describe('buildIndex', () => {
 			['2002', 'orphaned-dlc'],
 			['1003', 'game']
 		]);
-		expect(index.schema).toBe(6);
+		expect(index.schema).toBe(7);
 		expect(index.builtAt).toBe('2026-09-29T02:30:00.000Z');
 	});
 
@@ -977,6 +977,22 @@ describe('buildIndex and collections', () => {
 		// A series of one and a shop bundle make no collection; the series still names the game.
 		expect(entry('6004')).toMatchObject({ collection: null, series: 'Lone', packs: [] });
 		expect(index.details['6002']).toMatchObject({ collection: 's77', series: 'Dusk', packs: ['Dusk Double'] });
+	});
+
+	it('gives a game without a series the series of the pack of one GOG sells it as', async () => {
+		const index = await buildIndex(
+			memory({
+				list: [...list, { id: '6005', tt: 'T6005', os: [1] }],
+				records: {
+					'6005': apiProduct({ title: 'Dusk Four', released: '2004-01-01T00:00:00+01:00', includedIn: ['6905'] }),
+					'6905': apiProduct({ title: 'Dusk Four', type: 'PACK', series: dusk, includes: ['6005'] })
+				}
+			}),
+			logger().log
+		);
+		const entry = (id: string) => index.entries.find((e) => e.id === id);
+		expect(entry('6005')).toMatchObject({ collection: 's77', series: 'Dusk', packs: ['Dusk Four'] });
+		expect(index.collections.find((c) => c.id === 's77')?.games).toEqual(['6001', '6002', '6003', '6005']);
 	});
 
 	it('reads each named pack once, a pack of the library list not again, and none that a product left out names', async () => {

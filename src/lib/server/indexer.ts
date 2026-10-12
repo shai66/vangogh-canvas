@@ -225,6 +225,7 @@ async function readPacks(source: VangoghSource, gathered: Gathered[], named: Set
 		name,
 		poster: product.poster,
 		storeUrl: product.storeUrl,
+		series: product.series,
 		includes: product.includes.map((r) => r.id)
 	});
 	const packs: PackRecord[] = [];

@@ -222,9 +222,9 @@ describe('the pages, as the server draws them', () => {
 		expect(text).toContain('Strategy 2 Adventure 1 Role-playing 1');
 	});
 
-	it('leaves the cached index as it was: its schema is still 6', async () => {
+	it('leaves the cached index as it was: its schema is still 7', async () => {
 		const cached = JSON.parse(await readFile(join(cacheDir, 'index.json'), 'utf8')) as { schema: number };
-		expect(cached.schema).toBe(6);
+		expect(cached.schema).toBe(7);
 	});
 
 	it('gives the name of the system the visitor sits at to the download block', async () => {

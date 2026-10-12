@@ -14,6 +14,7 @@ const pack = (id: string, includes: string[], over: Partial<PackRecord> = {}): P
 	name: `Pack ${id}`,
 	poster: null,
 	storeUrl: null,
+	series: null,
 	includes,
 	...over
 });
@@ -153,6 +154,44 @@ describe('collect', () => {
 		]);
 		expect(of.get('1')?.packs).toEqual(['Alpha', 'Zeta']);
 		expect(collections.map((c) => c.name)).toEqual(['Alpha', 'Middle']);
+	});
+
+	it('gives a game without a series the series of a pack that holds only that game', () => {
+		const { collections, of } = collect(
+			[game('1'), game('2'), game('3')],
+			[pack('901', ['1'], { series: dusk }), pack('902', ['2'], { series: dusk }), pack('903', ['3'], { series: dusk })]
+		);
+		expect(collections).toHaveLength(1);
+		expect(collections[0]).toMatchObject({ id: 's77', kind: 'series', name: 'Dusk', games: ['1', '2', '3'] });
+		expect(of.get('1')).toEqual({ collection: 's77', series: 'Dusk', packs: ['Pack 901'] });
+	});
+
+	it("keeps a game's own series over the one of its pack of one", () => {
+		const { of } = collect([game('1', { series: { id: '78', name: 'Lone' } }), game('2', { series: dusk })], [pack('901', ['1'], { series: dusk })]);
+		expect(of.get('1')?.series).toBe('Lone');
+		expect(of.get('2')?.collection).toBeNull();
+	});
+
+	it('takes no series from a pack of two games', () => {
+		const { collections, of } = collect([game('1'), game('2')], [pack('901', ['1', '2'], { series: dusk })]);
+		expect(collections.map((c) => c.kind)).toEqual(['pack']);
+		expect(of.get('1')?.series).toBeNull();
+	});
+
+	it('lends a series through a pack of one that holds an inner pack of one game, and none for a game outside the library', () => {
+		const { collections, of } = collect(
+			[game('1'), game('2', { series: dusk })],
+			[pack('901', ['902'], { series: dusk }), pack('902', ['1']), pack('903', ['9'], { series: dusk })]
+		);
+		expect(collections.map((c) => c.games)).toEqual([['1', '2']]);
+		expect(of.get('1')?.series).toBe('Dusk');
+		expect(of.has('9')).toBe(false);
+	});
+
+	it('takes the series of the first pack of one in order when two lend different ones', () => {
+		const packs = [pack('901', ['1'], { series: dusk }), pack('902', ['1'], { series: { id: '78', name: 'Lone' } })];
+		expect(collect([game('1')], packs).of.get('1')?.series).toBe('Dusk');
+		expect(collect([game('1')], [...packs].reverse()).of.get('1')?.series).toBe('Lone');
 	});
 
 	it('gives a series no poster, total or page', () => {
