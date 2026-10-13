@@ -6,7 +6,7 @@ import { upperFirst } from './format';
 import type { GenreGroup } from './genres';
 import type { MatchField } from './search/query';
 import type { Together } from './search/state';
-import type { CollectionKind, JoinedGroup, Os } from './types';
+import type { CollectionKind, JoinedGroup, Os, RatingBody } from './types';
 import type { Visitor } from './visitor';
 
 const plural = (n: number, one: string, many: string): string => (n === 1 ? `1 ${one}` : `${n} ${many}`);
@@ -132,6 +132,9 @@ export const t = {
 		platform: 'Platform',
 		games: (n: number) => plural(n, 'game', 'games'),
 		together: 'Play together',
+		age: 'Age',
+		/** The one chip of the section "Age": the games for adults are left out. Also the chip in the count line. */
+		hide18: 'Hide 18+',
 		group: { genre: 'Genre', setting: 'Setting', style: 'How it plays' } satisfies Record<GenreGroup, string>,
 		showAll: (n: number) => `Show all ${n} genres`,
 		clear: 'Clear filters',
@@ -157,7 +160,9 @@ export const t = {
 		features: 'Features',
 		/** The link to the game's page on GOG.com, after the makers. Words only: GOG's logo is a trademark. */
 		store: 'GOG.com',
-		storeTitle: 'This game on GOG.com, in a new tab'
+		storeTitle: 'This game on GOG.com, in a new tab',
+		/** The one rating after the systems. ESRB rates by category, written here by its age: "ESRB 17+". */
+		rating: (body: RatingBody, age: number) => (body === 'esrb' ? `ESRB ${age}+` : `${body.toUpperCase()} ${age}`)
 	},
 
 	requirements: {
@@ -323,7 +328,10 @@ export const t = {
 		archivedBy: 'The games are archived by',
 		vangogh: 'vangogh',
 		readsApi: 'Canvas reads them through its API.',
-		source: 'Canvas on GitHub'
+		source: 'Canvas on GitHub',
+		/** After the version, when a newer Canvas is released: a link to the release. */
+		update: 'Update available',
+		updateTitle: (version: string) => `Canvas ${version} is released`
 	},
 
 	preparing: {
@@ -345,3 +353,5 @@ export const t = {
 export const VANGOGH_URL = 'https://github.com/arelate/vangogh';
 /** Where the source of Canvas can be read. */
 export const SOURCE_URL = 'https://github.com/shai66/vangogh-canvas';
+/** The page of a release on GitHub. */
+export const releaseUrl = (version: string): string => `${SOURCE_URL}/releases/tag/v${version}`;

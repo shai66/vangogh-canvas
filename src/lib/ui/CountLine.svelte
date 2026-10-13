@@ -14,6 +14,7 @@
 	const chips = $derived([
 		...view.os.map((os) => ({ key: `os:${os}`, label: t.osName[os], remove: () => view.toggleOs(os) })),
 		...view.together.map((flag) => ({ key: `together:${flag}`, label: t.together[flag], remove: () => view.toggleTogether(flag) })),
+		...(view.hide18 ? [{ key: 'hide18', label: t.filters.hide18, remove: () => view.toggleHide18() }] : []),
 		...view.genres.map((genre) => ({ key: `genre:${genre}`, label: genreName(genre), remove: () => view.toggleGenre(genre) }))
 	]);
 	/** The count in the words the line shows. */

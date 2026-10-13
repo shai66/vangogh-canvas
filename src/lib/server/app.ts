@@ -5,6 +5,7 @@ import { createLogger, type Logger } from './log';
 import { Rebuilder } from './rebuilder';
 import { Scheduler } from './scheduler';
 import { IndexStore } from './store';
+import { UpdateCheck } from './updates';
 import { VangoghClient } from './vangogh/client';
 
 export interface App {
@@ -14,6 +15,7 @@ export interface App {
 	store: IndexStore;
 	rebuilder: Rebuilder;
 	scheduler: Scheduler;
+	updates: UpdateCheck | null;
 }
 
 let current: App | null = null;
@@ -44,7 +46,11 @@ export function createApp(
 		timeZone: config.timeZone,
 		log
 	});
-	return { config, log, client, store, rebuilder, scheduler };
+	// Spec 0.10.0, section 7: the server asks GitHub for the latest release, unless switched off.
+	const updates = config.versionCheck
+		? new UpdateCheck({ version: VERSION, url: config.versionCheckUrl, fetch: globalThis.fetch, log })
+		: null;
+	return { config, log, client, store, rebuilder, scheduler, updates };
 }
 
 /** Reads the configuration, loads the cache, and starts the rebuilds. */
@@ -52,6 +58,7 @@ export async function startApp(
 	env: Record<string, string | undefined> = process.env
 ): Promise<App> {
 	current?.scheduler.stop();
+	current?.updates?.stop();
 	const app = createApp(env);
 	const cached = await app.store.load();
 	app.log.info('canvas started', {
@@ -59,14 +66,17 @@ export async function startApp(
 		vangogh: app.config.vangoghUrl,
 		rebuildAt: app.config.rebuildAt,
 		timeZone: app.config.timeZone,
-		cachedIndex: cached
+		cachedIndex: cached,
+		versionCheck: app.config.versionCheck
 	});
 	app.scheduler.start();
+	app.updates?.start();
 	// adapter-node emits this once it has closed the server after SIGTERM or SIGINT.
 	// Without it the scheduler's timer keeps the process alive.
 	if (onShutdown) process.off('sveltekit:shutdown', onShutdown);
 	onShutdown = () => {
 		app.scheduler.stop();
+		app.updates?.stop();
 		app.log.info('canvas stopped');
 	};
 	process.once('sveltekit:shutdown', onShutdown);

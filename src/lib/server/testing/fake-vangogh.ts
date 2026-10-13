@@ -13,6 +13,8 @@ export interface FakeData {
 	images: Record<string, { type: string; body: Buffer }>;
 	/** Keyed by `<id>/<downloadType>/<manualUrl without its leading slash>`. */
 	files: Record<string, { name: string; body: Buffer }>;
+	/** The tag of the latest release the fake answers at `/releases/latest`, for the version check. Absent: 404. */
+	release?: string;
 }
 
 export interface FakeVangogh {
@@ -173,6 +175,10 @@ export async function startFakeVangogh(
 		}
 		if (fake.hang) return;
 
+		// GitHub's releases API, for the version check: no token, like GitHub.
+		if (req.method === 'GET' && path === '/releases/latest') {
+			return data.release === undefined ? send(res, 404, 'not found') : sendJson(res, { tag_name: data.release });
+		}
 		if (req.method === 'POST' && path === '/api/auth-user') {
 			fake.loginAttempts++;
 			const form = new URLSearchParams(await readBody(req));

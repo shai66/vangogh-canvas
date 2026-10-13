@@ -71,6 +71,8 @@ export function query(entries: ListEntry[], state: ViewState, sorted = true): Ma
 			if (!groups.every((chosen) => chosen.some((genre) => own.includes(genre)))) continue;
 		}
 		if (state.together.length > 0 && !state.together.some((flag) => entry[flag])) continue;
+		// The games for adults, before the search: a hidden game is not found either.
+		if (state.hide18 && entry.adult) continue;
 		const match = matchEntry(entry, wanted);
 		if (match) matches.push(match);
 	}

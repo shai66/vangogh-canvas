@@ -7,7 +7,7 @@ import type { LayoutServerLoad } from './$types';
 
 /** What every page needs: the whole list, and a few facts about Canvas and the visitor. */
 export const load: LayoutServerLoad = ({ request, cookies }) => {
-	const { store, config } = getApp();
+	const { store, config, updates } = getApp();
 	const index = store.get();
 	return {
 		ready: index !== null,
@@ -17,6 +17,8 @@ export const load: LayoutServerLoad = ({ request, cookies }) => {
 		glance: index ? glanceFor(index) : null,
 		builtAt: index?.builtAt ?? null,
 		version: VERSION,
+		// Spec 0.10.0, section 7.6: the newer release, or null. Read with the page, as the built time is.
+		update: updates?.newer ?? null,
 		timeZone: config.timeZone,
 		visitor: detectVisitor(request.headers.get('user-agent') ?? ''),
 		remembered: parseRemembered(cookies.get(REMEMBER_COOKIE))

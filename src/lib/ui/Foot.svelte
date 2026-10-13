@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { ageInDays, builtTime, builtWhen, isStale } from '$lib/age';
-	import { SOURCE_URL, t, VANGOGH_URL } from '$lib/strings';
+	import { releaseUrl, SOURCE_URL, t, VANGOGH_URL } from '$lib/strings';
 	import Icon from './Icon.svelte';
 
 	interface Props {
@@ -9,8 +9,10 @@
 		builtAt: string | null;
 		/** The time zone the time is written in: the one Canvas is set to. */
 		timeZone: string;
+		/** A newer Canvas that is released, or null. */
+		update: string | null;
 	}
-	let { version, builtAt, timeZone }: Props = $props();
+	let { version, builtAt, timeZone, update }: Props = $props();
 
 	const built = $derived(builtTime(builtAt));
 	// The server and the browser write the time the same way, in the same zone.
@@ -19,6 +21,11 @@
 
 <footer class="foot">
 	<span class="mark"><img src="/logo" alt="" />{t.foot.version(version)}</span>
+	{#if update}
+		<a class="newer" href={releaseUrl(update)} target="_blank" rel="noreferrer" title={t.foot.updateTitle(update)}>
+			<span class="dot" aria-hidden="true"></span>{t.foot.update}<Icon name="external" />
+		</a>
+	{/if}
 	{#if when}
 		{#if isStale(builtAt)}
 			<span class="stale"><Icon name="warning" />{t.foot.stale(ageInDays(builtAt))}</span>

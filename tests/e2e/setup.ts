@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -250,6 +250,7 @@ function collectionLibrary(): FakeData {
 		series?: { id: number; name: string };
 		store?: string;
 		includedIn?: string[];
+		ratings?: { pegi: number };
 	}
 	const chapters: Game[] = Array.from({ length: 9 }, (_, i) => ({
 		id: String(4106 + i),
@@ -259,7 +260,7 @@ function collectionLibrary(): FakeData {
 	}));
 	const games: Game[] = [
 		{ id: '4117', title: 'Night Ferry', year: 2015 },
-		{ id: '4103', title: 'Saltwater Detectives', year: 2001, os: ['windows', 'osx'], series: thornwick },
+		{ id: '4103', title: 'Saltwater Detectives', year: 2001, os: ['windows', 'osx'], series: thornwick, ratings: { pegi: 18 } },
 		{ id: '4115', title: 'Lanterns of Orrin', year: 1999, series: { id: 501, name: 'Orrin Tales' }, includedIn: ['4898'] },
 		{ id: '4116', title: 'Quiet Harbour', year: 2012, os: ['linux'], includedIn: ['4805'] },
 		{ id: '4104', title: 'Helix Drift', year: 2004, store: `${at}/parallax_racing_trilogy`, includedIn: ['4802'] },
@@ -284,7 +285,8 @@ function collectionLibrary(): FakeData {
 			released: `${g.year}-06-01T00:00:00+02:00`,
 			series: g.series,
 			store: g.store,
-			includedIn: g.includedIn
+			includedIn: g.includedIn,
+			ratings: g.ratings
 		});
 		metadata[`gog-details/${g.id}`] = details({
 			english: Object.fromEntries(os.map((o) => [o === 'osx' ? 'mac' : o, [file(`${path}/en${number[o]}installer0`, g.title, '100 MB')]]))
@@ -400,9 +402,14 @@ export default async function setup(): Promise<() => Promise<void>> {
 			'/downloads/only_expansion_2/en1installer0': 'setup_only_expansion_2.exe'
 		}
 	};
+	// The version check: the main Canvas sees a newer release, the rich one its own version.
+	data.release = 'v99.0.0';
+	const own = (JSON.parse(readFileSync('package.json', 'utf8')) as { version: string }).version;
+	const rich = richLibrary();
+	rich.release = `v${own}`;
 	const fake = await startFakeVangogh(data);
 	const macFake = await startFakeVangogh(macLibrary());
-	const richFake = await startFakeVangogh(richLibrary());
+	const richFake = await startFakeVangogh(rich);
 	const collectionsFake = await startFakeVangogh(collectionLibrary());
 
 	const cache = await mkdtemp(join(tmpdir(), 'canvas-e2e-'));
@@ -428,12 +435,13 @@ export default async function setup(): Promise<() => Promise<void>> {
 		PORT: String(port),
 		VANGOGH_URL: fake.url,
 		CACHE_DIR: join(cache, 'full'),
-		TZ: 'UTC'
+		TZ: 'UTC',
+		VERSION_CHECK_URL: `${fake.url}/releases/latest`
 	});
-	launch({ PORT: String(emptyPort), VANGOGH_URL: `http://127.0.0.1:${closedPort}`, CACHE_DIR: join(cache, 'empty') });
-	launch({ PORT: String(macPort), VANGOGH_URL: macFake.url, CACHE_DIR: join(cache, 'mac'), TZ: 'UTC' });
-	launch({ PORT: String(richPort), VANGOGH_URL: richFake.url, CACHE_DIR: join(cache, 'rich'), TZ: 'UTC' });
-	launch({ PORT: String(collectionsPort), VANGOGH_URL: collectionsFake.url, CACHE_DIR: join(cache, 'collections'), TZ: 'UTC' });
+	launch({ PORT: String(emptyPort), VANGOGH_URL: `http://127.0.0.1:${closedPort}`, CACHE_DIR: join(cache, 'empty'), VERSION_CHECK: 'off' });
+	launch({ PORT: String(macPort), VANGOGH_URL: macFake.url, CACHE_DIR: join(cache, 'mac'), TZ: 'UTC', VERSION_CHECK: 'off' });
+	launch({ PORT: String(richPort), VANGOGH_URL: richFake.url, CACHE_DIR: join(cache, 'rich'), TZ: 'UTC', VERSION_CHECK_URL: `${richFake.url}/releases/latest` });
+	launch({ PORT: String(collectionsPort), VANGOGH_URL: collectionsFake.url, CACHE_DIR: join(cache, 'collections'), TZ: 'UTC', VERSION_CHECK: 'off' });
 
 	process.env.CANVAS_URL = `http://127.0.0.1:${port}`;
 	process.env.CANVAS_EMPTY_URL = `http://127.0.0.1:${emptyPort}`;

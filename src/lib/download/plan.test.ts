@@ -61,6 +61,7 @@ function detail(over: Partial<Detail> = {}): Detail {
 		macNotice: null,
 		requirements: {},
 		storeUrl: null,
+		rating: null,
 		downloads: { windows: [file({ run: true })] },
 		downloadLanguage: null,
 		dlc: [],
@@ -70,6 +71,7 @@ function detail(over: Partial<Detail> = {}): Detail {
 		collection: null,
 		series: null,
 		packs: [],
+		adult: false,
 		...over
 	};
 }

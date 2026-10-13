@@ -82,7 +82,9 @@
 				{#each detail.os as os (os)}
 					<span><Icon name={os} />{t.osName[os]}</span>
 				{/each}
-				{#if detail.os.length > 0 && (detail.multiplayer || detail.coop)}<span class="sep"></span>{/if}
+				<!-- The age rating after the systems (spec 0.10.0, section 6): "Windows, Linux, PEGI 18". -->
+				{#if detail.rating}<span><Icon name="shield" />{t.detail.rating(detail.rating.body, detail.rating.age)}</span>{/if}
+				{#if (detail.os.length > 0 || detail.rating) && (detail.multiplayer || detail.coop)}<span class="sep"></span>{/if}
 				{#if detail.multiplayer}<span><Icon name="multiplayer" />{t.together.multiplayer}</span>{/if}
 				{#if detail.coop}<span><Icon name="coop" />{t.together.coop}</span>{/if}
 			</div>

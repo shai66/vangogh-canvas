@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ListEntry } from '$lib/types';
 import { allGenres, genreFacets, matchEntry, query } from './query';
-import { DEFAULT_STATE } from './state';
+import { DEFAULT_STATE, type ViewState } from './state';
 import { existsSync, readFileSync } from 'node:fs';
 import { buildIndex } from '$lib/server/indexer';
 import { silentLogger } from '$lib/server/log';
@@ -27,6 +27,7 @@ function entry(over: Partial<ListEntry> & { id: string; title: string }): ListEn
 		collection: null,
 		series: null,
 		packs: [],
+		adult: false,
 		...over
 	};
 }
@@ -217,6 +218,16 @@ describe('query', () => {
 		expect(found([])).toEqual(['s', 'c', 'm']);
 		expect(found(['coop'])).toEqual(['c']);
 		expect(found(['coop', 'multiplayer'])).toEqual(['c', 'm']);
+	});
+
+	it('leaves the games for adults out while the chip is on, also for the search', () => {
+		const grown = entry({ id: 'n1', title: 'Night Market', adult: true });
+		const all = [grown, entry({ id: 'd1', title: 'Day Market' })];
+		const titles = (state: Partial<ViewState>) => query(all, { ...DEFAULT_STATE, ...state }).map((m) => m.entry.title);
+		expect(titles({})).toEqual(['Day Market', 'Night Market']);
+		expect(titles({ hide18: true })).toEqual(['Day Market']);
+		expect(titles({ hide18: true, q: 'night' })).toEqual([]);
+		expect(titles({ q: 'night' })).toEqual(['Night Market']);
 	});
 
 	it('needs both filters to hold', () => {

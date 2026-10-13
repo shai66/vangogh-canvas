@@ -397,7 +397,8 @@ export async function buildIndex(
 			// Worked out with the collections, once every entry is known.
 			collection: null,
 			series: null,
-			packs: []
+			packs: [],
+			adult: product?.adult ?? false
 		};
 		members.push({ id, title, releaseYear: entry.releaseYear, storeUrl: product?.storeUrl ?? null, series: product?.series ?? null });
 		for (const pack of product?.includedIn ?? []) named.add(pack.id);
@@ -414,6 +415,7 @@ export async function buildIndex(
 			macNotice: product?.macNotice ?? null,
 			requirements: product?.requirements ?? {},
 			storeUrl: product?.storeUrl ?? null,
+			rating: product?.rating ?? null,
 			downloads,
 			downloadLanguage: g.details?.downloads.language ?? null,
 			dlc,

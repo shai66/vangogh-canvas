@@ -24,6 +24,7 @@ const game = (id: string, over: Partial<ListEntry> = {}): ListEntry => ({
 	collection: null,
 	series: null,
 	packs: [],
+	adult: false,
 	...over
 });
 

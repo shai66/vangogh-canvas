@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { BACKDROP, BANNER, POSTER, SHOT, apiProduct, records } from '../testing/fixtures';
-import { macNoticeOf, mapApiProduct, requirementsOf, seriesOf, storeUrlOf } from './product';
+import { adultOf, macNoticeOf, mapApiProduct, ratingOf, requirementsOf, seriesOf, storeUrlOf } from './product';
 
 describe('mapApiProduct', () => {
 	const game = mapApiProduct(records.apiProducts['1001']);
@@ -136,6 +136,8 @@ describe('mapApiProduct', () => {
 				requirements: {},
 				storeUrl: null,
 				series: null,
+				adult: false,
+				rating: null,
 				requires: [],
 				includes: [],
 				includedIn: []
@@ -399,5 +401,87 @@ describe('seriesOf', () => {
 			{ id: 1, name: '   ' }
 		];
 		for (const x of odd) expect(seriesOf(x)).toBeNull();
+	});
+});
+
+describe('adultOf, the rule of spec 0.10.0 section 3.1', () => {
+	const embedded = (o: Record<string, unknown>) => (apiProduct({ title: 'X', ...o }) as { _embedded: unknown })._embedded;
+
+	it('hides a game that PEGI, USK, GOG or ESRB rates 18', () => {
+		expect(adultOf(embedded({ ratings: { pegi: 18 } }))).toBe(true);
+		expect(adultOf(embedded({ ratings: { usk: 18 } }))).toBe(true);
+		expect(adultOf(embedded({ ratings: { gog: 18 } }))).toBe(true);
+		expect(adultOf(embedded({ ratings: { esrb: 18 } }))).toBe(true);
+		expect(adultOf(embedded({ ratings: { pegi: 16, esrb: 17, usk: 18 } }))).toBe(true);
+	});
+
+	// Review focus 1
+	it('leaves a game that only ESRB rates Mature 17+ for everyone, and one rated 16 or less', () => {
+		expect(adultOf(embedded({ ratings: { esrb: 17 } }))).toBe(false);
+		expect(adultOf(embedded({ ratings: { pegi: 16, esrb: 17, usk: 16 } }))).toBe(false);
+		expect(adultOf(embedded({ ratings: { pegi: 3 } }))).toBe(false);
+		expect(adultOf(embedded({ ratings: { usk: 0 } }))).toBe(false);
+	});
+
+	it('lets Brazil and the tags stand in only when no other body rated the game', () => {
+		expect(adultOf(embedded({ ratings: { br: 18 } }))).toBe(true);
+		expect(adultOf(embedded({ tags: ['Nudity'] }))).toBe(true);
+		expect(adultOf(embedded({ tags: ['Sexual Content'] }))).toBe(true);
+		expect(adultOf(embedded({ ratings: { br: 18, usk: 16 } }))).toBe(false);
+		expect(adultOf(embedded({ ratings: { esrb: 13 }, tags: ['Nudity', 'Sexual Content'] }))).toBe(false);
+		expect(adultOf(embedded({ ratings: { br: 16 } }))).toBe(false);
+	});
+
+	it('does not count the tag Mature, which GOG puts on violent games too', () => {
+		expect(adultOf(embedded({ tags: ['Mature', 'Violent', 'Gore'] }))).toBe(false);
+	});
+
+	it('leaves a game without any rating or tag for everyone', () => {
+		expect(adultOf(embedded({}))).toBe(false);
+		expect(adultOf(undefined)).toBe(false);
+	});
+
+	// Review focus 2
+	it('takes an age that is not a finite number as no rating', () => {
+		expect(adultOf({ pegiRating: { ageRating: '18' } })).toBe(false);
+		expect(adultOf({ pegiRating: { ageRating: Infinity } })).toBe(false);
+		expect(adultOf({ pegiRating: {} })).toBe(false);
+		expect(adultOf({ pegiRating: 18 })).toBe(false);
+		// A string PEGI leaves nothing of the main bodies, so the stand-ins count.
+		expect(adultOf({ pegiRating: { ageRating: '12' }, brRating: { ageRating: 18 } })).toBe(true);
+	});
+});
+
+describe('ratingOf, the rule of spec 0.10.0 section 3.2', () => {
+	const embedded = (o: Record<string, unknown>) => (apiProduct({ title: 'X', ...o }) as { _embedded: unknown })._embedded;
+
+	it('shows PEGI first, then ESRB, then USK', () => {
+		expect(ratingOf(embedded({ ratings: { pegi: 18, esrb: 17, usk: 16 } }))).toEqual({ body: 'pegi', age: 18 });
+		expect(ratingOf(embedded({ ratings: { esrb: 17, usk: 16 } }))).toEqual({ body: 'esrb', age: 17 });
+		expect(ratingOf(embedded({ ratings: { usk: 0 } }))).toEqual({ body: 'usk', age: 0 });
+	});
+
+	it('never shows Brazil or GOG, and nothing without the three', () => {
+		expect(ratingOf(embedded({ ratings: { br: 18, gog: 18 } }))).toBeNull();
+		expect(ratingOf(embedded({}))).toBeNull();
+		expect(ratingOf(undefined)).toBeNull();
+	});
+
+	it('passes over an age that is not a finite number', () => {
+		expect(ratingOf({ pegiRating: { ageRating: '18' }, uskRating: { ageRating: 16 } })).toEqual({ body: 'usk', age: 16 });
+	});
+});
+
+describe('mapApiProduct and the ratings', () => {
+	it('carries the rule and the shown rating of the record', () => {
+		const road = mapApiProduct(records.apiProducts['1001']);
+		expect(road.adult).toBe(true);
+		expect(road.rating).toEqual({ body: 'pegi', age: 18 });
+		const small = mapApiProduct(records.apiProducts['1002']);
+		expect(small.adult).toBe(false);
+		expect(small.rating).toEqual({ body: 'esrb', age: 13 });
+		const bare = mapApiProduct(apiProduct({ title: 'Bare' }));
+		expect(bare.adult).toBe(false);
+		expect(bare.rating).toBeNull();
 	});
 });

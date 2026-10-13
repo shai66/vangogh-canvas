@@ -53,7 +53,9 @@ import puzzlePieceSvg from '@phosphor-icons/core/regular/puzzle-piece.svg?raw';
 import rightSvg from '@phosphor-icons/core/regular/caret-right.svg?raw';
 import runSvg from '@phosphor-icons/core/fill/play-circle-fill.svg?raw';
 import searchSvg from '@phosphor-icons/core/regular/magnifying-glass.svg?raw';
+import shieldCheckSvg from '@phosphor-icons/core/regular/shield-check.svg?raw';
 import shieldChevronSvg from '@phosphor-icons/core/regular/shield-chevron.svg?raw';
+import shieldSvg from '@phosphor-icons/core/regular/shield.svg?raw';
 import skullSvg from '@phosphor-icons/core/regular/skull.svg?raw';
 import stackSvg from '@phosphor-icons/core/regular/stack.svg?raw';
 import stairsSvg from '@phosphor-icons/core/regular/stairs.svg?raw';
@@ -87,6 +89,8 @@ export const ICONS = {
 	linux: inner(linuxSvg),
 	github: inner(githubLogoSvg),
 	warning: inner(warningSvg),
+	shield: inner(shieldSvg),
+	'shield-check': inner(shieldCheckSvg),
 	multiplayer: inner(multiplayerSvg),
 	coop: inner(coopSvg),
 	run: inner(runSvg),

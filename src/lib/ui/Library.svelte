@@ -30,6 +30,8 @@
 		builtAt: string | null;
 		version: string;
 		timeZone: string;
+		/** A newer Canvas that is released, or null. */
+		update: string | null;
 		/** What the server made of the browser's name. */
 		visitor: Visitor;
 		remembered: Remembered;
@@ -49,6 +51,7 @@
 		builtAt,
 		version,
 		timeZone,
+		update,
 		visitor: guessed,
 		remembered,
 		linked = null,
@@ -101,8 +104,8 @@
 		(state, before) => {
 			clearTimeout(pending);
 			pending = setTimeout(write, PAUSE);
-			// Remembered is what the visitor sets: the platform filter, the order and the collections toggle. A search
-			// does not change it, nor does a view that came from an address.
+			// Remembered is what the visitor sets: the platform filter, the chip "Hide 18+", the order and the collections
+			// toggle. A search does not change it, nor does a view that came from an address.
 			const next = nextRemembered(recall(document.cookie), before, state);
 			if (next) document.cookie = rememberedCookie(next);
 		},
@@ -196,6 +199,9 @@
 	});
 	/** The collection of the open game, for its row of posters. */
 	const detailCollection = $derived(detail?.collection ? (collections.find((c) => c.id === detail.collection) ?? null) : null);
+	/** The games of a collection as the chip "Hide 18+" lets them through; the open game stays in its own row. */
+	const letThrough = (games: ListEntry[], keep: string | null = null) =>
+		view.hide18 ? games.filter((e) => !e.adult || e.id === keep) : games;
 	/**
 	 * True while the library at a glance lies over the list: opened by a click, or by its address. Back onto the entry
 	 * of a sheet that came by its address is a shallow popstate: only the address says so, as for a collection.
@@ -336,9 +342,9 @@
 		}
 	}
 
-	/** A tag is searched for in the whole library. The platform filter, the order and the toggle are the visitor's settings: they stay. */
+	/** A tag is searched for in the whole library. The platform filter, the chip "Hide 18+", the order and the toggle are the visitor's settings: they stay. */
 	function searchTag(tag: string) {
-		goto(address({ ...DEFAULT_STATE, os: view.os, sort: view.sort, grouped: view.grouped, q: tag }));
+		goto(address({ ...DEFAULT_STATE, os: view.os, sort: view.sort, grouped: view.grouped, hide18: view.hide18, q: tag }));
 	}
 
 	// ---------- The rest of the page ----------
@@ -410,7 +416,7 @@
 	<div class="sentinel" bind:this={sentinel}></div>
 </main>
 
-<Foot {version} {builtAt} {timeZone} />
+<Foot {version} {builtAt} {timeZone} {update} />
 
 <FilterPanel open={filtersOpen} onclose={() => (filtersOpen = false)} {view} {entries} />
 
@@ -430,14 +436,14 @@
 				onclose={close}
 				ontag={searchTag}
 				collection={detailCollection}
-				collectionGames={detailCollection ? gamesOf(detailCollection, entries) : []}
+				collectionGames={detailCollection ? letThrough(gamesOf(detailCollection, entries), detail.id) : []}
 				shelfOpen={page.state.shelf ?? false}
 				onswap={swap}
 			/>
 		{/key}
 	{:else if collection}
 		{#key collection.id}
-			<CollectionView {collection} games={gamesOf(collection, entries)} onclose={close} onopen={open} />
+			<CollectionView {collection} games={letThrough(gamesOf(collection, entries))} onclose={close} onopen={open} />
 		{/key}
 	{:else if glanceOpen && glance}
 		<GlanceView {glance} games={entries.length} collections={collections.length} {builtAt} {timeZone} onclose={close} />

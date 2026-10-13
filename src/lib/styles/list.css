@@ -478,6 +478,28 @@ main {
 	width: 18px;
 	height: 18px;
 }
+/* A newer release (spec 0.10.0, section 7.6): a yellow dot and the words, a link to the release, on the mark's line. */
+.foot .newer {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	margin-left: -14px;
+	color: var(--starlight);
+	text-decoration: none;
+}
+.foot .newer:hover {
+	text-decoration: underline;
+}
+.foot .newer .dot {
+	width: 7px;
+	height: 7px;
+	border-radius: 50%;
+	background: var(--accent);
+}
+.foot .newer .ic {
+	font-size: 13px;
+	color: var(--starlight-dim);
+}
 .foot .links {
 	display: flex;
 	gap: 20px;

@@ -20,6 +20,8 @@ Canvas assumes you follow GOG.com's
 
 - Docker.
 - vangogh, reachable over HTTP. Tested with vangogh 1.2.20.
+- A way to `api.github.com` for the version check, unless you switch it off
+  (`VERSION_CHECK=off`).
 - A vangogh account of role `user` for Canvas only. It can read the whole
   archive: treat its password like your GOG login and keep vangogh off the
   internet.
@@ -59,7 +61,7 @@ Canvas assumes you follow GOG.com's
      canvas-cache:
    ```
 
-   Tags: `latest`, `0.9`, `0.9.2`. amd64 and arm64.
+   Tags: `latest`, `0.10`, `0.10.0`. amd64 and arm64.
 
 3. Put the account in `.env` next to it (`VANGOGH_USERNAME`,
    `VANGOGH_PASSWORD`). Write a `$` in the password as `$$`, or quote the
@@ -122,6 +124,7 @@ All settings are environment variables.
 | `TZ` | Time zone of `REBUILD_AT` and of the times Canvas shows | `UTC` |
 | `CACHE_DIR` | Folder for the cached index | `/cache` |
 | `PORT` | Port inside the container | `1854` |
+| `VERSION_CHECK` | `off` stops Canvas asking GitHub once a day whether a newer version is released | `on` |
 
 Canvas refuses to start when a required variable is missing, and says
 which.
@@ -149,6 +152,10 @@ curl http://127.0.0.1:1854/healthz     # version shows the new version
 Name the service, as above, or the example stack pulls and recreates
 vangogh too.
 
+Canvas checks GitHub once a day for a newer release and says "Update
+available" in the foot of the page, with a link to it. `VERSION_CHECK=off`
+stops it; `/healthz` shows the last answer under `update`.
+
 Some versions change the shape of the cached index. After such an update
 every page says "The library is being prepared" and `/healthz` answers
 `503` for a few seconds, until the first rebuild is done. Don't redeploy
@@ -172,15 +179,15 @@ resume it.
 While vangogh restarts around its nightly sync, Canvas keeps serving the
 previous index and tries again after 5, 15 and 60 minutes.
 
-The one cookie, `canvas-view`, keeps the platform filter, the sort order
-and the collections toggle. Everything else is in the address, so a view
-can be shared as a link.
+The one cookie, `canvas-view`, keeps the platform filter, the sort order,
+the collections toggle and the chip Hide 18+. Everything else is in the
+address, so a view can be shared as a link.
 
 ## Routes
 
 | Route | Returns |
 |---|---|
-| `GET /` | The library. `?q=`, `?os=`, `?genre=`, `?play=`, `?sort=recent` or `?sort=year`, and `?view=collections` choose the view. |
+| `GET /` | The library. `?q=`, `?os=`, `?genre=`, `?play=`, `?hide=18`, `?sort=recent` or `?sort=year`, and `?view=collections` choose the view. |
 | `GET /game/{id}` | The library with that game open |
 | `GET /collection/{id}` | The library with that collection's sheet open |
 | `GET /api/index` | Every game and collection. The header `x-built-at` gives the time of the last rebuild. |

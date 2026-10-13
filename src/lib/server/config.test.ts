@@ -16,7 +16,9 @@ describe('loadConfig', () => {
 			rebuildAt: '04:30',
 			timeZone: 'UTC',
 			customLogo: null,
-			cacheDir: '/cache'
+			cacheDir: '/cache',
+			versionCheck: true,
+			versionCheckUrl: 'https://api.github.com/repos/shai66/vangogh-canvas/releases/latest'
 		});
 	});
 
@@ -39,6 +41,21 @@ describe('loadConfig', () => {
 			customLogo: '/logo/vangog.svg',
 			cacheDir: '/tmp/cache'
 		});
+	});
+
+	it('switches the version check off for off, false and 0, in any case, and keeps it on for anything else', () => {
+		for (const value of ['off', 'OFF', 'false', 'False', '0']) {
+			expect(loadConfig({ ...required, VERSION_CHECK: value }).versionCheck).toBe(false);
+		}
+		for (const value of ['on', 'true', '1', 'yes', '']) {
+			expect(loadConfig({ ...required, VERSION_CHECK: value }).versionCheck).toBe(true);
+		}
+	});
+
+	it('takes another address for the version check, for the tests', () => {
+		expect(loadConfig({ ...required, VERSION_CHECK_URL: 'http://127.0.0.1:9/releases/latest' }).versionCheckUrl).toBe('http://127.0.0.1:9/releases/latest');
+		expect(() => loadConfig({ ...required, VERSION_CHECK_URL: 'ftp://x' })).toThrow(ConfigError);
+		expect(loadConfig({ ...required, VERSION_CHECK: 'off', VERSION_CHECK_URL: 'ftp://x' }).versionCheck).toBe(false);
 	});
 
 	it('names every missing required variable', () => {

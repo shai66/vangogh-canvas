@@ -1,7 +1,7 @@
 // Hand-made records in the shapes vangogh returns. Six products cover the
 // rules of spec section 4:
-//   1001  a game for three systems, multi-part on Windows, one DLC, in a pack, with extras
-//   1002  a game for Windows only, one file
+//   1001  a game for three systems, multi-part on Windows, one DLC, in a pack, with extras, rated PEGI 18 and ESRB Mature 17+
+//   1002  a game for Windows only, one file, rated ESRB Teen
 //   2002  a DLC whose base game (9999) is not owned
 //   3001  a pack that includes 1001 and has no files of its own
 //   1003  a product without any metadata
@@ -51,6 +51,8 @@ export interface ApiProductOptions {
 	store?: string;
 	/** GOG's series of the product, `_embedded.series`: a numeric id and a name. */
 	series?: { id: number; name: string };
+	/** The age ratings, `_embedded.<body>Rating.ageRating`, by body: pegi, esrb (the category's age, Mature 17+ is 17), usk, br, gog. */
+	ratings?: Partial<Record<'pegi' | 'esrb' | 'usk' | 'br' | 'gog', number>>;
 	/** GOG's system requirements by system name ("windows", "osx", "linux"): rows of [id, GOG's label, text]. */
 	requirements?: Record<string, { minimum?: [string, string, string][]; recommended?: [string, string, string][] }>;
 	requires?: string[];
@@ -79,6 +81,7 @@ export function apiProduct(o: ApiProductOptions): unknown {
 			},
 			productType: o.type ?? 'GAME',
 			...(o.series ? { series: o.series } : {}),
+			...Object.fromEntries(Object.entries(o.ratings ?? {}).map(([body, age]) => [`${body}Rating`, { ageRating: age }])),
 			tags: (o.genres ?? []).map((name) => ({ name })),
 			properties: (o.tags ?? []).map((name) => ({ name })),
 			supportedOperatingSystems: (o.os ?? ['windows']).map((name) => {
@@ -179,7 +182,8 @@ export const productOptions: Record<string, ApiProductOptions> = {
 		backdrop: BACKDROP['1001'],
 		released: '2002-09-27T00:00:00+02:00',
 		store: 'https://www.gog.com/en/game/the_long_dark_road',
-		includedIn: ['3001']
+		includedIn: ['3001'],
+		ratings: { pegi: 18, esrb: 17 }
 	},
 	'1002': {
 		title: 'Windows Only Game',
@@ -190,7 +194,8 @@ export const productOptions: Record<string, ApiProductOptions> = {
 		publisher: 'Small Team',
 		features: ['Single-player'],
 		poster: POSTER['1002'],
-		banner: BANNER['1002']
+		banner: BANNER['1002'],
+		ratings: { esrb: 13 }
 	},
 	'2002': {
 		title: 'Lonely Expansion',

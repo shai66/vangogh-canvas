@@ -28,6 +28,7 @@ function entry(id: string, o: Partial<ListEntry> = {}): ListEntry {
 		collection: null,
 		series: null,
 		packs: [],
+		adult: false,
 		...o
 	};
 }
@@ -48,6 +49,7 @@ function detail(e: ListEntry, o: Partial<Detail> = {}): Detail {
 		macNotice: null,
 		requirements: {},
 		storeUrl: null,
+		rating: null,
 		downloads: {},
 		downloadLanguage: null,
 		dlc: [],

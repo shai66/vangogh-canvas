@@ -1,3 +1,5 @@
+import { GITHUB_LATEST_RELEASE_URL } from './updates';
+
 export interface Config {
 	vangoghUrl: string;
 	username: string;
@@ -6,6 +8,10 @@ export interface Config {
 	timeZone: string;
 	customLogo: string | null;
 	cacheDir: string;
+	/** False when `VERSION_CHECK` is off: Canvas never asks GitHub for the latest release. */
+	versionCheck: boolean;
+	/** Where the latest release is asked for. Replaced in the tests only (`VERSION_CHECK_URL`). */
+	versionCheckUrl: string;
 }
 
 export class ConfigError extends Error {}
@@ -46,6 +52,12 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
 		throw new ConfigError('TZ is not a known time zone');
 	}
 
+	const versionCheck = !['off', 'false', '0'].includes(value('VERSION_CHECK').toLowerCase());
+	const versionCheckUrl = (versionCheck && value('VERSION_CHECK_URL')) || GITHUB_LATEST_RELEASE_URL;
+	if (!/^https?:\/\//.test(versionCheckUrl)) {
+		throw new ConfigError('VERSION_CHECK_URL must be an http or https address');
+	}
+
 	return {
 		vangoghUrl: value('VANGOGH_URL').replace(/\/+$/, ''),
 		username: value('VANGOGH_USERNAME'),
@@ -53,6 +65,8 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
 		rebuildAt,
 		timeZone,
 		customLogo: value('CUSTOM_LOGO') || null,
-		cacheDir: value('CACHE_DIR') || '/cache'
+		cacheDir: value('CACHE_DIR') || '/cache',
+		versionCheck,
+		versionCheckUrl
 	};
 }

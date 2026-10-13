@@ -1,3 +1,4 @@
+import { causeCode } from './errors';
 import type { FileTarget } from './index-types';
 import { fileId } from './indexer';
 import { silentLogger, type Fields, type Logger } from './log';
@@ -38,18 +39,6 @@ type FailureKind = 'unreachable' | 'login-rejected' | 'status' | 'content-type';
 
 function warn(log: Logger, kind: FailureKind, asked: Asked, extra: Fields = {}): void {
 	log.warn('the archive could not serve a request', { kind, ...extra, ...asked });
-}
-
-/** The code of the network error behind an unreachable vangogh, like ECONNREFUSED. */
-function causeCode(error: VangoghUnreachable): string | null {
-	let cause: unknown = error.cause;
-	for (let depth = 0; depth < 3 && cause instanceof Error; depth++) {
-		const code = (cause as { code?: unknown }).code;
-		if (typeof code === 'string') return code;
-		if (cause.name === 'TimeoutError') return 'timeout';
-		cause = cause.cause;
-	}
-	return null;
 }
 
 function failed(error: unknown, request: Request, log: Logger, asked: Asked): Response {

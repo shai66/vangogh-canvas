@@ -26,6 +26,7 @@ function entry(id: number, over: Partial<ListEntry> = {}): ListEntry {
 		collection: null,
 		series: null,
 		packs: [],
+		adult: false,
 		...over
 	};
 }
@@ -35,9 +36,9 @@ const library = [
 	entry(200, { title: 'Linux Strategy', os: ['linux'], genres: ['Strategy'], coop: true })
 ];
 
-function view(initial: Partial<ViewState> = {}) {
+function view(initial: Partial<ViewState> = {}, entries: ListEntry[] = library) {
 	const reported: ViewState[] = [];
-	const made = new View(() => library, { ...DEFAULT_STATE, ...initial }, (state) => reported.push(state));
+	const made = new View(() => entries, { ...DEFAULT_STATE, ...initial }, (state) => reported.push(state));
 	return { view: made, reported };
 }
 
@@ -80,7 +81,8 @@ describe('View', () => {
 			genres: ['Strategy'],
 			together: ['coop'],
 			sort: 'recent',
-			grouped: false
+			grouped: false,
+			hide18: false
 		});
 		expect(v.cards).toEqual([]);
 	});
@@ -128,6 +130,31 @@ describe('View', () => {
 		v.toggleGenre('Strategy');
 		v.toggleTogether('coop');
 		expect(v.filterCount).toBe(3);
+	});
+
+	it('counts the chip "Hide 18+" as a filter, and clears it with the filters', () => {
+		const { view: v } = view();
+		v.toggleHide18();
+		expect(v.hide18).toBe(true);
+		expect([v.filterCount, v.narrowed]).toEqual([1, true]);
+		expect(v.state.hide18).toBe(true);
+		v.toggleHide18();
+		expect(v.hide18).toBe(false);
+		v.toggleHide18();
+		v.clearFilters();
+		expect(v.hide18).toBe(false);
+		v.toggleHide18();
+		v.clearAll();
+		expect(v.hide18).toBe(false);
+	});
+
+	it('leaves the games for adults out while the chip is on', () => {
+		const grown = entry(300, { title: 'Grown Game', adult: true });
+		const { view: v } = view({}, [...library, grown]);
+		expect(v.cards.some((card) => card.kind === 'game' && card.entry.title === 'Grown Game')).toBe(true);
+		v.toggleHide18();
+		expect(v.cards.some((card) => card.kind === 'game' && card.entry.title === 'Grown Game')).toBe(false);
+		expect(v.games).toBe(library.length);
 	});
 
 	it('clears the filters and keeps the search and the order, or clears the search too', () => {

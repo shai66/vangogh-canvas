@@ -66,6 +66,8 @@ export interface ListEntry {
 	series: string | null;
 	/** The names of the packs that count and hold the game, A to Z. For search. */
 	packs: string[];
+	/** True when the game is for adults by the rule of spec 0.10.0, section 3.1: hidden by "Hide 18+". */
+	adult: boolean;
 }
 
 export interface FileEntry {
@@ -119,6 +121,9 @@ export interface RequirementSet {
 /** By system. A system GOG lists no requirements for has no entry. */
 export type Requirements = Partial<Record<Os, RequirementSet>>;
 
+/** The body whose rating the detail shows, spec 0.10.0, section 3.2. */
+export type RatingBody = 'pegi' | 'esrb' | 'usk';
+
 export interface Detail extends Omit<ListEntry, 'dlc'> {
 	/** Sanitised HTML. */
 	description: string;
@@ -134,6 +139,8 @@ export interface Detail extends Omit<ListEntry, 'dlc'> {
 	requirements: Requirements;
 	/** The game's page on GOG.com, always an https address on www.gog.com, or null. */
 	storeUrl: string | null;
+	/** The one rating the detail shows: PEGI, else ESRB by its age, else USK. Null when none of them rated the game. */
+	rating: { body: RatingBody; age: number } | null;
 	downloads: Downloads;
 	/** Null for English, otherwise the language the downloads are in. */
 	downloadLanguage: string | null;

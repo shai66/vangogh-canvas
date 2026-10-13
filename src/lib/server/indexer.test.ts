@@ -40,7 +40,7 @@ describe('buildIndex', () => {
 			['2002', 'orphaned-dlc'],
 			['1003', 'game']
 		]);
-		expect(index.schema).toBe(7);
+		expect(index.schema).toBe(8);
 		expect(index.builtAt).toBe('2026-09-29T02:30:00.000Z');
 	});
 
@@ -72,7 +72,8 @@ describe('buildIndex', () => {
 			hasFiles: true,
 			collection: null,
 			series: null,
-			packs: ['Road Trilogy']
+			packs: ['Road Trilogy'],
+			adult: true
 		});
 	});
 
@@ -123,6 +124,17 @@ describe('buildIndex', () => {
 		// A record without metadata has none.
 		expect(index.details['1003'].storeUrl).toBeNull();
 		expect(index.entries[0]).not.toHaveProperty('storeUrl');
+	});
+
+	it('hands the rule for adults to the list entry and the shown rating to the detail only', async () => {
+		const index = await buildIndex(source(), logger().log);
+		expect(index.entries[0].adult).toBe(true);
+		expect(index.entries[1].adult).toBe(false);
+		expect(index.entries[3].adult).toBe(false);
+		expect(index.details['1001'].rating).toEqual({ body: 'pegi', age: 18 });
+		expect(index.details['1002'].rating).toEqual({ body: 'esrb', age: 13 });
+		expect(index.details['1003'].rating).toBeNull();
+		expect(index.entries[0]).not.toHaveProperty('rating');
 	});
 
 	it('hands the system requirements to the detail only', async () => {

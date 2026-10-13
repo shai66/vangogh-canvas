@@ -16,7 +16,7 @@ describe('parseState', () => {
 
 	it('gives the defaults for an empty address', () => {
 		expect(parse('')).toEqual(DEFAULT_STATE);
-		expect(DEFAULT_STATE).toEqual({ q: '', os: [], genres: [], together: [], sort: 'title', grouped: false });
+		expect(DEFAULT_STATE).toEqual({ q: '', os: [], genres: [], together: [], sort: 'title', grouped: false, hide18: false });
 	});
 
 	it('reads and writes the collections toggle, and takes any other view as off', () => {
@@ -28,6 +28,15 @@ describe('parseState', () => {
 		expect(toParams(DEFAULT_STATE).toString()).toBe('');
 	});
 
+	it('reads and writes the chip "Hide 18+", and takes any other value as off', () => {
+		expect(parse('hide=18').hide18).toBe(true);
+		expect(parse('hide=16').hide18).toBe(false);
+		expect(parse('hide=18%2B').hide18).toBe(false);
+		expect(parse('').hide18).toBe(false);
+		expect(toParams({ ...DEFAULT_STATE, hide18: true }).toString()).toBe('hide=18');
+		expect(toParams({ ...DEFAULT_STATE, hide18: true, grouped: true }).toString()).toBe('view=collections&hide=18');
+	});
+
 	it('reads the example of the spec', () => {
 		expect(parse('q=witcher&os=linux&genre=strategy&sort=recent')).toEqual({
 			q: 'witcher',
@@ -35,7 +44,8 @@ describe('parseState', () => {
 			genres: ['strategy'],
 			together: [],
 			sort: 'recent',
-			grouped: false
+			grouped: false,
+			hide18: false
 		});
 	});
 
@@ -60,7 +70,8 @@ describe('parseState', () => {
 			genres: [],
 			together: [],
 			sort: 'title',
-			grouped: false
+			grouped: false,
+			hide18: false
 		});
 	});
 
@@ -81,7 +92,8 @@ describe('toParams', () => {
 			genres: ['Role-playing', 'Strategy'],
 			together: ['coop', 'multiplayer'] as const,
 			sort: 'recent' as const,
-			grouped: true
+			grouped: true,
+			hide18: false
 		};
 		const params = toParams({ ...state, os: [...state.os], together: [...state.together] });
 		expect(params.toString()).toBe(

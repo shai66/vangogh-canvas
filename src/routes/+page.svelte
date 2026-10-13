@@ -10,6 +10,7 @@
 	glance={data.glance}
 	builtAt={data.builtAt}
 	version={data.version}
+	update={data.update}
 	timeZone={data.timeZone}
 	visitor={data.visitor}
 	remembered={data.remembered}

@@ -1,4 +1,4 @@
-import type { Os, RequirementRow, RequirementSet, Requirements } from '../../types';
+import type { Os, RatingBody, RequirementRow, RequirementSet, Requirements } from '../../types';
 import { imageIdFromUrl } from './imageId';
 import { arr, names, obj, str, unique } from './raw';
 import { sanitizeDescription } from './sanitize';
@@ -39,6 +39,10 @@ export interface MappedProduct {
 	requirements: Requirements;
 	storeUrl: string | null;
 	series: Series | null;
+	/** Spec 0.10.0, section 3.1. */
+	adult: boolean;
+	/** Spec 0.10.0, section 3.2. */
+	rating: { body: RatingBody; age: number } | null;
 	requires: Related[];
 	includes: Related[];
 	includedIn: Related[];
@@ -207,6 +211,40 @@ export function seriesOf(x: unknown): Series | null {
 	return id !== null && name !== '' ? { id, name } : null;
 }
 
+/** The age of a body's rating, `<body>Rating.ageRating` of `_embedded`, or null when it is not a finite number. */
+function ageOf(embedded: Record<string, unknown>, body: string): number | null {
+	const age = obj(embedded[`${body}Rating`]).ageRating;
+	return typeof age === 'number' && Number.isFinite(age) ? age : null;
+}
+
+/** GOG's store tags that stand for sexual content, as GOG writes them. "Mature" is not one: GOG puts it on violent games too. */
+const SEXUAL_TAGS = ['Nudity', 'Sexual Content'];
+
+/**
+ * True when the game is for adults (spec 0.10.0, section 3.1): PEGI, USK, GOG or ESRB
+ * rate it 18 or more (ESRB's Mature 17+ does not count). When none of those four has
+ * rated it, Brazil's 18 or more, or the tags "Nudity" and "Sexual Content", stand in.
+ * Never throws, whatever it is given.
+ */
+export function adultOf(x: unknown): boolean {
+	const embedded = obj(x);
+	const main = ['pegi', 'usk', 'gog', 'esrb'].map((body) => ageOf(embedded, body)).filter((age): age is number => age !== null);
+	if (main.length > 0) return main.some((age) => age >= 18);
+	const br = ageOf(embedded, 'br');
+	if (br !== null && br >= 18) return true;
+	return names(embedded.properties).some((tag) => SEXUAL_TAGS.includes(tag));
+}
+
+/** The one rating the detail shows (spec 0.10.0, section 3.2): PEGI, else ESRB, else USK, else null. Never throws. */
+export function ratingOf(x: unknown): { body: RatingBody; age: number } | null {
+	const embedded = obj(x);
+	for (const body of ['pegi', 'esrb', 'usk'] as const) {
+		const age = ageOf(embedded, body);
+		if (age !== null) return { body, age };
+	}
+	return null;
+}
+
 /** Maps a `gog-api-products` record. Never throws, whatever it is given. */
 export function mapApiProduct(raw: unknown): MappedProduct {
 	const root = obj(raw);
@@ -256,6 +294,8 @@ export function mapApiProduct(raw: unknown): MappedProduct {
 		requirements: requirementsOf(embedded.supportedOperatingSystems),
 		storeUrl: storeUrlOf(links.store),
 		series: seriesOf(embedded.series),
+		adult: adultOf(embedded),
+		rating: ratingOf(embedded),
 		requires: related(links.requiresGames),
 		includes: related(links.includesGames),
 		includedIn: related(links.isIncludedInGames)

@@ -25,6 +25,7 @@ function entry(over: Partial<ListEntry> & { id: string; title: string }): ListEn
 		collection: null,
 		series: null,
 		packs: [],
+		adult: false,
 		...over
 	};
 }

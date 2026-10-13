@@ -19,9 +19,11 @@ export interface ViewState {
 	sort: Sort;
 	/** True while the list shows each collection as one card: `?view=collections`. */
 	grouped: boolean;
+	/** True while the games for adults are left out: `?hide=18`, the chip "Hide 18+". */
+	hide18: boolean;
 }
 
-export const DEFAULT_STATE: ViewState = { q: '', os: [], genres: [], together: [], sort: 'title', grouped: false };
+export const DEFAULT_STATE: ViewState = { q: '', os: [], genres: [], together: [], sort: 'title', grouped: false, hide18: false };
 
 const MAX_QUERY = 200;
 
@@ -40,7 +42,8 @@ export function parseState(params: URLSearchParams): ViewState {
 			(ALL_TOGETHER as readonly string[]).includes(v)
 		),
 		sort: parseSort(params.get('sort')),
-		grouped: params.get('view') === 'collections'
+		grouped: params.get('view') === 'collections',
+		hide18: params.get('hide') === '18'
 	};
 }
 
@@ -53,5 +56,6 @@ export function toParams(state: ViewState): URLSearchParams {
 	if (state.together.length > 0) params.set('play', state.together.join(','));
 	if (state.sort !== 'title') params.set('sort', state.sort);
 	if (state.grouped) params.set('view', 'collections');
+	if (state.hide18) params.set('hide', '18');
 	return params;
 }

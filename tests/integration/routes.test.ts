@@ -67,6 +67,7 @@ beforeAll(async () => {
 	for (const id of ['1001', '1002']) {
 		data.metadata[`gog-api-products/${id}`] = apiProduct({ ...productOptions[id], series: { id: 77, name: 'Dusk Saga' } });
 	}
+	data.release = 'v0.0.1';
 	fake = await startFakeVangogh(data);
 	cacheDir = await mkdtemp(join(tmpdir(), 'canvas-it-'));
 	const port = await freePort();
@@ -76,7 +77,8 @@ beforeAll(async () => {
 		VANGOGH_URL: fake.url,
 		VANGOGH_USERNAME: 'api',
 		VANGOGH_PASSWORD: PASSWORD,
-		CACHE_DIR: cacheDir
+		CACHE_DIR: cacheDir,
+		VERSION_CHECK_URL: `${fake.url}/releases/latest`
 	});
 	await waitFor(async () => (await fetch(`${base}/healthz`)).status === 200, 'the first index');
 });
@@ -133,6 +135,14 @@ describe('the pages, as the server draws them', () => {
 		expect(cards((await page('/?q=road')).html)).toEqual(['The Long Dark Road']);
 		expect(cards((await page('/?os=linux&sort=recent')).html)).toEqual(['The Long Dark Road']);
 		expect(cards((await page('/?genre=Strategy&play=coop')).html)).toEqual([]);
+	});
+
+	it('draws the list without the games for adults when the address or the cookie says so', async () => {
+		// The page carries the whole list for the script, so only the drawn cards tell.
+		const passing = ['Broken Record', 'Lonely Expansion', 'Windows Only Game'];
+		expect(cards((await page('/?hide=18')).html)).toEqual(passing);
+		expect(cards((await page('/', { cookie: 'canvas-view=|title|hide18' })).html)).toEqual(passing);
+		expect(cards((await page('/')).html)).toContain('The Long Dark Road');
 	});
 
 	it('draws the list as the browser remembers it, unless the address says otherwise', async () => {
@@ -222,9 +232,9 @@ describe('the pages, as the server draws them', () => {
 		expect(text).toContain('Strategy 2 Adventure 1 Role-playing 1');
 	});
 
-	it('leaves the cached index as it was: its schema is still 7', async () => {
+	it('leaves the cached index as it was: its schema is still 8', async () => {
 		const cached = JSON.parse(await readFile(join(cacheDir, 'index.json'), 'utf8')) as { schema: number };
-		expect(cached.schema).toBe(7);
+		expect(cached.schema).toBe(8);
 	});
 
 	it('gives the name of the system the visitor sits at to the download block', async () => {
@@ -286,6 +296,12 @@ describe('the routes', () => {
 		});
 		expect(body.version).toMatch(/^\d+\.\d+\.\d+$/);
 		expect(body.index.ageSeconds).toBeLessThan(60);
+		// The check runs 10 seconds after start.
+		await waitFor(async () => ((await (await fetch(`${base}/healthz`)).json()) as { update: { latest: string | null } }).update?.latest !== null, 'the version check');
+		const later = await (await fetch(`${base}/healthz`)).json();
+		expect(later.update).toEqual({ latest: '0.0.1', checkedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/) });
+		// An older release is no update: the foot says nothing.
+		expect(await (await fetch(`${base}/`)).text()).not.toContain('Update available');
 	});
 
 	it('serves the list with a version tag', async () => {
@@ -293,6 +309,7 @@ describe('the routes', () => {
 		expect(res.status).toBe(200);
 		const body = (await res.json()) as IndexPayload;
 		expect(body.entries.map((e) => e.id)).toEqual(['1001', '1002', '2002', '1003']);
+		expect(body.entries.map((e) => e.adult)).toEqual([true, false, false, false]);
 		expect(Object.keys(body).sort()).toEqual(['builtAt', 'collections', 'entries', 'version']);
 		expect(res.headers.get('etag')).toBe(`"${body.version}"`);
 
@@ -302,6 +319,13 @@ describe('the routes', () => {
 		expect(again.status).toBe(304);
 		expect(res.headers.get('x-built-at')).toBe(body.builtAt);
 		expect(again.headers.get('x-built-at')).toBe(body.builtAt);
+	});
+
+	it('serves a game with the one rating its detail shows', async () => {
+		const road = (await (await fetch(`${base}/api/games/1001`)).json()) as Detail;
+		expect(road.rating).toEqual({ body: 'pegi', age: 18 });
+		const only = (await (await fetch(`${base}/api/games/1002`)).json()) as Detail;
+		expect(only.rating).toEqual({ body: 'esrb', age: 13 });
 	});
 
 	it('tells a browser that got a 304 when the last rebuild was', async () => {
@@ -713,7 +737,9 @@ describe('what a browser cannot make Canvas do', () => {
 			'GET /api/gog/image/',
 			'GET /api/gog/manual-url/',
 			// Whether an extra is on disk.
-			'HEAD /api/gog/manual-url/'
+			'HEAD /api/gog/manual-url/',
+			// Not vangogh's: the version check, which the fake answers in GitHub's place.
+			'GET /releases/latest'
 		];
 		expect(fake.requests.length).toBeGreaterThan(0);
 		expect(fake.requests.filter((r) => r.includes('other-record'))).toEqual([]);
@@ -731,7 +757,8 @@ describe('the start', () => {
 			VANGOGH_URL: silent.url,
 			VANGOGH_USERNAME: 'api',
 			VANGOGH_PASSWORD: PASSWORD,
-			CACHE_DIR: cacheDir
+			CACHE_DIR: cacheDir,
+			VERSION_CHECK: 'off'
 		});
 		try {
 			await waitFor(
@@ -756,7 +783,8 @@ describe('the start', () => {
 			VANGOGH_URL: silent.url,
 			VANGOGH_USERNAME: 'api',
 			VANGOGH_PASSWORD: PASSWORD,
-			CACHE_DIR: empty
+			CACHE_DIR: empty,
+			VERSION_CHECK: 'off'
 		});
 		try {
 			await waitFor(
@@ -795,7 +823,8 @@ describe('the start', () => {
 				VANGOGH_URL: fake.url,
 				VANGOGH_USERNAME: 'api',
 				VANGOGH_PASSWORD: PASSWORD,
-				CACHE_DIR: cacheDir
+				CACHE_DIR: cacheDir,
+				VERSION_CHECK: 'off'
 			},
 			stdio: ['ignore', 'pipe', 'pipe']
 		});
@@ -856,7 +885,8 @@ describe('the start', () => {
 				VANGOGH_USERNAME: 'api',
 				VANGOGH_PASSWORD: PASSWORD,
 				CACHE_DIR: cacheDir,
-				CUSTOM_LOGO: file
+				CUSTOM_LOGO: file,
+				VERSION_CHECK: 'off'
 			});
 			try {
 				await waitFor(

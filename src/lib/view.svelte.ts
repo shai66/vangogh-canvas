@@ -27,6 +27,8 @@ export class View {
 	sort = $state<Sort>('title');
 	/** True while each collection is one card. */
 	grouped = $state(false);
+	/** True while the games for adults are left out. */
+	hide18 = $state(false);
 	/** How many cards are drawn. */
 	limit = $state(BATCH);
 
@@ -61,12 +63,12 @@ export class View {
 		this.games = $derived(this.cards.reduce((n, card) => n + (card.kind === 'collection' ? card.games.length : 1), 0));
 		this.collectionCount = $derived(this.cards.filter((card) => card.kind === 'collection').length);
 		this.total = $derived(entries().length);
-		this.filterCount = $derived(this.os.length + this.genres.length + this.together.length);
+		this.filterCount = $derived(this.os.length + this.genres.length + this.together.length + (this.hide18 ? 1 : 0));
 		this.narrowed = $derived(this.filterCount > 0 || this.q.trim() !== '');
 	}
 
 	get state(): ViewState {
-		return { q: this.q, os: this.os, genres: this.genres, together: this.together, sort: this.sort, grouped: this.grouped };
+		return { q: this.q, os: this.os, genres: this.genres, together: this.together, sort: this.sort, grouped: this.grouped, hide18: this.hide18 };
 	}
 
 	#set(state: ViewState): void {
@@ -76,6 +78,7 @@ export class View {
 		this.together = [...state.together];
 		this.sort = state.sort;
 		this.grouped = state.grouped;
+		this.hide18 = state.hide18;
 		this.limit = BATCH;
 	}
 
@@ -113,11 +116,15 @@ export class View {
 	toggleGrouped(): void {
 		this.#apply({ grouped: !this.grouped });
 	}
+	/** The chip "Hide 18+". */
+	toggleHide18(): void {
+		this.#apply({ hide18: !this.hide18 });
+	}
 	/** Leaves the search alone. */
 	clearFilters(): void {
-		this.#apply({ os: [], genres: [], together: [] });
+		this.#apply({ os: [], genres: [], together: [], hide18: false });
 	}
 	clearAll(): void {
-		this.#apply({ q: '', os: [], genres: [], together: [] });
+		this.#apply({ q: '', os: [], genres: [], together: [], hide18: false });
 	}
 }

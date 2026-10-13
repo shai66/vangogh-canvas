@@ -53,6 +53,14 @@
 			</div>
 		</section>
 		<section>
+			<h3>{t.filters.age}</h3>
+			<div class="chip-set">
+				<button class="chip" type="button" aria-pressed={view.hide18} onclick={() => view.toggleHide18()}>
+					<Icon name="shield-check" />{t.filters.hide18}<span class="n">{count((e) => e.adult)}</span>
+				</button>
+			</div>
+		</section>
+		<section>
 			<h3>{t.filters.together}</h3>
 			<div class="chip-set">
 				{#each ALL_TOGETHER as flag (flag)}

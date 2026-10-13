@@ -4,7 +4,7 @@ import { VERSION } from '$lib/version';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = () => {
-	const { store, rebuilder, client } = getApp();
+	const { store, rebuilder, client, updates } = getApp();
 	const index = store.get();
 	return json(
 		{
@@ -18,7 +18,8 @@ export const GET: RequestHandler = () => {
 			},
 			rebuild: rebuilder.status(),
 			login: client.loginState,
-			cache: store.cacheState()
+			cache: store.cacheState(),
+			update: updates ? { latest: updates.latest, checkedAt: updates.checkedAt } : null
 		},
 		{ status: index ? 200 : 503, headers: { 'cache-control': 'no-store' } }
 	);
