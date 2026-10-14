@@ -61,7 +61,7 @@ Canvas assumes you follow GOG.com's
      canvas-cache:
    ```
 
-   Tags: `latest`, `0.10`, `0.10.0`. amd64 and arm64.
+   Tags: `latest`, `0.10`, `0.10.1`. amd64 and arm64.
 
 3. Put the account in `.env` next to it (`VANGOGH_USERNAME`,
    `VANGOGH_PASSWORD`). Write a `$` in the password as `$$`, or quote the

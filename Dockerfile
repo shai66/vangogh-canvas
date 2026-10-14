@@ -1,4 +1,7 @@
-FROM node:22-alpine AS build
+# The build stage runs on the builder's own platform: node under QEMU crashes
+# at random. Its output is plain JavaScript, so the final stage, built per
+# platform, can copy it.
+FROM --platform=$BUILDPLATFORM node:22-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json .npmrc ./
 RUN npm ci
