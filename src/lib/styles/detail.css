@@ -228,6 +228,17 @@
 	background: var(--night-line);
 	align-self: center;
 }
+/* The genres: a quieter line than the systems and the rating above them, so that they do not read as more facts
+   about the files (0.10.2). */
+.detail-info .facts + .facts {
+	margin-top: 10px;
+	gap: 6px 14px;
+	font-size: 13.5px;
+}
+.detail-info .facts + .facts .ic {
+	font-size: 15px;
+	color: var(--starlight-dim);
+}
 .relation {
 	margin-top: 14px;
 	font-size: 14px;

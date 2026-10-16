@@ -31,18 +31,28 @@
 	color: inherit;
 	text-decoration: none;
 }
+/* Since 0.10.2 it looks like a link: the chart in starlight, and a dotted line under the count, solid when pointed
+   at. The collections part is a grid of its own, which a line drawn under its parent does not reach. */
 .status .glance-count .ic {
 	flex: none;
 	font-size: 17px;
-	color: var(--starlight-dim);
+	color: var(--starlight);
 }
 .status .glance-count .count-text {
 	margin-right: 0;
 }
+.status .glance-count .count-text,
+.status .glance-count .coll-real {
+	text-decoration: underline dotted 1px var(--starlight-faint);
+	text-underline-offset: 5px;
+}
+.status .glance-count:hover .count-text,
+.status .glance-count:hover .coll-real {
+	text-decoration-style: solid;
+}
 .status .glance-count:hover {
 	background: var(--night-control);
 }
-.status .glance-count:hover .ic,
 .status .glance-count:hover .count-text {
 	color: var(--starlight);
 }
@@ -165,9 +175,15 @@
 .poster img.is-waiting {
 	opacity: 0;
 }
-.card:hover .poster::after,
 .card:focus-visible .poster::after {
 	opacity: 1;
+}
+/* A touch leaves a card "pointed at" until the next touch, so the ring of a pointer is drawn only
+   where there is a pointer (0.10.2). The keyboard's ring is drawn everywhere. */
+@media (hover: hover) {
+	.card:hover .poster::after {
+		opacity: 1;
+	}
 }
 /* A collection's card: the frame of a game's card, with two edges behind its poster, as of more
    posters under it. They lie in the gap above the card, so the card keeps the size of the others
@@ -341,10 +357,10 @@
 	border-radius: 9px;
 	background: var(--night-control);
 	color: var(--starlight-dim);
-	font-size: 11px;
+	/* 12 px at the face's normal width since 0.10.2; it was 11 px at 92 %. The pill stays 17 px high. */
+	font-size: 12px;
 	line-height: 17px;
 	font-weight: 600;
-	font-stretch: 92%;
 	white-space: nowrap;
 	font-variant-numeric: tabular-nums;
 }
@@ -387,11 +403,11 @@
 .card-meta .missing .ic {
 	font-size: 15px;
 }
+/* The genre line and the reason of a match: 13 px at the face's normal width since 0.10.2 (12.5 px at 94 %). */
 .card-genres {
 	margin-top: 4px;
-	font-size: 12.5px;
+	font-size: 13px;
 	line-height: 18px;
-	font-stretch: 94%;
 	color: var(--starlight-faint);
 	display: flex;
 	flex-wrap: wrap;
@@ -404,7 +420,7 @@
 .card-genres span + span::before {
 	content: ',\00a0';
 }
-/* Sorted by release year, the year leads the genre line. */
+/* The year leads the genre line, in every order since 0.10.2 (before, only sorted by release year). */
 .card-genres .year {
 	color: var(--starlight-dim);
 	font-variant-numeric: tabular-nums;
@@ -421,8 +437,7 @@
 }
 .card-reason {
 	margin-top: 4px;
-	font-size: 12.5px;
-	font-stretch: 94%;
+	font-size: 13px;
 	color: var(--accent);
 	white-space: nowrap;
 	overflow: hidden;
@@ -531,16 +546,31 @@ main {
 	font-size: 15px;
 }
 
-/* A short note above the list that goes away by itself. */
+/* A short note that goes away by itself. It lies over the page at the foot of the window and takes no room,
+   so nothing moves when it goes (0.10.2; above the list it moved the list by 62 px after 8 seconds). */
 .toast {
+	position: fixed;
+	z-index: 30;
+	left: 50%;
+	bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+	translate: -50% 0;
+	width: max-content;
+	max-width: calc(100% - 2 * var(--gutter));
 	display: flex;
 	gap: 12px;
 	align-items: center;
-	margin: 18px var(--gutter) 0;
-	padding: 12px 14px;
+	padding: 12px 16px;
 	border-radius: 9px;
+	border: 1px solid var(--night-edge);
 	background: var(--night-control);
+	box-shadow: 0 12px 32px rgb(0 0 0 / 0.45);
 	font-size: 14px;
+	/* It has nothing to press: a click goes to the card under it. */
+	pointer-events: none;
+}
+/* While a sheet is open the page's scrollbar is gone and its room kept (base.css): the note keeps its place too. */
+html.is-locked .toast {
+	translate: calc(-50% - var(--scrollbar, 0px) / 2) 0;
 }
 .toast .ic {
 	font-size: 20px;

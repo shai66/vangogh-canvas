@@ -20,6 +20,8 @@ describe('the strings', () => {
 		expect(t.count.ofTotal(118)).toBe('of 118 games');
 		expect(t.download.summary(1, '1.8 GB')).toBe('1 file, 1.8 GB');
 		expect(t.download.summary(5, '38 GB')).toBe('5 files, 38 GB');
+		expect(t.download.downloadPart('Part 1 of 4', '11.6 GB')).toBe('Download Part 1 of 4, 11.6 GB');
+		expect(t.download.downloadPart('Patch 2.0 to 2.1', '')).toBe('Download Patch 2.0 to 2.1');
 		expect(t.filters.show(1)).toBe('Show 1 game');
 		expect(t.filters.show(0)).toBe('Show 0 games');
 	});

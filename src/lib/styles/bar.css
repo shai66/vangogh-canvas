@@ -68,6 +68,13 @@
 	background: var(--night-raised);
 	outline-offset: 0;
 }
+/* 16 px on a touch screen: a phone zooms into a field whose text is smaller when it gets the focus, also when held
+   sideways, where it gets the wide bar (0.10.2). */
+@media (pointer: coarse) {
+	.search input {
+		font-size: 16px;
+	}
+}
 .search input::placeholder {
 	color: var(--starlight-faint);
 }
@@ -161,7 +168,8 @@
 	background: var(--accent);
 	color: var(--accent-ink);
 }
-/* The toggle "Collections" has the look of the Filters button, and of a chosen chip while it is on. */
+/* The toggle "Collections" has the look of the Filters button. While it is on it is in the sky blue of a
+   collection's card, not in the yellow of "press this" (0.10.2). */
 .filter-button,
 .view-toggle {
 	flex: none;
@@ -185,9 +193,9 @@
 }
 .view-toggle[aria-pressed='true'],
 .view-toggle[aria-pressed='true']:hover {
-	border-color: var(--accent);
-	background: var(--accent-wash);
-	color: var(--accent);
+	border-color: rgb(var(--sky) / 0.7);
+	background: rgb(var(--sky) / 0.14);
+	color: rgb(var(--sky));
 }
 .filter-button {
 	position: relative;

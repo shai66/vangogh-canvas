@@ -16,6 +16,8 @@ dialog::backdrop {
 	margin: 0 0 0 auto;
 	width: min(440px, 100vw);
 	height: 100dvh;
+	/* The browser's own limits of a dialog go: on a phone the panel fills the screen (0.10.2; it was 38 px short). */
+	max-width: none;
 	max-height: none;
 	border-left: 1px solid var(--night-line);
 	box-shadow: -30px 0 60px rgb(0 0 0 / 0.35);

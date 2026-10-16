@@ -777,7 +777,8 @@ describe('the start', () => {
 		const port = await freePort();
 		const empty = await mkdtemp(join(tmpdir(), 'canvas-it-empty-'));
 		const silent = await startFakeVangogh({ ...fixtureData(), password: PASSWORD });
-		silent.down = true;
+		// vangogh takes its time: the first reading is still running (0.10.2: the page says so).
+		silent.hang = true;
 		const second = launch({
 			PORT: String(port),
 			VANGOGH_URL: silent.url,
@@ -807,6 +808,35 @@ describe('the start', () => {
 		} finally {
 			await stop(second);
 			await silent.close();
+			await rm(empty, { recursive: true, force: true });
+		}
+	});
+
+	it('says that vangogh refused the login while there is no index', async () => {
+		const port = await freePort();
+		const empty = await mkdtemp(join(tmpdir(), 'canvas-it-refused-'));
+		const strict = await startFakeVangogh({ ...fixtureData(), password: 'another-password' });
+		const second = launch({
+			PORT: String(port),
+			VANGOGH_URL: strict.url,
+			VANGOGH_USERNAME: 'api',
+			VANGOGH_PASSWORD: PASSWORD,
+			CACHE_DIR: empty,
+			VERSION_CHECK: 'off'
+		});
+		try {
+			await waitFor(async () => {
+				const health = await (await fetch(`http://127.0.0.1:${port}/healthz`)).json();
+				return health.login === 'rejected' && health.rebuild.running === false;
+			}, 'the rejected login');
+			const html = await (await fetch(`http://127.0.0.1:${port}/`)).text();
+			expect(html).toContain('vangogh refused the login');
+			expect(html).toContain('VANGOGH_PASSWORD');
+			expect(html).not.toContain(PASSWORD);
+			expect(html).not.toContain(strict.url);
+		} finally {
+			await stop(second);
+			await strict.close();
 			await rm(empty, { recursive: true, force: true });
 		}
 	});

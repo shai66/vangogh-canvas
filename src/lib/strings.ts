@@ -268,6 +268,8 @@ export const t = {
 		platforms: 'Files by platform',
 		openThis: 'Open this one to install',
 		downloadFile: (filename: string) => `Download ${filename}`,
+		/** What a screen reader hears for a file of the list: its part or name, and its size (0.10.2). */
+		downloadPart: (name: string, size: string) => (size ? `Download ${name}, ${size}` : `Download ${name}`),
 		fileMissing: 'This file is missing in the archive.',
 		showAll: (n: number) => `Show all ${n} files`,
 		language: (language: string) => `These files are in ${language}. The archive has no English version of this game.`,
@@ -334,9 +336,20 @@ export const t = {
 		updateTitle: (version: string) => `Canvas ${version} is released`
 	},
 
+	/** The page while there is no library: reading, or why the last reading failed (0.10.2). */
 	preparing: {
-		title: 'The library is being prepared',
-		text: 'Canvas is reading the archive for the first time. This page shows the games as soon as it is done.'
+		reading: {
+			title: 'The library is being prepared',
+			text: 'Canvas is reading the archive for the first time. This page shows the games as soon as it is done.'
+		},
+		unreadable: {
+			title: 'Canvas cannot read the archive',
+			text: 'When Canvas last tried, vangogh did not answer, answered with an error, or listed no games yet. Canvas tries again by itself, at the latest with the next daily update, and this page shows the games as soon as it has them. The log of the Canvas container names the cause; a restart of Canvas tries again at once.'
+		},
+		refused: {
+			title: 'vangogh refused the login',
+			text: 'vangogh did not accept the account that Canvas logs in with, VANGOGH_USERNAME and VANGOGH_PASSWORD in the settings of Canvas. Check that the account exists in vangogh and that both settings match it; vangogh reads its accounts only when it starts. Then restart Canvas, or wait: it tries again by itself, at the latest with the next daily update.'
+		}
 	},
 
 	notInLibrary: 'This game is not in the library.',

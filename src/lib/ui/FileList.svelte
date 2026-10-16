@@ -39,7 +39,7 @@
 				title={t.download.downloadFile(file.filename)}
 				onclick={(event) => ondownload(event, file)}
 			>
-				<Icon name="download" /><span class="sr">{t.download.downloadFile(file.filename)}</span>
+				<Icon name="download" /><span class="sr">{t.download.downloadPart(partLabel(file, inParts), file.sizeText)}</span>
 			</a>
 			{#if missing.includes(file.fileId)}
 				<span class="bad" role="alert">{t.download.fileMissing}</span>

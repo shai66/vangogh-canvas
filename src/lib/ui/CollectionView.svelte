@@ -62,7 +62,7 @@
 			<h2 class="section-title">{t.collections.gamesTitle} <span>{t.collections.gamesNote(games.length)}</span></h2>
 			<div class="grid coll-grid">
 				{#each games as entry (entry.id)}
-					<Card match={{ entry, reason: null }} showYear {onopen} />
+					<Card match={{ entry, reason: null }} {onopen} />
 				{/each}
 			</div>
 		</div>

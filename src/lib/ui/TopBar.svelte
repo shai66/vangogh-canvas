@@ -7,8 +7,10 @@
 	interface Props {
 		view: View;
 		onfilters: () => void;
+		/** Enter or the down arrow in the box: moves the focus to the first result. False when there is none. */
+		onresults: () => boolean;
 	}
-	let { view, onfilters }: Props = $props();
+	let { view, onfilters, onresults }: Props = $props();
 
 	let input: HTMLInputElement;
 
@@ -35,6 +37,13 @@
 				if (event.key === 'Escape' && view.q !== '') {
 					event.preventDefault();
 					view.setQuery('');
+				}
+				// Enter or the down arrow goes on to the results. An Enter that ends a composed character stays in the box
+				// (Safari ends the composition first and marks that Enter with key code 229), and so does a key with a modifier.
+				const composing = event.isComposing || event.keyCode === 229;
+				const modified = event.shiftKey || event.altKey || event.ctrlKey || event.metaKey;
+				if ((event.key === 'Enter' || event.key === 'ArrowDown') && !composing && !modified && onresults()) {
+					event.preventDefault();
 				}
 			}}
 			placeholder={t.bar.searchPlaceholder}

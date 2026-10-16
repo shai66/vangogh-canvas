@@ -110,6 +110,11 @@
 		gap: 6px 12px;
 		font-size: 13px;
 	}
+	/* The genres stay a step smaller than the systems. */
+	.detail-info .facts + .facts {
+		gap: 6px 10px;
+		font-size: 12.5px;
+	}
 	.facts .sep {
 		display: none;
 	}
@@ -214,6 +219,15 @@
 		content: '';
 		position: absolute;
 		inset: -7px 0;
+	}
+	/* The tabs of the system requirements are drawn 31 px high: a finger reaches 45 (0.10.2). */
+	.req-tabs button {
+		position: relative;
+	}
+	.req-tabs button::after {
+		content: '';
+		position: absolute;
+		inset: -7px -9px;
 	}
 	.filter-button {
 		height: 44px;

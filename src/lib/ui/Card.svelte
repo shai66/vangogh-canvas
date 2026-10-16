@@ -10,12 +10,10 @@
 
 	interface Props {
 		match: Match;
-		/** True while the list is sorted by release year: the year leads the genre line. */
-		showYear?: boolean;
 		/** Called for a click. The card is a link and works without it. */
 		onopen?: (event: MouseEvent, href: string) => void;
 	}
-	let { match, showYear = false, onopen }: Props = $props();
+	let { match, onopen }: Props = $props();
 
 	const entry = $derived(match.entry);
 	const missing = $derived(entry.complete && !entry.hasFiles);
@@ -82,8 +80,9 @@
 		{#if reason}
 			<div class="card-reason" title={reason}>{reason}</div>
 		{:else}
+			<!-- The year leads the genre line, in every order (0.10.2). -->
 			<div class="card-genres" title={entry.genres.map(genreName).join(', ')}>
-				{#if showYear && entry.releaseYear}<span class="year">{entry.releaseYear}</span>{/if}{#each entry.genres as genre (genre)}<span>{genreName(genre)}</span>{/each}
+				{#if entry.releaseYear}<span class="year">{entry.releaseYear}</span>{/if}{#each entry.genres as genre (genre)}<span>{genreName(genre)}</span>{/each}
 			</div>
 		{/if}
 	</div>

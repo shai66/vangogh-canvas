@@ -33,8 +33,12 @@ test.describe('the list', () => {
 		await expect(road.locator('.os .sr')).toHaveText(['Windows', 'macOS', 'Linux']);
 		await expect(road.locator('.dlc')).toHaveText('1 DLC');
 		await expect(road.locator('.people .sr')).toHaveText(['Co-op', 'Multiplayer']);
-		await expect(road.locator('.card-genres')).toHaveText('Role-playingAdventure');
+		await expect(road.locator('.card-genres')).toHaveText('2002Role-playingAdventure');
 		await expect(road.locator('.poster img')).toHaveCount(1);
+		// 0.10.2: the small print of a card a step larger, at the normal width of the face.
+		const type = (selector: string) => road.locator(selector).evaluate((node) => [getComputedStyle(node).fontSize, getComputedStyle(node).fontStretch]);
+		expect(await type('.dlc')).toEqual(['12px', '100%']);
+		expect(await type('.card-genres')).toEqual(['13px', '100%']);
 
 		await expect(page.locator('.card', { hasText: 'Lonely Expansion' }).locator('.badge-note')).toHaveText('DLC, base game not owned');
 		await expect(page.locator('.card', { hasText: 'Broken Record' }).locator('.poster-plain')).toHaveText('Broken Record');
@@ -83,7 +87,7 @@ test.describe('the list', () => {
 		await expect(page).toHaveURL(/\?sort=recent$/);
 	});
 
-	test('sorts by release year, newest first, with the year in front of the genres', async ({ page }) => {
+	test('sorts by release year, newest first; the year is in front of the genres in every order', async ({ page }) => {
 		await page.goto('/');
 		await page.getByRole('button', { name: 'Release year' }).click();
 		await expect(page).toHaveURL(/\?sort=year$/);
@@ -102,8 +106,11 @@ test.describe('the list', () => {
 		await expect(road.locator('.card-genres')).toHaveText('2002Role-playingAdventure');
 		await expect(page.locator('.card', { hasText: 'Windows Only Game' }).locator('.year')).toHaveCount(0);
 
+		// Since 0.10.2 the year stays in the other orders.
 		await page.getByRole('button', { name: 'A to Z' }).click();
-		await expect(road.locator('.year')).toHaveCount(0);
+		await expect(road.locator('.card-genres')).toHaveText('2002Role-playingAdventure');
+		await page.getByRole('button', { name: 'Recently added' }).click();
+		await expect(road.locator('.card-genres')).toHaveText('2002Role-playingAdventure');
 	});
 
 	test('sends a security policy that allows no script from elsewhere', async ({ page }) => {
@@ -191,6 +198,44 @@ test.describe('search', () => {
 		await page.keyboard.press('Escape');
 		await expect(box).toHaveValue('');
 		await expect(page.locator('.count-text')).toHaveText('7 games', { useInnerText: true });
+	});
+
+	test('moves to the first result with Enter or the down arrow, and stays when nothing matches', async ({ page }) => {
+		await page.goto('/');
+		const box = page.getByLabel('Search the library');
+		const first = page.locator('.grid > .card').first();
+		await box.fill('expansion');
+		await expect(page.locator('.count-text')).toHaveText('3 of 7 games', { useInnerText: true });
+		await box.press('Enter');
+		await expect(first).toBeFocused();
+		await expect(first.locator('.card-title')).toHaveText('Expansion Only Game');
+		await expect(box).toHaveValue('expansion');
+
+		await box.press('ArrowDown');
+		await expect(first).toBeFocused();
+		// Enter on the card opens it, as on any link.
+		await page.keyboard.press('Enter');
+		await expect(page.locator('dialog.detail h1')).toHaveText('Expansion Only Game');
+		await page.keyboard.press('Escape');
+
+		await box.fill('zzzz');
+		await expect(page.locator('.empty h2')).toBeVisible();
+		await box.press('Enter');
+		await expect(box).toBeFocused();
+	});
+
+	test('stays in the box for an Enter that ends a composed character, and for the arrow with a modifier', async ({ page }) => {
+		await page.goto('/');
+		const box = page.getByLabel('Search the library');
+		await box.fill('expansion');
+		await expect(page.locator('.count-text')).toHaveText('3 of 7 games', { useInnerText: true });
+		await box.dispatchEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true });
+		await expect(box).toBeFocused();
+		// Shift and the down arrow select to the end of the text, as in any field.
+		await box.press('Shift+ArrowDown');
+		await expect(box).toBeFocused();
+		await box.press('Alt+ArrowDown');
+		await expect(box).toBeFocused();
 	});
 
 	test('shows one cross in the search box, its own: the browser draws none beside it', async ({ page }) => {
@@ -287,6 +332,28 @@ test.describe('filters', () => {
 		await expect(page.locator('.active-chip')).toHaveText(['Co-opRemove the filter Co-op', 'StrategyRemove the filter Strategy']);
 		await page.getByRole('button', { name: 'Remove the filter Co-op' }).click();
 		await expect(page.locator('.count-text')).toHaveText('2 of 7 games', { useInnerText: true });
+	});
+
+	test('read the count out from inside the panel, since the page behind an open panel is inert', async ({ page }) => {
+		await page.goto('/');
+		await page.getByRole('button', { name: 'Filters', exact: true }).click();
+		const panel = page.locator('dialog.filters');
+		const status = panel.locator('[role="status"]');
+		await expect(status).toHaveText('7 games');
+		await panel.getByRole('button', { name: /^Linux/ }).click();
+		await expect(status).toHaveText('1 of 7 games');
+		await expect(page.locator('.status [role="status"]')).toHaveText('1 of 7 games');
+	});
+
+	test('keep the look of a chosen chip while the pointer is on it', async ({ page }) => {
+		await page.goto('/');
+		await page.getByRole('button', { name: 'Filters', exact: true }).click();
+		const chip = page.locator('dialog.filters').getByRole('button', { name: /^Strategy/ });
+		await chip.click();
+		await chip.hover();
+		await expect(chip).toHaveAttribute('aria-pressed', 'true');
+		const look = await chip.evaluate((node) => [getComputedStyle(node).color, getComputedStyle(node).borderTopColor]);
+		expect(look).toEqual(['rgb(245, 189, 31)', 'rgb(245, 189, 31)']);
 	});
 
 	test('need a genre and a setting to hold both', async ({ page }) => {

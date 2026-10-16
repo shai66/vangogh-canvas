@@ -153,7 +153,10 @@ button.chip:hover {
 	color: var(--starlight);
 	border-color: var(--starlight-dim);
 }
-.chip[aria-pressed='true'] {
+/* A chosen chip keeps its look while the pointer is on it: the rule for pointing at a button chip was the
+   stronger one, and hid that the chip was on (0.10.2). */
+.chip[aria-pressed='true'],
+button.chip[aria-pressed='true']:hover {
 	background: var(--accent-wash);
 	border-color: var(--accent);
 	color: var(--accent);

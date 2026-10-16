@@ -29,9 +29,14 @@ test.describe('the way into the library at a glance', () => {
 		const watched = ['.glance-count', '.count-text', '.sort button:nth-of-type(1)', '.grid > .card'];
 		const before = await Promise.all(watched.map((s) => place(page, s)));
 		const ground = () => page.locator('.glance-count').evaluate((node) => getComputedStyle(node).backgroundColor);
+		// It looks like a link (0.10.2): a dotted line under the count that turns solid, and the chart in starlight.
+		const line = () => page.locator('.count-text').evaluate((node) => getComputedStyle(node).textDecorationStyle);
 		expect(await ground()).toBe('rgba(0, 0, 0, 0)');
+		expect(await line()).toBe('dotted');
+		expect(await page.locator('.glance-count .ic').evaluate((node) => getComputedStyle(node).color)).toBe('rgb(241, 235, 218)');
 		await page.locator('.glance-count').hover();
 		expect(await ground()).toBe('rgb(31, 42, 69)');
+		expect(await line()).toBe('solid');
 		expect(await Promise.all(watched.map((s) => place(page, s)))).toEqual(before);
 	});
 
@@ -185,11 +190,14 @@ test.describe('what the library at a glance shows', () => {
 			fill: getComputedStyle(sheet.querySelector('.glance-bars .fill')!).backgroundColor,
 			track: getComputedStyle(sheet.querySelector('.glance-bars .track')!).backgroundColor,
 			col: getComputedStyle(sheet.querySelector('.glance-cols .col')!).backgroundColor,
+			values: [...sheet.querySelectorAll('.glance-bars .v, .glance-cols .v')].map((v) => getComputedStyle(v).color),
 			night: getComputedStyle(sheet.querySelector('.glance-night')!).backgroundImage
 		}));
-		expect(look.fill).toBe('rgb(138, 149, 177)');
+		// Since 0.10.2 in starlight's soft tone, the numbers in starlight.
+		expect(look.fill).toBe('rgb(213, 210, 198)');
 		expect(look.track).toBe('rgb(31, 42, 69)');
-		expect(look.col).toBe('rgb(138, 149, 177)');
+		expect(look.col).toBe('rgb(213, 210, 198)');
+		expect(new Set(look.values)).toEqual(new Set(['rgb(241, 235, 218)']));
 		expect(look.night).toContain('radial-gradient');
 		expect(look.night).toContain('rgba(111, 160, 255, 0.2)');
 	});

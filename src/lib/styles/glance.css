@@ -1,6 +1,7 @@
 /* The library at a glance (0.9.1, spec 2026-10-04-canvas-glance-design.md): the sheet of a game's detail,
    narrower, with Canvas's night behind its head and four panels in two columns. Every bar is starlight on a
-   quiet track: yellow means "press this", red "something is wrong", sky blue "collection". */
+   quiet track, in its soft tone with the numbers in starlight since 0.10.2 (they were the faint grey): yellow means
+   "press this", red "something is wrong", sky blue "collection". */
 .detail-inner.glance-inner {
 	width: min(960px, 100% - 48px);
 }
@@ -105,13 +106,13 @@
 	display: block;
 	height: 100%;
 	border-radius: 0 4px 4px 0;
-	background: var(--starlight-faint);
+	background: var(--starlight-soft);
 }
 .glance-bars .v {
 	text-align: right;
 	white-space: nowrap;
 	font-variant-numeric: tabular-nums;
-	color: var(--starlight-dim);
+	color: var(--starlight);
 }
 .glance-cols {
 	list-style: none;
@@ -144,13 +145,13 @@
 	margin-bottom: 6px;
 	font-size: 13px;
 	font-variant-numeric: tabular-nums;
-	color: var(--starlight-dim);
+	color: var(--starlight);
 }
 .glance-cols .col {
 	flex: none;
 	width: min(24px, 70%);
 	border-radius: 4px 4px 0 0;
-	background: var(--starlight-faint);
+	background: var(--starlight-soft);
 }
 .glance-cols .lbl {
 	margin-top: 8px;

@@ -1,7 +1,18 @@
+<script lang="ts" module>
+	import type { View } from '$lib/view.svelte';
+	import { t } from '$lib/strings';
+
+	/** The count in the words the line shows, as a screen reader hears it. The filter panel says it too (0.10.2). */
+	export function spokenCount(view: View): string {
+		return (
+			(view.narrowed ? `${view.games} ${t.count.ofTotal(view.total)}` : `${view.total} ${t.count.games(view.total)}`) +
+			(view.grouped ? `${t.count.separator}${view.collectionCount} ${t.count.collections(view.collectionCount)}` : '')
+		);
+	}
+</script>
+
 <script lang="ts">
 	import { genreName } from '$lib/genres';
-	import { t } from '$lib/strings';
-	import type { View } from '$lib/view.svelte';
 	import Icon from './Icon.svelte';
 
 	interface Props {
@@ -17,11 +28,7 @@
 		...(view.hide18 ? [{ key: 'hide18', label: t.filters.hide18, remove: () => view.toggleHide18() }] : []),
 		...view.genres.map((genre) => ({ key: `genre:${genre}`, label: genreName(genre), remove: () => view.toggleGenre(genre) }))
 	]);
-	/** The count in the words the line shows. */
-	const spoken = $derived(
-		(view.narrowed ? `${view.games} ${t.count.ofTotal(view.total)}` : `${view.total} ${t.count.games(view.total)}`) +
-			(view.grouped ? `${t.count.separator}${view.collectionCount} ${t.count.collections(view.collectionCount)}` : '')
-	);
+	const spoken = $derived(spokenCount(view));
 </script>
 
 <div class="status">

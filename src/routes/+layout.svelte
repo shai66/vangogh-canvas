@@ -22,5 +22,5 @@
 {#if data.ready}
 	{@render children()}
 {:else}
-	<Preparing />
+	<Preparing state={data.preparing ?? 'reading'} />
 {/if}

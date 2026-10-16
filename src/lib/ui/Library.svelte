@@ -360,6 +360,14 @@
 		}
 	}
 
+	/** From the search box to the first card: it has the focus and its ring. False when the list is empty. */
+	let grid = $state<HTMLElement | null>(null);
+	function toResults(): boolean {
+		const first = grid?.querySelector<HTMLElement>('.card');
+		first?.focus();
+		return first !== undefined && first !== null;
+	}
+
 	// More cards are drawn when the end of the list comes near.
 	let sentinel: HTMLElement;
 	$effect(() => {
@@ -389,7 +397,7 @@
 	<title>{detail ? t.gameTitle(detail.title) : collection ? t.collectionTitle(collection.name) : glanceOpen ? t.glanceTitle : t.pageTitle}</title>
 </svelte:head>
 
-<TopBar bind:this={bar} {view} onfilters={() => (filtersOpen = true)} />
+<TopBar bind:this={bar} {view} onfilters={() => (filtersOpen = true)} onresults={toResults} />
 
 <main>
 	{#if note}
@@ -397,10 +405,10 @@
 	{/if}
 	<CountLine {view} onglance={openGlance} />
 	{#if view.cards.length > 0}
-		<div class="grid">
+		<div class="grid" bind:this={grid}>
 			{#each view.shown as card (card.key)}
 				{#if card.kind === 'game'}
-					<Card match={card} showYear={view.sort === 'year'} onopen={open} />
+					<Card match={card} onopen={open} />
 				{:else}
 					<CollectionCard {card} oldest={byId.get(card.collection.games[0])} onopen={openCollection} />
 				{/if}

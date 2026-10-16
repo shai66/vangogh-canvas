@@ -5,6 +5,7 @@
 	import { t } from '$lib/strings';
 	import { ALL_OS, type ListEntry } from '$lib/types';
 	import type { View } from '$lib/view.svelte';
+	import { spokenCount } from './CountLine.svelte';
 	import Icon from './Icon.svelte';
 	import { genreIcon } from './icons';
 	import Sheet from './Sheet.svelte';
@@ -97,6 +98,8 @@
 		{/each}
 	</div>
 	<div class="filters-foot">
+		<!-- The open panel makes the page behind it inert, and the count line's words with it: the panel says them itself (0.10.2). -->
+		<span class="sr" role="status">{spokenCount(view)}</span>
 		<button class="btn" type="button" onclick={() => view.clearFilters()}>{t.filters.clear}</button>
 		<button class="btn btn-primary" type="button" onclick={onclose}>{t.filters.show(view.games)}</button>
 	</div>

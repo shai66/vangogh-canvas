@@ -30,8 +30,11 @@ test.describe('the collections in the list', () => {
 		await toggle(page);
 		await expect(page.locator('.card.is-collection').first()).toBeVisible();
 		expect(await Promise.all(watched.map((s) => place(page, s)))).toEqual(before);
-		const look = await page.locator('.view-toggle').evaluate((node) => [getComputedStyle(node).color, getComputedStyle(node).borderTopColor]);
-		expect(look).toEqual(['rgb(245, 189, 31)', 'rgb(245, 189, 31)']);
+		// On, it is in the sky blue of a collection (0.10.2), not in the yellow of "press this".
+		const look = await page
+			.locator('.view-toggle')
+			.evaluate((node) => [getComputedStyle(node).color, getComputedStyle(node).borderTopColor, getComputedStyle(node).backgroundColor]);
+		expect(look).toEqual(['rgb(111, 160, 255)', 'rgba(111, 160, 255, 0.7)', 'rgba(111, 160, 255, 0.14)']);
 	});
 
 	// Spec 5.2: the count line keeps the room of its collections part, so the sort words and the cards stay.

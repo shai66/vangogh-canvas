@@ -303,6 +303,19 @@
 .file:hover {
 	background: rgb(31 42 69 / 0.6);
 }
+/* The row is shaded, but only its arrow downloads: the arrow lights up with its row (0.10.2), where there is a
+   pointer (a touch would leave it lit), and when the keyboard reaches it. A button that waits stays as it is.
+   Colours only. */
+@media (hover: hover) {
+	.file:hover .icon-btn:not(:disabled) {
+		color: var(--accent);
+		background: var(--accent-wash);
+	}
+}
+.file .icon-btn:focus-visible {
+	color: var(--accent);
+	background: var(--accent-wash);
+}
 .file .name {
 	display: flex;
 	flex-wrap: wrap;

@@ -28,6 +28,11 @@ test.describe('the game detail', () => {
 		await expect(page).toHaveTitle('The Long Dark Road | Canvas for vangogh');
 		await expect(detail.locator('h1')).toHaveText('The Long Dark Road');
 		await expect(detail.locator('.detail-makers')).toHaveText('Šťastný Studio, published by Road Works, 2002 · GOG.com');
+		// The genres are a quieter line than the systems (0.10.2).
+		const genres = detail.locator('.detail-info .facts').nth(1);
+		expect(await genres.evaluate((node) => getComputedStyle(node).fontSize)).toBe('13.5px');
+		expect(await genres.locator('.ic').first().evaluate((node) => getComputedStyle(node).color)).toBe('rgb(166, 174, 196)');
+		expect(await detail.locator('.detail-info .facts .ic').first().evaluate((node) => getComputedStyle(node).color)).toBe('rgb(241, 235, 218)');
 		// The line "Part of" is gone since 0.9.0: an owned pack is a collection like any other.
 		await expect(detail.locator('.relation')).toHaveCount(0);
 		// The list is still there, behind the sheet.
@@ -258,6 +263,25 @@ test.describe('the game detail', () => {
 		}
 	});
 
+	test('the note about an unknown game takes no room, so that nothing moves when it goes', async ({ page }) => {
+		await page.goto('/');
+		const where = await Promise.all(['.status', '.grid > .card'].map((s) => place(page, s)));
+		await page.goto('/game/424242');
+		const note = page.locator('.toast');
+		await expect(note).toBeVisible();
+		expect(await Promise.all(['.status', '.grid > .card'].map((s) => place(page, s)))).toEqual(where);
+		// A click on it reaches what lies under it: it has nothing to press.
+		expect(await note.evaluate((node) => {
+			const box = node.getBoundingClientRect();
+			return node.contains(document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2));
+		})).toBe(false);
+		// The page's scrollbar goes while a sheet is open: the note stays where it was.
+		const before = await place(page, '.toast');
+		await page.getByRole('button', { name: 'Filters', exact: true }).click();
+		await expect(page.locator('dialog.filters')).toBeVisible();
+		expect(await place(page, '.toast')).toEqual(before);
+	});
+
 	test('shows the description as sanitised HTML and everything else as text', async ({ page }) => {
 		await page.goto('/game/1001');
 		const description = page.locator('.description');
@@ -381,6 +405,23 @@ test.describe('the download block', () => {
 			'setup_the_long_dark_road_2.1-1.bin',
 			'setup_the_long_dark_road_2.1-2.bin'
 		]);
+	});
+
+	test('names the link of a file by its part and size, and lights it while its row is pointed at', async ({ page }) => {
+		await page.goto('/game/1001');
+		const rows = page.locator('.dl-list .file');
+		const link = rows.first().locator('.icon-btn');
+		// What a screen reader says; the title keeps the name of the file on the disk.
+		await expect(link).toHaveAccessibleName('Download Part 1 of 3, 1 MB');
+		await expect(link).toHaveAttribute('title', 'Download setup_the_long_dark_road_2.1.exe');
+		await expect(rows.nth(1).locator('.icon-btn')).toHaveAccessibleName('Download Part 2 of 3, 4 GB');
+
+		const look = (n: number) => rows.nth(n).locator('.icon-btn').evaluate((node) => [getComputedStyle(node).color, getComputedStyle(node).backgroundColor]);
+		const quiet = await look(1);
+		expect(quiet).toEqual(['rgb(166, 174, 196)', 'rgba(0, 0, 0, 0)']);
+		await rows.first().locator('.name').hover();
+		expect(await look(0)).toEqual(['rgb(245, 189, 31)', 'rgba(245, 189, 31, 0.14)']);
+		expect(await look(1)).toEqual(quiet);
 	});
 
 	test('starts each file once, however often and however fast the button is pressed', async ({ page }) => {
@@ -543,7 +584,7 @@ test.describe('the download block', () => {
 		await expect(button).toBeDisabled();
 
 		await page.getByRole('tab', { name: 'macOS' }).click();
-		await page.getByRole('link', { name: 'Download the_long_dark_road_2.1.pkg' }).click();
+		await page.getByRole('link', { name: 'Download The Long Dark Road, 7 GB' }).click();
 		await expect.poll(() => names).toContain('the_long_dark_road_2.1.pkg');
 		// The tab turned the button to macOS: back on Windows it is still busy with its parts.
 		await page.getByRole('tab', { name: 'Windows' }).click();
