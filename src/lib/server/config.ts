@@ -12,6 +12,10 @@ export interface Config {
 	versionCheck: boolean;
 	/** Where the latest release is asked for. Replaced in the tests only (`VERSION_CHECK_URL`). */
 	versionCheckUrl: string;
+	/** The PIN that unlocks the settings; null while settings are off. Never logged. */
+	settingsPin: string | null;
+	/** The folder of `settings.json`. */
+	settingsDir: string;
 }
 
 export class ConfigError extends Error {}
@@ -58,6 +62,11 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
 		throw new ConfigError('VERSION_CHECK_URL must be an http or https address');
 	}
 
+	const settingsPin = value('SETTINGS_PIN') || null;
+	if (settingsPin !== null && !/^\d{4,8}$/.test(settingsPin)) {
+		throw new ConfigError('SETTINGS_PIN must be 4 to 8 digits');
+	}
+
 	return {
 		vangoghUrl: value('VANGOGH_URL').replace(/\/+$/, ''),
 		username: value('VANGOGH_USERNAME'),
@@ -67,6 +76,8 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
 		customLogo: value('CUSTOM_LOGO') || null,
 		cacheDir: value('CACHE_DIR') || '/cache',
 		versionCheck,
-		versionCheckUrl
+		versionCheckUrl,
+		settingsPin,
+		settingsDir: value('SETTINGS_DIR') || '/settings'
 	};
 }

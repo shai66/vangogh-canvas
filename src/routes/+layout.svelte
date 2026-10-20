@@ -8,6 +8,7 @@
 	import '$lib/styles/detail.css';
 	import '$lib/styles/download.css';
 	import '$lib/styles/glance.css';
+	import '$lib/styles/settings.css';
 	import '$lib/styles/narrow.css';
 	import Preparing from '$lib/ui/Preparing.svelte';
 	import { t } from '$lib/strings';

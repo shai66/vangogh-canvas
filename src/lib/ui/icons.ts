@@ -16,6 +16,7 @@ import checkSvg from '@phosphor-icons/core/regular/check.svg?raw';
 import citySvg from '@phosphor-icons/core/regular/city.svg?raw';
 import closeSvg from '@phosphor-icons/core/regular/x.svg?raw';
 import compassSvg from '@phosphor-icons/core/regular/compass.svg?raw';
+import copySvg from '@phosphor-icons/core/regular/copy.svg?raw';
 import coopSvg from '@phosphor-icons/core/fill/handshake-fill.svg?raw';
 import crosshairSvg from '@phosphor-icons/core/regular/crosshair.svg?raw';
 import cursorClickSvg from '@phosphor-icons/core/regular/cursor-click.svg?raw';
@@ -28,6 +29,7 @@ import eyeSvg from '@phosphor-icons/core/regular/eye.svg?raw';
 import filmStripSvg from '@phosphor-icons/core/regular/film-strip.svg?raw';
 import filterSvg from '@phosphor-icons/core/regular/funnel.svg?raw';
 import flagCheckeredSvg from '@phosphor-icons/core/regular/flag-checkered.svg?raw';
+import gearSixSvg from '@phosphor-icons/core/regular/gear-six.svg?raw';
 import ghostSvg from '@phosphor-icons/core/regular/ghost.svg?raw';
 import giftSvg from '@phosphor-icons/core/regular/gift.svg?raw';
 import githubLogoSvg from '@phosphor-icons/core/regular/github-logo.svg?raw';
@@ -40,6 +42,7 @@ import infoSvg from '@phosphor-icons/core/regular/info.svg?raw';
 import joystickSvg from '@phosphor-icons/core/regular/joystick.svg?raw';
 import leftSvg from '@phosphor-icons/core/regular/caret-left.svg?raw';
 import lightningSvg from '@phosphor-icons/core/regular/lightning.svg?raw';
+import lockKeySvg from '@phosphor-icons/core/regular/lock-key.svg?raw';
 import linuxSvg from '@phosphor-icons/core/fill/linux-logo-fill.svg?raw';
 import macosSvg from '@phosphor-icons/core/fill/apple-logo-fill.svg?raw';
 import magicWandSvg from '@phosphor-icons/core/regular/magic-wand.svg?raw';
@@ -62,6 +65,7 @@ import stairsSvg from '@phosphor-icons/core/regular/stairs.svg?raw';
 import steeringWheelSvg from '@phosphor-icons/core/regular/steering-wheel.svg?raw';
 import strategySvg from '@phosphor-icons/core/regular/strategy.svg?raw';
 import swordSvg from '@phosphor-icons/core/regular/sword.svg?raw';
+import terminalWindowSvg from '@phosphor-icons/core/regular/terminal-window.svg?raw';
 import timerSvg from '@phosphor-icons/core/regular/timer.svg?raw';
 import userCircleSvg from '@phosphor-icons/core/regular/user-circle.svg?raw';
 import userFocusSvg from '@phosphor-icons/core/regular/user-focus.svg?raw';
@@ -139,7 +143,11 @@ export const ICONS = {
 	filmStrip: inner(filmStripSvg),
 	package: inner(packageSvg),
 	external: inner(arrowUpRightSvg),
-	stack: inner(stackSvg)
+	stack: inner(stackSvg),
+	gear: inner(gearSixSvg),
+	lock: inner(lockKeySvg),
+	terminal: inner(terminalWindowSvg),
+	copy: inner(copySvg)
 } as const;
 
 export type IconName = keyof typeof ICONS;

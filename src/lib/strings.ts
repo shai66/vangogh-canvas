@@ -66,6 +66,7 @@ export const t = {
 	gameTitle: (title: string) => `${title} | Canvas for vangogh`,
 	collectionTitle: (name: string) => `${name} | Canvas for vangogh`,
 	glanceTitle: 'Library at a glance | Canvas for vangogh',
+	settingsTitle: 'Settings | Canvas for vangogh',
 
 	osName,
 	together: { multiplayer: 'Multiplayer', coop: 'Co-op' } satisfies Record<Together, string>,
@@ -284,6 +285,18 @@ export const t = {
 		dlcAll: 'Download all DLC'
 	},
 
+	/** The panel "Install with theo" in a game's detail, while the settings switch it on (0.11.0). */
+	theo: {
+		title: 'Install with theo',
+		text: 'theo downloads this game from vangogh, installs it and starts it, on macOS or Linux.',
+		about: 'About theo',
+		command: (id: string) => `theo install ${id}`,
+		copy: 'Copy',
+		copied: 'Copied',
+		/** The name of the button, for a screen reader. */
+		copyLabel: 'Copy the command'
+	},
+
 	glance: {
 		/** The title of the way in, shown on hover. */
 		open: 'Library at a glance',
@@ -333,7 +346,61 @@ export const t = {
 		source: 'Canvas on GitHub',
 		/** After the version, when a newer Canvas is released: a link to the release. */
 		update: 'Update available',
-		updateTitle: (version: string) => `Canvas ${version} is released`
+		updateTitle: (version: string) => `Canvas ${version} is released`,
+		/** The way into the settings, before "Canvas on GitHub" (0.11.0). */
+		settings: 'Settings',
+		/** The tooltip of "Settings" while no PIN is set: the words, the name of the setting, the words after it. */
+		settingsOff: {
+			before: 'Settings are off. To turn them on, give Canvas a PIN: ',
+			code: 'SETTINGS_PIN',
+			after: ", 4 to 8 digits, in the container's environment. Then restart Canvas."
+		}
+	},
+
+	/** The PIN prompt at /settings while the browser is locked (0.11.0). */
+	pin: {
+		title: 'Settings are locked',
+		text: 'Enter the PIN to change how Canvas works for everyone at home.',
+		/** In place of the text when the settings were locked while the sheet was open. */
+		again: 'Settings were locked again. Enter the PIN.',
+		field: 'PIN',
+		wrong: 'That is not the PIN. Try again.',
+		failed: 'Canvas did not answer. Try again.',
+		/** Canvas answered and refused: from another site, as behind a proxy, or the PIN was removed. */
+		refused: 'Canvas refused the request. See the README.',
+		unlock: 'Unlock',
+		hint: 'The PIN is set where Canvas is installed. Ask whoever set it up.'
+	},
+
+	/** The settings sheet (0.11.0). */
+	settings: {
+		title: 'Settings',
+		intro: 'They apply to everyone who opens Canvas here. A change is saved at once.',
+		saved: 'Saved',
+		/** The foot of the sheet: "Unlocked in this browser until 19 November". */
+		until: (day: string) => `Unlocked in this browser until ${day}`,
+		lock: 'Lock',
+		/** The panel of the library defaults, its note after the title, and its rows. */
+		opens: 'How the library opens',
+		opensNote: 'in a browser that has not chosen its own view',
+		sorted: 'Sorted',
+		platforms: 'Platforms',
+		/** After the platform chips, while none is pressed. */
+		noneChosen: 'None chosen: all games',
+		collections: 'Collections',
+		showCollections: 'Show collections',
+		age: 'Age',
+		keepsOwn: 'A browser where someone already chose a view keeps their choice.',
+		/** The panel of the theo command. */
+		theo: 'theo',
+		theoNote: 'for people who install games with theo',
+		theoSwitch: "Show the theo command in a game's detail",
+		theoText: 'theo installs games from vangogh and starts them, on macOS and Linux.',
+		theoLink: 'theo on GitHub',
+		/** The red notices under the head: the folder cannot be written, a change got no answer, or Canvas refused it. */
+		unwritable: 'Canvas cannot save settings: the folder /settings cannot be written. Give the container a volume there, as the README shows.',
+		unreachable: 'Canvas did not answer. The change was not saved.',
+		refused: 'Canvas refused the change. The README says why, under "The settings page".'
 	},
 
 	/** The page while there is no library: reading, or why the last reading failed (0.10.2). */
@@ -366,5 +433,7 @@ export const t = {
 export const VANGOGH_URL = 'https://github.com/arelate/vangogh';
 /** Where the source of Canvas can be read. */
 export const SOURCE_URL = 'https://github.com/shai66/vangogh-canvas';
+/** theo, which installs games from vangogh (0.11.0). */
+export const THEO_URL = 'https://github.com/arelate/theo';
 /** The page of a release on GitHub. */
 export const releaseUrl = (version: string): string => `${SOURCE_URL}/releases/tag/v${version}`;

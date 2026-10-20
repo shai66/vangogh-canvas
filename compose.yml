@@ -14,8 +14,10 @@ services:
       TZ: ${TZ:-UTC}
       CUSTOM_LOGO: ${CUSTOM_LOGO:-}
       SHUTDOWN_TIMEOUT: ${SHUTDOWN_TIMEOUT:-5}
+      SETTINGS_PIN: ${SETTINGS_PIN:-}
     volumes:
       - canvas-cache:/cache
+      - canvas-settings:/settings
       # A folder on the host when LOGO_DIR names one, otherwise an empty named volume.
       - ${LOGO_DIR:-canvas-logo}:/logo:ro
     read_only: true
@@ -26,4 +28,5 @@ services:
 
 volumes:
   canvas-cache:
+  canvas-settings:
   canvas-logo:

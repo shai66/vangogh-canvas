@@ -20,6 +20,8 @@ declare global {
 			shelf?: boolean;
 			/** Set while the library at a glance lies over the list, opened by a click on the count. */
 			glance?: true;
+			/** Set while the settings, or the PIN prompt, lie over the list, opened by a click on "Settings" in the foot. */
+			settings?: true;
 		}
 	}
 }

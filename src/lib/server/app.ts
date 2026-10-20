@@ -4,6 +4,7 @@ import { buildIndex } from './indexer';
 import { createLogger, type Logger } from './log';
 import { Rebuilder } from './rebuilder';
 import { Scheduler } from './scheduler';
+import { SettingsStore } from './settings';
 import { IndexStore } from './store';
 import { UpdateCheck } from './updates';
 import { VangoghClient } from './vangogh/client';
@@ -16,6 +17,8 @@ export interface App {
 	rebuilder: Rebuilder;
 	scheduler: Scheduler;
 	updates: UpdateCheck | null;
+	/** Null while no PIN is set: then the settings file is not read. */
+	settings: SettingsStore | null;
 }
 
 let current: App | null = null;
@@ -50,7 +53,8 @@ export function createApp(
 	const updates = config.versionCheck
 		? new UpdateCheck({ version: VERSION, url: config.versionCheckUrl, fetch: globalThis.fetch, log })
 		: null;
-	return { config, log, client, store, rebuilder, scheduler, updates };
+	const settings = config.settingsPin ? new SettingsStore({ dir: config.settingsDir, log }) : null;
+	return { config, log, client, store, rebuilder, scheduler, updates, settings };
 }
 
 /** Reads the configuration, loads the cache, and starts the rebuilds. */
@@ -61,13 +65,15 @@ export async function startApp(
 	current?.updates?.stop();
 	const app = createApp(env);
 	const cached = await app.store.load();
+	await app.settings?.load();
 	app.log.info('canvas started', {
 		version: VERSION,
 		vangogh: app.config.vangoghUrl,
 		rebuildAt: app.config.rebuildAt,
 		timeZone: app.config.timeZone,
 		cachedIndex: cached,
-		versionCheck: app.config.versionCheck
+		versionCheck: app.config.versionCheck,
+		settings: app.settings !== null
 	});
 	app.scheduler.start();
 	app.updates?.start();

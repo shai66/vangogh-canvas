@@ -32,6 +32,15 @@ export function blockKind(detail: Detail, visitor: Visitor): BlockKind {
 	return (detail.downloads[visitor]?.length ?? 0) > 0 ? 'mine' : 'not-mine';
 }
 
+/**
+ * True while the panel "Install with theo" shows (0.11.0, spec 6.1): theo is switched on, the game has files of
+ * its own, the visitor is at a computer, and the archive holds the game in English. theo asks for the English
+ * files unless it is told a language, and Canvas knows the language's name, not theo's code for it.
+ */
+export function theoShown(theo: boolean, kind: BlockKind, downloadLanguage: string | null): boolean {
+	return theo && (kind === 'mine' || kind === 'not-mine' || kind === 'other') && downloadLanguage === null;
+}
+
 /** The tab the file list opens on: the visitor's system when the game has it. */
 export function firstTab(detail: Detail, visitor: Visitor): Os | null {
 	const systems = systemsOf(detail);

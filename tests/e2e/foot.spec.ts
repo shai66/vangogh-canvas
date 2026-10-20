@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { expect, test } from './helpers';
+import { expect, place, test, UA } from './helpers';
 
 /** The running version, which the rich Canvas's fake answers as the latest release (setup.ts). */
 const OWN = (JSON.parse(readFileSync('package.json', 'utf8')) as { version: string }).version;
@@ -37,5 +37,47 @@ test.describe('the notice of a newer release', () => {
 		await page.goto('/');
 		await expect(page.locator('.foot .newer')).toBeVisible();
 		expect((await page.locator('.foot').boundingBox())!.height).toBe(without);
+	});
+});
+
+test.describe('"Settings" in the foot, without a PIN', () => {
+	test('says how to turn settings on when no PIN is set', async ({ page }) => {
+		await page.goto('/');
+		await expect(page.locator('.foot .links > *')).toHaveText(['Settings', 'Canvas on GitHub'], { useInnerText: true });
+		const button = page.locator('.foot .settings-link');
+		await expect(button).toHaveAttribute('aria-describedby', 'settings-tip');
+		const tip = page.locator('#settings-tip');
+		await expect(tip).toBeHidden();
+		await button.scrollIntoViewIfNeeded();
+		const before = await place(page, '.foot');
+		await button.hover();
+		await expect(tip).toBeVisible();
+		await expect(tip).toContainText('SETTINGS_PIN, 4 to 8 digits');
+		expect(await place(page, '.foot')).toEqual(before);
+		await expect(page).toHaveURL(/\/$/);
+	});
+
+	test.describe('on a phone', () => {
+		test.use({ userAgent: UA.phone, viewport: { width: 390, height: 844 } });
+
+		test('shows the tooltip on a tap on a phone, and Esc hides it', async ({ page }) => {
+			await page.goto('/');
+			const tap = () => page.locator('.foot .settings-link').evaluate((node: HTMLElement) => node.click());
+			const tip = page.locator('#settings-tip');
+			await expect(tip).toBeHidden();
+			await tap();
+			await expect(tip).toBeVisible();
+			// Within the screen, with room to spare on both sides.
+			const [left, , width] = await place(page, '#settings-tip');
+			expect(left).toBeGreaterThanOrEqual(8);
+			expect(left + width).toBeLessThanOrEqual(390 - 8);
+			await page.keyboard.press('Escape');
+			await expect(tip).toBeHidden();
+			await tap();
+			await expect(tip).toBeVisible();
+			await page.locator('main').click({ position: { x: 4, y: 4 } });
+			await expect(tip).toBeHidden();
+			await expect(page).toHaveURL(/\/$/);
+		});
 	});
 });

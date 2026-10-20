@@ -16,7 +16,7 @@ WORKDIR /app
 COPY --from=build /app/package.json ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/build ./build
-RUN mkdir /cache && chown node:node /cache
+RUN mkdir /cache /settings && chown node:node /cache /settings
 USER node
 VOLUME /cache
 EXPOSE 1854

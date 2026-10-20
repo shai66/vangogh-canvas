@@ -49,8 +49,10 @@ Canvas assumes you follow GOG.com's
          VANGOGH_URL: http://vangogh.lan:1853
          VANGOGH_USERNAME: ${VANGOGH_USERNAME:?set VANGOGH_USERNAME in .env}
          VANGOGH_PASSWORD: ${VANGOGH_PASSWORD:?set VANGOGH_PASSWORD in .env}
+         SETTINGS_PIN: ${SETTINGS_PIN:-}
        volumes:
          - canvas-cache:/cache
+         - canvas-settings:/settings
        read_only: true
        tmpfs:
          - /tmp
@@ -59,9 +61,10 @@ Canvas assumes you follow GOG.com's
 
    volumes:
      canvas-cache:
+     canvas-settings:
    ```
 
-   Tags: `latest`, `0.10`, `0.10.2`. amd64 and arm64.
+   Tags: `latest`, `0.11`, `0.11.0`. amd64 and arm64.
 
 3. Put the account in `.env` next to it (`VANGOGH_USERNAME`,
    `VANGOGH_PASSWORD`). Write a `$` in the password as `$$`, or quote the
@@ -79,8 +82,8 @@ Canvas assumes you follow GOG.com's
    vangogh refused the password.
 
 Canvas rebuilds its index at start and then once a day. The container runs
-as `node`, read-only, without capabilities, and writes only to the volume
-`canvas-cache` and to `/tmp`.
+as `node`, read-only, without capabilities, and writes only to the volumes
+`canvas-cache` and `canvas-settings` and to `/tmp`.
 
 ## Run it next to vangogh
 
@@ -113,7 +116,7 @@ port on the host.
 
 ## Settings
 
-All settings are environment variables.
+These settings are environment variables.
 
 | Variable | Meaning | Default |
 |---|---|---|
@@ -125,9 +128,39 @@ All settings are environment variables.
 | `CACHE_DIR` | Folder for the cached index | `/cache` |
 | `PORT` | Port inside the container | `1854` |
 | `VERSION_CHECK` | `off` stops Canvas asking GitHub once a day whether a newer version is released | `on` |
+| `SETTINGS_PIN` | 4 to 8 digits. Turns on the settings page, which it unlocks. Without it, "Settings" in the foot says how to turn them on. | none |
+| `SETTINGS_DIR` | Folder for the settings, a volume | `/settings` |
 
-Canvas refuses to start when a required variable is missing, and says
-which.
+Canvas refuses to start when a required variable is missing, or when
+`SETTINGS_PIN` is not 4 to 8 digits, and says why.
+
+## The settings page
+
+Put `SETTINGS_PIN` in `.env` and run `docker compose up -d` again, which
+recreates Canvas with it. Then click "Settings" in the foot of the page and
+enter the PIN: it unlocks that browser for 30 days, and "Lock" on the page
+ends it sooner.
+
+The page holds how the library opens in a browser that has not chosen its
+own view (sort order, platforms, collections, Hide 18+), and a switch for
+the theo command in a game's detail: `theo install <id>` to copy, for
+people who install games with [theo](https://github.com/arelate/theo). A
+change is saved at once; other browsers see it when they next load a page.
+
+The settings are kept in `settings.json` in `/settings`. A stack made
+before 0.11.0 has neither the volume there nor the PIN's line: add
+`canvas-settings:/settings` under `volumes` and
+`SETTINGS_PIN: ${SETTINGS_PIN:-}` under `environment`, as in "Run it".
+Without the volume Canvas says it cannot save; without the line the PIN in
+`.env` never reaches the container. `settings` in `/healthz` says `ok`,
+`unwritable`, or `off` without a PIN.
+
+Behind a reverse proxy, let the proxy pass the `Host` header through, or
+set `ORIGIN` to the address the browser uses, for example
+`ORIGIN=http://canvas.home:1854` (a setting of SvelteKit's Node server).
+Otherwise Canvas takes the page's requests for requests from another site:
+it refuses to unlock and says so. It refuses in the same way when it was
+restarted without `SETTINGS_PIN` while the page was open.
 
 ## Extras
 
@@ -179,7 +212,7 @@ resume it.
 While vangogh restarts around its nightly sync, Canvas keeps serving the
 previous index and tries again after 5, 15 and 60 minutes.
 
-The one cookie, `canvas-view`, keeps the platform filter, the sort order,
+The cookie `canvas-view` keeps the platform filter, the sort order,
 the collections toggle and the chip Hide 18+. Everything else is in the
 address, so a view can be shared as a link.
 
@@ -190,6 +223,7 @@ address, so a view can be shared as a link.
 | `GET /` | The library. `?q=`, `?os=`, `?genre=`, `?play=`, `?hide=18`, `?sort=recent` or `?sort=year`, and `?view=collections` choose the view. |
 | `GET /game/{id}` | The library with that game open |
 | `GET /collection/{id}` | The library with that collection's sheet open |
+| `GET /settings` | The library with the settings page open, or the PIN prompt while the browser is locked. `404` without `SETTINGS_PIN`. |
 | `GET /api/index` | Every game and collection. The header `x-built-at` gives the time of the last rebuild. |
 | `GET /api/games/{id}` | One game in full |
 | `GET /img/{imageId}` | A poster or a screenshot |
@@ -198,6 +232,10 @@ address, so a view can be shared as a link.
 | `GET /logo` | The logo |
 | `GET /healthz` | Status |
 | `POST /api/rebuild` | Starts a rebuild: `202`, `409` while one runs, `403` when sent from a page of another site |
+| `GET /api/settings` | The settings, to an unlocked browser: `401` while locked |
+| `PUT /api/settings` | Saves the settings: `200`, `400` when they are not valid, `401` while locked, `403` when sent from a page of another site, `500` when they cannot be written |
+| `POST /api/settings/unlock` | Body `{"pin":"…"}`: `204` with the cookie that unlocks the browser, `401` a second later for a wrong PIN, `403` when sent from a page of another site |
+| `POST /api/settings/lock` | Locks the browser again: `204`, `403` when sent from a page of another site |
 
 ## Develop
 

@@ -391,6 +391,83 @@
 	padding: 0;
 }
 
+/* The theo command (0.11.0): a panel in the extras' box between the file list and the extras, the words on the
+   left and the command on the right; one column on a narrow window. */
+.theo-panel {
+	grid-column: 1 / -1;
+	margin-top: 12px;
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(0, 330px);
+	align-items: center;
+	gap: 10px 24px;
+	padding: 14px 16px 14px 20px;
+	border-radius: 13px;
+	background: color-mix(in srgb, var(--night-raised) 82%, transparent);
+	border: 1px solid var(--night-line);
+}
+.theo-panel .t {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 15px;
+	font-weight: 650;
+}
+.theo-panel .t .ic {
+	font-size: 17px;
+	color: var(--starlight-dim);
+}
+.theo-panel .what {
+	margin-top: 3px;
+	font-size: 13px;
+	color: var(--starlight-dim);
+}
+.theo-panel .what a {
+	color: var(--starlight-dim);
+	text-underline-offset: 3px;
+}
+.theo-panel .what a:hover {
+	color: var(--starlight);
+}
+.theo-panel .what a .ic {
+	margin-left: 2px;
+	font-size: 12px;
+}
+.theo-cmdbox {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-width: 0;
+	padding: 4px 4px 4px 12px;
+	border-radius: var(--radius-control);
+	background: var(--night);
+	border: 1px solid var(--night-line);
+}
+/* Selectable text that scrolls sideways rather than wrap, if it ever must. */
+.theo-cmd {
+	flex: 1;
+	overflow-x: auto;
+	font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+	font-size: 13.5px;
+	color: var(--starlight);
+	white-space: nowrap;
+}
+.theo-copy {
+	flex: none;
+}
+.theo-copy .stack > span {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+.theo-copy .ic {
+	font-size: 15px;
+}
+@media (max-width: 760px) {
+	.theo-panel {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+
 /* Extras: a panel of their own under the file list, folded by default. */
 .extras {
 	border-radius: 13px;

@@ -51,6 +51,13 @@ describe('what the browser remembers', () => {
 		expect(recall('a=1; xcanvas-view=linux|recent')).toEqual(NOTHING_REMEMBERED);
 	});
 
+	it('falls back to the defaults it is given when there is no cookie', () => {
+		const defaults = { os: ['macos' as const], sort: 'recent' as const, grouped: true, hide18: true };
+		expect(recall('other=1', defaults)).toEqual(defaults);
+		expect(recall('canvas-view=linux|year', defaults)).toEqual({ os: ['linux'], sort: 'year', grouped: false, hide18: false });
+		expect(recall('')).toEqual(NOTHING_REMEMBERED);
+	});
+
 	it('changes only the part the visitor changed, and keeps the rest as it was remembered', () => {
 		const kept = { os: ['macos' as const], sort: 'title' as const, grouped: false, hide18: false };
 		const shared = { ...DEFAULT_STATE, os: ['linux' as const] };

@@ -1,3 +1,18 @@
+<script module lang="ts">
+	/**
+	 * Until when this browser is unlocked, as the page last learned it; undefined until it learns it. The layout's
+	 * data is not loaded again by a navigation inside the app: the list of another route, drawn after an unlock or
+	 * a "Lock", would start from what the server said when the page was loaded. Written in the browser only.
+	 */
+	let learnedUntil: string | null | undefined;
+	/**
+	 * The settings, and whether the server can write them, as the page last learned them: from an unlock, a save or
+	 * a refused save; undefined until then. For the same reason: a list of another route would start from the
+	 * settings the server drew the page with. Written in the browser only.
+	 */
+	let learnedSettings: { settings: Settings; writable: boolean } | undefined;
+</script>
+
 <script lang="ts">
 	import { afterNavigate, beforeNavigate, goto, preloadData, pushState, replaceState } from '$app/navigation';
 	import { page } from '$app/state';
@@ -5,6 +20,7 @@
 	import { gamesOf } from '$lib/collections';
 	import { nextRemembered, recall, rememberedCookie, type Remembered } from '$lib/remember';
 	import { DEFAULT_STATE, parseState, toParams, type ViewState } from '$lib/search/state';
+	import type { Settings, SettingsAnswer, SettingsInfo } from '$lib/settings';
 	import { t } from '$lib/strings';
 	import type { Collection, Detail, Glance, ListEntry } from '$lib/types';
 	import { View } from '$lib/view.svelte';
@@ -18,6 +34,8 @@
 	import Foot from './Foot.svelte';
 	import GlanceView from './GlanceView.svelte';
 	import Icon from './Icon.svelte';
+	import PinPrompt from './PinPrompt.svelte';
+	import SettingsView from './SettingsView.svelte';
 	import Sheet from './Sheet.svelte';
 	import TopBar from './TopBar.svelte';
 
@@ -41,6 +59,12 @@
 		linkedCollection?: Collection | null;
 		/** True when the page was opened at `/glance`. */
 		linkedGlance?: boolean;
+		/** What the page is told of the settings: whether a PIN is set, and until when this browser is unlocked. */
+		settings: SettingsInfo;
+		/** How the library opens in a browser that has not chosen its own view: the defaults of the settings. */
+		defaults: Remembered;
+		/** True when the page was opened at `/settings`. */
+		linkedSettings?: boolean;
 		/** Set when the address names a game or a collection that is not in the library. */
 		unknown?: 'game' | 'collection' | null;
 	}
@@ -57,12 +81,15 @@
 		linked = null,
 		linkedCollection = null,
 		linkedGlance = false,
+		settings,
+		defaults,
+		linkedSettings = false,
 		unknown = null
 	}: Props = $props();
 
 	const onList = () => page.url.pathname === '/';
-	/** True while a detail, a collection's sheet or the library at a glance, opened by a click, lies over the list. */
-	const covered = () => page.state.detail !== undefined || page.state.collection !== undefined || page.state.glance === true;
+	/** True while a detail, a collection's sheet, the library at a glance or the settings, opened by a click, lie over the list. */
+	const covered = () => page.state.detail !== undefined || page.state.collection !== undefined || page.state.glance === true || page.state.settings === true;
 	const address = (state: ViewState) => {
 		const params = toParams(state).toString();
 		return params ? `/?${params}` : '/';
@@ -76,7 +103,7 @@
 	const initial: ViewState =
 		onList() && page.url.search !== ''
 			? parseState(page.url.searchParams)
-			: { ...DEFAULT_STATE, ...(browser ? recall(document.cookie) : remembered) };
+			: { ...DEFAULT_STATE, ...(browser ? recall(document.cookie, defaults) : remembered) };
 
 	// The list is written into the address, so that it can be shared and survives a reload.
 	// It is written with a navigation of its own, so that SvelteKit and the history entry
@@ -106,7 +133,7 @@
 			pending = setTimeout(write, PAUSE);
 			// Remembered is what the visitor sets: the platform filter, the chip "Hide 18+", the order and the collections
 			// toggle. A search does not change it, nor does a view that came from an address.
-			const next = nextRemembered(recall(document.cookie), before, state);
+			const next = nextRemembered(recall(document.cookie, defaults), before, state);
 			if (next) document.cookie = rememberedCookie(next);
 		},
 		() => collections
@@ -161,7 +188,7 @@
 	function follow(url: URL) {
 		if (url.search === '') {
 			// The list without parameters is the list as remembered, however it was reached.
-			view.read({ ...DEFAULT_STATE, ...recall(document.cookie) });
+			view.read({ ...DEFAULT_STATE, ...recall(document.cookie, defaults) });
 			write();
 		} else {
 			view.read(parseState(url.searchParams));
@@ -210,6 +237,13 @@
 		!page.state.detail &&
 			page.state.collection === undefined &&
 			(page.state.glance === true || linkedGlance || page.url.pathname === '/glance')
+	);
+	/** True while the settings, or the PIN prompt, lie over the list: opened by a click, or by the address, as the glance. */
+	const settingsOpen = $derived(
+		!page.state.detail &&
+			page.state.collection === undefined &&
+			!glanceOpen &&
+			(page.state.settings === true || linkedSettings || page.url.pathname === '/settings')
 	);
 
 	let opening = false;
@@ -298,10 +332,25 @@
 		}
 	}
 
+	/** A plain click on "Settings" in the foot opens the settings, or the PIN prompt, over the list. */
+	async function openSettings(event: MouseEvent) {
+		if (!isPlainClick(event)) return;
+		event.preventDefault();
+		if (opening || covered()) return;
+		opening = true;
+		try {
+			// The entry of the list says what the list shows before the sheet goes over it.
+			await write();
+			if (!covered()) pushState('/settings', { settings: true, list: address(view.state) });
+		} finally {
+			opening = false;
+		}
+	}
+
 	function close() {
 		// A second press before the first has taken effect would go back out of the list.
 		if (closing) return;
-		const back = page.state.detail ? (page.state.back ?? 1) : page.state.collection !== undefined || page.state.glance ? 1 : 0;
+		const back = page.state.detail ? (page.state.back ?? 1) : page.state.collection !== undefined || page.state.glance || page.state.settings ? 1 : 0;
 		if (back > 0) {
 			// Opened over the list, perhaps from a collection's sheet: going back that far shows the list where it was.
 			closing = true;
@@ -345,6 +394,46 @@
 	/** A tag is searched for in the whole library. The platform filter, the chip "Hide 18+", the order and the toggle are the visitor's settings: they stay. */
 	function searchTag(tag: string) {
 		goto(address({ ...DEFAULT_STATE, os: view.os, sort: view.sort, grouped: view.grouped, hide18: view.hide18, q: tag }));
+	}
+
+	// ---------- The settings ----------
+
+	/** Until when this browser is unlocked, as an ISO time; null while it is locked: the PIN prompt shows. */
+	// svelte-ignore state_referenced_locally
+	let until = $state(learnedUntil === undefined ? settings.unlockedUntil : learnedUntil);
+	/** True when the settings were locked while their sheet was open: the PIN prompt says so. */
+	let lockedAgain = $state(false);
+	// svelte-ignore state_referenced_locally
+	let current = $state<Settings>(learnedSettings?.settings ?? { defaults, theo: settings.theo });
+	// svelte-ignore state_referenced_locally
+	let writable = $state(learnedSettings?.writable ?? settings.writable);
+	/** True from "Lock" until the sheet has closed: the PIN prompt does not take its place on the way. */
+	let locking = $state(false);
+	$effect(() => {
+		if (!settingsOpen) locking = false;
+	});
+
+	/** What the server holds, and whether it can write it, as an answer told it or a refused change showed it. */
+	function learn(next: Settings, canWrite: boolean) {
+		const held = { defaults: $state.snapshot(next.defaults), theo: next.theo };
+		current = held;
+		writable = canWrite;
+		learnedSettings = { settings: held, writable: canWrite };
+	}
+
+	function unlocked(answer: SettingsAnswer) {
+		learn(answer, answer.writable);
+		until = learnedUntil = answer.unlockedUntil;
+		lockedAgain = false;
+	}
+
+	function locked(again: boolean) {
+		until = learnedUntil = null;
+		lockedAgain = again;
+		if (!again) {
+			locking = true;
+			close();
+		}
 	}
 
 	// ---------- The rest of the page ----------
@@ -394,7 +483,7 @@
 <svelte:window onkeydown={keydown} />
 
 <svelte:head>
-	<title>{detail ? t.gameTitle(detail.title) : collection ? t.collectionTitle(collection.name) : glanceOpen ? t.glanceTitle : t.pageTitle}</title>
+	<title>{detail ? t.gameTitle(detail.title) : collection ? t.collectionTitle(collection.name) : glanceOpen ? t.glanceTitle : settingsOpen ? t.settingsTitle : t.pageTitle}</title>
 </svelte:head>
 
 <TopBar bind:this={bar} {view} onfilters={() => (filtersOpen = true)} onresults={toResults} />
@@ -424,17 +513,17 @@
 	<div class="sentinel" bind:this={sentinel}></div>
 </main>
 
-<Foot {version} {builtAt} {timeZone} {update} />
+<Foot {version} {builtAt} {timeZone} {update} settings={settings.enabled ? 'on' : 'off'} onsettings={openSettings} />
 
 <FilterPanel open={filtersOpen} onclose={() => (filtersOpen = false)} {view} {entries} />
 
-<!-- One sheet for a game, a collection and the library at a glance: a game opened from a collection takes its place without the sheet closing. -->
+<!-- One sheet for a game, a collection, the library at a glance and the settings: a game opened from a collection takes its place without the sheet closing. -->
 <Sheet
-	open={detail !== null || collection !== null || (glanceOpen && glance !== null)}
+	open={detail !== null || collection !== null || (glanceOpen && glance !== null) || (settingsOpen && until !== null)}
 	onclose={close}
 	class="detail"
-	label={detail?.title ?? collection?.name ?? (glanceOpen ? t.glance.title : '')}
-	view={detail ? `game/${detail.id}` : collection ? `collection/${collection.id}` : glanceOpen ? 'glance' : ''}
+	label={detail?.title ?? collection?.name ?? (glanceOpen ? t.glance.title : settingsOpen ? t.settings.title : '')}
+	view={detail ? `game/${detail.id}` : collection ? `collection/${collection.id}` : glanceOpen ? 'glance' : settingsOpen ? 'settings' : ''}
 >
 	{#if detail}
 		{#key detail.id}
@@ -447,6 +536,7 @@
 				collectionGames={detailCollection ? letThrough(gamesOf(detailCollection, entries), detail.id) : []}
 				shelfOpen={page.state.shelf ?? false}
 				onswap={swap}
+				theo={current.theo}
 			/>
 		{/key}
 	{:else if collection}
@@ -455,5 +545,20 @@
 		{/key}
 	{:else if glanceOpen && glance}
 		<GlanceView {glance} games={entries.length} collections={collections.length} {builtAt} {timeZone} onclose={close} />
+	{:else if settingsOpen && until !== null}
+		<SettingsView
+			settings={current}
+			unlockedUntil={until}
+			bind:writable={() => writable, (canWrite) => learn(current, canWrite)}
+			{timeZone}
+			onsaved={(answer) => learn(answer, answer.writable)}
+			onlocked={locked}
+			onclose={close}
+		/>
 	{/if}
+</Sheet>
+
+<!-- The PIN prompt: a small sheet of its own, at /settings while this browser is locked. -->
+<Sheet open={settingsOpen && until === null && !locking} onclose={close} class="pin" label={t.pin.title}>
+	<PinPrompt again={lockedAgain} onunlocked={unlocked} onclose={close} />
 </Sheet>

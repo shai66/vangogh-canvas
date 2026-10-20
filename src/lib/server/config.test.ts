@@ -18,7 +18,9 @@ describe('loadConfig', () => {
 			customLogo: null,
 			cacheDir: '/cache',
 			versionCheck: true,
-			versionCheckUrl: 'https://api.github.com/repos/shai66/vangogh-canvas/releases/latest'
+			versionCheckUrl: 'https://api.github.com/repos/shai66/vangogh-canvas/releases/latest',
+			settingsPin: null,
+			settingsDir: '/settings'
 		});
 	});
 
@@ -56,6 +58,26 @@ describe('loadConfig', () => {
 		expect(loadConfig({ ...required, VERSION_CHECK_URL: 'http://127.0.0.1:9/releases/latest' }).versionCheckUrl).toBe('http://127.0.0.1:9/releases/latest');
 		expect(() => loadConfig({ ...required, VERSION_CHECK_URL: 'ftp://x' })).toThrow(ConfigError);
 		expect(loadConfig({ ...required, VERSION_CHECK: 'off', VERSION_CHECK_URL: 'ftp://x' }).versionCheck).toBe(false);
+	});
+
+	it('leaves settings off when SETTINGS_PIN is unset or empty', () => {
+		expect(loadConfig(required).settingsPin).toBeNull();
+		expect(loadConfig({ ...required, SETTINGS_PIN: '  ' }).settingsPin).toBeNull();
+	});
+
+	it('reads a SETTINGS_PIN of 4 to 8 digits, trimmed', () => {
+		expect(loadConfig({ ...required, SETTINGS_PIN: '2468' }).settingsPin).toBe('2468');
+		expect(loadConfig({ ...required, SETTINGS_PIN: ' 12345678 ' }).settingsPin).toBe('12345678');
+	});
+
+	it('refuses a SETTINGS_PIN that is not 4 to 8 digits', () => {
+		for (const pin of ['123', '123456789', 'abcd', '12 34', '-1234'])
+			expect(() => loadConfig({ ...required, SETTINGS_PIN: pin }), pin).toThrow('SETTINGS_PIN must be 4 to 8 digits');
+	});
+
+	it('keeps the settings in /settings unless SETTINGS_DIR says otherwise', () => {
+		expect(loadConfig(required).settingsDir).toBe('/settings');
+		expect(loadConfig({ ...required, SETTINGS_DIR: '/data/canvas' }).settingsDir).toBe('/data/canvas');
 	});
 
 	it('names every missing required variable', () => {

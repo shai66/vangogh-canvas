@@ -38,3 +38,10 @@ export function builtWhen(built: Date, timeZone: string): string {
 	const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? '';
 	return `${part('day')} ${part('month')}, ${part('hour')}:${part('minute')}`;
 }
+
+/** A day as the foot writes a date, without the time: "19 November", in the given time zone. */
+export function dayWhen(date: Date, timeZone: string): string {
+	const parts = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', timeZone }).formatToParts(date);
+	const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? '';
+	return `${part('day')} ${part('month')}`;
+}

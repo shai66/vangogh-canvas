@@ -15,6 +15,7 @@ import {
 	runFile,
 	sharedVersion,
 	systemsOf,
+	theoShown,
 	totalBytes,
 	visibleFiles,
 	type MacNote
@@ -330,5 +331,18 @@ describe('isPrimary', () => {
 	it('is quiet on macOS where GOG says the installer will not work, also on a Mac', () => {
 		expect(isPrimary('mine', 'macos', 'macos', false, gog)).toBe(false);
 		expect(isPrimary('mine', 'macos', 'macos', false, { kind: 'unlisted' })).toBe(true);
+	});
+});
+
+describe('theoShown', () => {
+	it('shows the theo panel for a game with files at a computer, in English, while switched on', () => {
+		for (const kind of ['mine', 'not-mine', 'other'] as const) {
+			expect(theoShown(true, kind, null)).toBe(true);
+			expect(theoShown(false, kind, null)).toBe(false);
+		}
+		for (const kind of ['phone', 'unread', 'no-files', 'dlc-only'] as const) {
+			expect(theoShown(true, kind, null)).toBe(false);
+		}
+		expect(theoShown(true, 'mine', 'Deutsch')).toBe(false);
 	});
 });

@@ -1,9 +1,10 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { NOTHING_REMEMBERED } from '../../src/lib/remember';
 import { fixtureData, startFakeVangogh, type FakeData } from '../../src/lib/server/testing/fake-vangogh';
 import { apiProduct, details, extra, file, POSTER } from '../../src/lib/server/testing/fixtures';
 
@@ -326,6 +327,37 @@ function collectionLibrary(): FakeData {
 	};
 }
 
+/**
+ * The library of the settings tests: the fixtures with pictures a browser shows, and two more entries:
+ *   1005  Missing Files Game, as the main library has it: GOG offers an installer, the archive holds no file
+ *   1008  Foreign Only Game, Windows, whose only files are German
+ */
+function settingsLibrary(): FakeData {
+	const data = fixtureData();
+	// The fixtures' pictures are words. A browser needs real ones.
+	for (const id of Object.keys(data.images)) data.images[id] = { type: 'image/png', body: PIXEL };
+	data.library = [
+		...(data.library as unknown[]),
+		{ id: '1005', tt: 'Missing Files Game', os: [1] },
+		{ id: '1008', tt: 'Foreign Only Game', os: [1] }
+	];
+	data.metadata['gog-api-products/1005'] = apiProduct({ title: 'Missing Files Game', genres: ['Puzzle'] });
+	data.metadata['gog-details/1005'] = details({
+		english: { windows: [file('/downloads/missing_files_game/en1installer0', 'Missing Files Game')] }
+	});
+	data.metadata['gog-api-products/1008'] = apiProduct({ title: 'Foreign Only Game', genres: ['Puzzle'] });
+	data.metadata['gog-details/1008'] = details({
+		other: [['Deutsch', { windows: [file('/downloads/foreign_only_game/de1installer0', 'Foreign Only Game', '10 MB')] }]]
+	});
+	data.files['1008/installer/downloads/foreign_only_game/de1installer0'] = { name: 'setup_foreign_only_game.exe', body: Buffer.from('foreign') };
+	data.filenames = {
+		...data.filenames,
+		'1005': {},
+		'1008': { '/downloads/foreign_only_game/de1installer0': 'setup_foreign_only_game.exe' }
+	};
+	return data;
+}
+
 function freePort(): Promise<number> {
 	return new Promise((resolve, reject) => {
 		const server = createServer();
@@ -348,12 +380,14 @@ async function waitFor(url: string, wanted: number, output: () => string): Promi
 }
 
 /**
- * Starts three fake vangoghs and four copies of the built app:
+ * Starts six fake vangoghs and seven copies of the built app:
  *   CANVAS_URL        a Canvas with the library of the fixtures
  *   CANVAS_EMPTY_URL  a Canvas whose vangogh is not there, so it has no library yet
  *   CANVAS_MAC_URL    a Canvas with the two games of macLibrary()
  *   CANVAS_RICH_URL   a Canvas with the three games of richLibrary()
  *   CANVAS_COLLECTIONS_URL  a Canvas with the seventeen games of collectionLibrary()
+ *   CANVAS_SETTINGS_URL     a Canvas with a PIN, 2468, and the library of settingsLibrary()
+ *   CANVAS_THEO_URL         the same, with a vangogh of its own and theo switched on before it starts
  */
 export default async function setup(): Promise<() => Promise<void>> {
 	if (!existsSync('build/index.js')) throw new Error('run "npm run build" first');
@@ -411,6 +445,9 @@ export default async function setup(): Promise<() => Promise<void>> {
 	const macFake = await startFakeVangogh(macLibrary());
 	const richFake = await startFakeVangogh(rich);
 	const collectionsFake = await startFakeVangogh(collectionLibrary());
+	const settingsFake = await startFakeVangogh(settingsLibrary());
+	// 1001 keeps its extras in this library too: the extras' panel stands under the theo panel.
+	const theoFake = await startFakeVangogh(settingsLibrary());
 
 	const cache = await mkdtemp(join(tmpdir(), 'canvas-e2e-'));
 	const children: ChildProcess[] = [];
@@ -431,6 +468,8 @@ export default async function setup(): Promise<() => Promise<void>> {
 	const macPort = await freePort();
 	const richPort = await freePort();
 	const collectionsPort = await freePort();
+	const settingsPort = await freePort();
+	const theoPort = await freePort();
 	launch({
 		PORT: String(port),
 		VANGOGH_URL: fake.url,
@@ -442,24 +481,51 @@ export default async function setup(): Promise<() => Promise<void>> {
 	launch({ PORT: String(macPort), VANGOGH_URL: macFake.url, CACHE_DIR: join(cache, 'mac'), TZ: 'UTC', VERSION_CHECK: 'off' });
 	launch({ PORT: String(richPort), VANGOGH_URL: richFake.url, CACHE_DIR: join(cache, 'rich'), TZ: 'UTC', VERSION_CHECK_URL: `${richFake.url}/releases/latest` });
 	launch({ PORT: String(collectionsPort), VANGOGH_URL: collectionsFake.url, CACHE_DIR: join(cache, 'collections'), TZ: 'UTC', VERSION_CHECK: 'off' });
+	launch({
+		PORT: String(settingsPort),
+		VANGOGH_URL: settingsFake.url,
+		CACHE_DIR: join(cache, 'settings-cache'),
+		SETTINGS_PIN: '2468',
+		SETTINGS_DIR: join(cache, 'settings'),
+		TZ: 'UTC',
+		VERSION_CHECK: 'off'
+	});
+	// The theo tests need theo on without depending on the tests of the settings: it is in the file before Canvas reads it.
+	await mkdir(join(cache, 'theo'), { recursive: true });
+	await writeFile(join(cache, 'theo', 'settings.json'), JSON.stringify({ version: 1, defaults: NOTHING_REMEMBERED, theo: true }));
+	launch({
+		PORT: String(theoPort),
+		VANGOGH_URL: theoFake.url,
+		CACHE_DIR: join(cache, 'theo-cache'),
+		SETTINGS_PIN: '2468',
+		SETTINGS_DIR: join(cache, 'theo'),
+		TZ: 'UTC',
+		VERSION_CHECK: 'off'
+	});
 
 	process.env.CANVAS_URL = `http://127.0.0.1:${port}`;
 	process.env.CANVAS_EMPTY_URL = `http://127.0.0.1:${emptyPort}`;
 	process.env.CANVAS_MAC_URL = `http://127.0.0.1:${macPort}`;
 	process.env.CANVAS_RICH_URL = `http://127.0.0.1:${richPort}`;
 	process.env.CANVAS_COLLECTIONS_URL = `http://127.0.0.1:${collectionsPort}`;
+	process.env.CANVAS_SETTINGS_URL = `http://127.0.0.1:${settingsPort}`;
+	process.env.CANVAS_THEO_URL = `http://127.0.0.1:${theoPort}`;
 	try {
 		await waitFor(`${process.env.CANVAS_URL}/healthz`, 200, () => output);
 		await waitFor(`${process.env.CANVAS_EMPTY_URL}/healthz`, 503, () => output);
 		await waitFor(`${process.env.CANVAS_MAC_URL}/healthz`, 200, () => output);
 		await waitFor(`${process.env.CANVAS_RICH_URL}/healthz`, 200, () => output);
 		await waitFor(`${process.env.CANVAS_COLLECTIONS_URL}/healthz`, 200, () => output);
+		await waitFor(`${process.env.CANVAS_SETTINGS_URL}/healthz`, 200, () => output);
+		await waitFor(`${process.env.CANVAS_THEO_URL}/healthz`, 200, () => output);
 	} catch (error) {
 		for (const child of children) child.kill('SIGKILL');
 		await fake.close();
 		await macFake.close();
 		await richFake.close();
 		await collectionsFake.close();
+		await settingsFake.close();
+		await theoFake.close();
 		throw error;
 	}
 
@@ -469,6 +535,8 @@ export default async function setup(): Promise<() => Promise<void>> {
 		await macFake.close();
 		await richFake.close();
 		await collectionsFake.close();
+		await settingsFake.close();
+		await theoFake.close();
 		await rm(cache, { recursive: true, force: true });
 	};
 }

@@ -26,8 +26,10 @@
 		shelfOpen?: boolean;
 		/** Another game of the row was clicked: it opens in place of this one. */
 		onswap?: (event: MouseEvent, href: string) => void;
+		/** True while the settings switch the theo command on. */
+		theo?: boolean;
 	}
-	let { detail, visitor, onclose, ontag, collection = null, collectionGames = [], shelfOpen = false, onswap = () => {} }: Props = $props();
+	let { detail, visitor, onclose, ontag, collection = null, collectionGames = [], shelfOpen = false, onswap = () => {}, theo = false }: Props = $props();
 
 	const developers = $derived(detail.developers.join(', '));
 	const hasMakers = $derived(developers !== '' || detail.publisher !== '');
@@ -100,7 +102,7 @@
 				<p class="relation">{t.detail.orphan(detail.requires)}</p>
 			{/if}
 		</div>
-		<div class="dl-slot"><DownloadBlock {detail} {visitor} onsystem={blockShows} /></div>
+		<div class="dl-slot"><DownloadBlock {detail} {visitor} onsystem={blockShows} {theo} /></div>
 	</div>
 
 	{#if collection}

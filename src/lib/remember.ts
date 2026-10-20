@@ -38,13 +38,16 @@ export function parseRemembered(value: string | undefined): Remembered {
 	};
 }
 
-/** Reads what is remembered out of a whole cookie text, as `document.cookie` gives it. */
-export function recall(cookies: string): Remembered {
+/**
+ * Reads what is remembered out of a whole cookie text, as `document.cookie` gives it.
+ * Without the cookie: `fallback`, the library defaults of the settings.
+ */
+export function recall(cookies: string, fallback: Remembered = NOTHING_REMEMBERED): Remembered {
 	for (const part of cookies.split(';')) {
 		const [name, ...value] = part.trim().split('=');
 		if (name === REMEMBER_COOKIE) return parseRemembered(value.join('='));
 	}
-	return NOTHING_REMEMBERED;
+	return fallback;
 }
 
 /**

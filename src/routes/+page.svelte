@@ -14,4 +14,6 @@
 	timeZone={data.timeZone}
 	visitor={data.visitor}
 	remembered={data.remembered}
+	settings={data.settings}
+	defaults={data.defaults}
 />

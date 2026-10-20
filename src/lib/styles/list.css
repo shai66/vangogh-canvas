@@ -535,6 +535,111 @@ main {
 .foot .links .ic {
 	font-size: 15px;
 }
+/* "Settings" (0.11.0): a link while a PIN is set, else a button in the same look, with a tooltip that says how
+   to set one. */
+.foot .settings-link {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var(--starlight-dim);
+	text-decoration: underline;
+	text-underline-offset: 3px;
+}
+.foot .settings-link:hover {
+	color: var(--starlight);
+}
+.foot .settings-wrap {
+	position: relative;
+	display: inline-flex;
+}
+/* It lies over the page, above the button and right-aligned to it, so the foot keeps its height and nothing
+   moves. Hidden, it keeps its box: it only shows. */
+.foot .settings-tip {
+	position: absolute;
+	z-index: 25;
+	right: -8px;
+	bottom: calc(100% + 12px);
+	width: 300px;
+	max-width: calc(100vw - 32px);
+	padding: 11px 14px;
+	border-radius: var(--radius-control);
+	border: 1px solid var(--night-edge);
+	background: var(--night-control);
+	box-shadow: 0 12px 32px rgb(0 0 0 / 0.45);
+	font-size: 13px;
+	line-height: 1.5;
+	color: var(--starlight);
+	visibility: hidden;
+	opacity: 0;
+	transition: opacity 150ms var(--ease-out), visibility 150ms var(--ease-out);
+}
+/* The arrow at its foot, over the middle of the button wherever the tooltip is placed: drawn by the button, over the
+   tooltip's edge. */
+.foot .settings-wrap .settings-link {
+	position: relative;
+}
+.foot .settings-wrap .settings-link::after {
+	content: '';
+	position: absolute;
+	z-index: 26;
+	left: calc(50% - 5px);
+	bottom: calc(100% + 7px);
+	width: 10px;
+	height: 10px;
+	rotate: 45deg;
+	background: var(--night-control);
+	border-right: 1px solid var(--night-edge);
+	border-bottom: 1px solid var(--night-edge);
+	visibility: hidden;
+	opacity: 0;
+	transition: opacity 150ms var(--ease-out), visibility 150ms var(--ease-out);
+}
+/* The gap between the button and the tooltip belongs to the tooltip, so the pointer can move onto it. */
+.foot .settings-tip::before {
+	content: '';
+	position: absolute;
+	inset: 100% 0 auto;
+	height: 12px;
+}
+.foot .settings-tip code {
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	font-size: 12.5px;
+	color: var(--accent);
+}
+.foot .settings-wrap.is-open .settings-tip,
+.foot .settings-wrap.is-open .settings-link::after,
+.foot .settings-wrap:focus-within .settings-tip,
+.foot .settings-wrap:focus-within .settings-link::after {
+	visibility: visible;
+	opacity: 1;
+}
+/* Pointed at by a mouse. A phone has no pointing: its tap toggles the tooltip. */
+@media (hover: hover) {
+	.foot .settings-wrap:hover .settings-tip,
+	.foot .settings-wrap:hover .settings-link::after {
+		visibility: visible;
+		opacity: 1;
+	}
+}
+/* A narrow window has no room for it left of the button: it is right-aligned to the links, which end at the
+   gutter, and the arrow still points at the button. */
+@media (max-width: 760px) {
+	.foot .links {
+		position: relative;
+	}
+	.foot .settings-wrap {
+		position: static;
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.foot .settings-tip,
+	.foot .settings-wrap .settings-link::after {
+		transition: none;
+	}
+}
 .foot .stale {
 	display: inline-flex;
 	align-items: center;

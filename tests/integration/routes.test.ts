@@ -1,11 +1,12 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { request as httpRequest } from 'node:http';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { NOTHING_REMEMBERED } from '../../src/lib/remember';
 import type { Detail, IndexPayload } from '../../src/lib/types';
 import {
 	fixtureData,
@@ -15,6 +16,8 @@ import {
 import { POSTER, apiProduct, productOptions } from '../../src/lib/server/testing/fixtures';
 
 const PASSWORD = 'pa55-w0rd-xyz';
+/** The PIN of the Canvases in "the settings". */
+const PIN = '86420135';
 
 let fake: FakeVangogh;
 let child: ChildProcess;
@@ -114,15 +117,15 @@ function rawRequest(method: string, path: string): Promise<number> {
 	});
 }
 
+/** The titles of the cards, in the order drawn. */
+const cards = (html: string) =>
+	[...html.matchAll(/<h3 class="card-title"[^>]*><span>([^<]*)<\/span>/g)].map((m) => m[1]);
+
 describe('the pages, as the server draws them', () => {
 	const page = async (path: string, headers: Record<string, string> = {}) => {
 		const res = await fetch(`${base}${path}`, { headers });
 		return { res, html: await res.text() };
 	};
-
-	/** The titles of the cards, in the order drawn. */
-	const cards = (html: string) =>
-		[...html.matchAll(/<h3 class="card-title"[^>]*><span>([^<]*)<\/span>/g)].map((m) => m[1]);
 
 	it('draws the whole list without a script having run', async () => {
 		const { res, html } = await page('/');
@@ -284,6 +287,188 @@ describe('the pages, as the server draws them', () => {
 	});
 });
 
+describe('the settings', () => {
+	const chosen = { defaults: { os: ['macos'], sort: 'recent', grouped: false, hide18: false }, theo: true };
+	let folder: string;
+	let settingsDir: string;
+	let pinnedChild: ChildProcess | undefined;
+	let stuckChild: ChildProcess | undefined;
+	/** A Canvas with a PIN, which keeps its settings in an empty folder. */
+	let pinned: string;
+	/** A Canvas with a PIN, whose settings folder cannot be written: there is a file in the way. */
+	let stuck: string;
+
+	beforeAll(async () => {
+		folder = await mkdtemp(join(tmpdir(), 'canvas-it-settings-'));
+		settingsDir = join(folder, 'settings');
+		await mkdir(settingsDir);
+		await writeFile(join(folder, 'a-file'), 'a file where a folder is expected');
+		const common = {
+			VANGOGH_URL: fake.url,
+			VANGOGH_USERNAME: 'api',
+			VANGOGH_PASSWORD: PASSWORD,
+			VERSION_CHECK: 'off',
+			SETTINGS_PIN: PIN
+		};
+		const pinnedPort = await freePort();
+		pinned = `http://127.0.0.1:${pinnedPort}`;
+		pinnedChild = launch({ ...common, PORT: String(pinnedPort), CACHE_DIR: join(folder, 'pinned-cache'), SETTINGS_DIR: settingsDir });
+		const stuckPort = await freePort();
+		stuck = `http://127.0.0.1:${stuckPort}`;
+		stuckChild = launch({
+			...common,
+			PORT: String(stuckPort),
+			CACHE_DIR: join(folder, 'stuck-cache'),
+			SETTINGS_DIR: join(folder, 'a-file', 'settings')
+		});
+		for (const at of [pinned, stuck]) {
+			await waitFor(async () => (await fetch(`${at}/healthz`)).status === 200, `the Canvas at ${at}`);
+		}
+	});
+
+	afterAll(async () => {
+		await stop(pinnedChild);
+		await stop(stuckChild);
+		if (folder) await rm(folder, { recursive: true, force: true });
+	});
+
+	/** A request with a JSON body, as the page sends it: a body of another type meets SvelteKit's own check first. */
+	const send = (at: string, method: string, path: string, body?: unknown, headers: Record<string, string> = {}) =>
+		fetch(`${at}${path}`, {
+			method,
+			headers: { 'content-type': 'application/json', ...headers },
+			body: body === undefined || typeof body === 'string' ? body : JSON.stringify(body)
+		});
+
+	/** The status and the body of an answer of the settings routes, which no cache may keep. */
+	async function answer(res: Response): Promise<{ status: number; body: unknown }> {
+		expect(res.headers.get('cache-control')).toBe('no-store');
+		const text = await res.text();
+		return { status: res.status, body: text ? JSON.parse(text) : null };
+	}
+
+	/** Unlocks the Canvas at `at`, and gives the cookie as the browser sends it back. */
+	async function unlock(at: string): Promise<string> {
+		const res = await send(at, 'POST', '/api/settings/unlock', { pin: PIN });
+		expect(res.status).toBe(204);
+		return (res.headers.get('set-cookie') ?? '').split(';')[0];
+	}
+
+	it('has no settings without a PIN', async () => {
+		const off = { status: 404, body: { error: 'settings-off' } };
+		expect(await answer(await fetch(`${base}/api/settings`))).toEqual(off);
+		expect(await answer(await send(base, 'POST', '/api/settings/unlock', { pin: PIN }))).toEqual(off);
+	});
+
+	it('has no settings page without a PIN', async () => {
+		const off = await fetch(`${base}/settings`);
+		expect(off.status).toBe(404);
+		expect(await off.text()).toContain('This page does not exist');
+		const on = await fetch(`${pinned}/settings`);
+		expect(on.status).toBe(200);
+		expect(await on.text()).toContain('Settings are locked');
+	});
+
+	it('answers 401 to the settings while locked', async () => {
+		const locked = { status: 401, body: { error: 'locked' } };
+		expect(await answer(await fetch(`${pinned}/api/settings`))).toEqual(locked);
+		expect(await answer(await send(pinned, 'PUT', '/api/settings', chosen))).toEqual(locked);
+	});
+
+	it('refuses a wrong PIN after a second, and unlocks with the right one', async () => {
+		const began = Date.now();
+		const wrong = await send(pinned, 'POST', '/api/settings/unlock', { pin: '86420136' });
+		expect(Date.now() - began).toBeGreaterThanOrEqual(900);
+		expect(wrong.headers.get('set-cookie')).toBeNull();
+		expect(await answer(wrong)).toEqual({ status: 401, body: { error: 'wrong-pin' } });
+
+		const right = await send(pinned, 'POST', '/api/settings/unlock', { pin: PIN });
+		const cookie = right.headers.get('set-cookie') ?? '';
+		expect(await answer(right)).toEqual({ status: 204, body: null });
+		for (const part of ['canvas-settings=', 'HttpOnly', 'SameSite=Strict', 'Path=/', 'Max-Age=2592000']) {
+			expect(cookie).toContain(part);
+		}
+		// Canvas is served over plain HTTP at home.
+		expect(cookie).not.toContain('Secure');
+	});
+
+	// Review focus 1
+	it('accepts the PIN with spaces around it', async () => {
+		const res = await send(pinned, 'POST', '/api/settings/unlock', { pin: ` ${PIN}\n` });
+		expect((await answer(res)).status).toBe(204);
+	});
+
+	it('refuses unlocking, saving and locking asked for by another site', async () => {
+		const evil = { origin: 'http://evil.example', cookie: await unlock(pinned) };
+		for (const res of [
+			await send(pinned, 'POST', '/api/settings/unlock', { pin: PIN }, evil),
+			await send(pinned, 'PUT', '/api/settings', chosen, evil),
+			await send(pinned, 'POST', '/api/settings/lock', undefined, evil)
+		]) {
+			expect(res.headers.get('set-cookie')).toBeNull();
+			expect(await answer(res)).toEqual({ status: 403, body: { error: 'cross-site' } });
+		}
+	});
+
+	it('serves and saves the settings while unlocked', async () => {
+		const cookie = await unlock(pinned);
+		const first = await answer(await fetch(`${pinned}/api/settings`, { headers: { cookie } }));
+		expect(first).toEqual({
+			status: 200,
+			body: { defaults: NOTHING_REMEMBERED, theo: false, writable: true, unlockedUntil: expect.any(String) }
+		});
+		// About 30 days on.
+		const ahead = Date.parse((first.body as { unlockedUntil: string }).unlockedUntil) - Date.now();
+		expect(Math.abs(ahead - 2_592_000_000)).toBeLessThan(60_000);
+
+		const saved = await answer(await send(pinned, 'PUT', '/api/settings', chosen, { cookie }));
+		expect(saved).toEqual({ status: 200, body: { ...chosen, writable: true, unlockedUntil: expect.any(String) } });
+		expect(JSON.parse(await readFile(join(settingsDir, 'settings.json'), 'utf8'))).toEqual({ version: 1, ...chosen });
+		expect((await answer(await fetch(`${pinned}/api/settings`, { headers: { cookie } }))).body).toMatchObject(chosen);
+	});
+
+	it('refuses settings that are not valid, and keeps what it had', async () => {
+		const cookie = await unlock(pinned);
+		const before = await readFile(join(settingsDir, 'settings.json'), 'utf8');
+		for (const body of [{ defaults: { os: ['amiga'] }, theo: true }, 'not json']) {
+			const res = await send(pinned, 'PUT', '/api/settings', body, { cookie });
+			expect(await answer(res), JSON.stringify(body)).toEqual({ status: 400, body: { error: 'bad-settings' } });
+		}
+		expect(await readFile(join(settingsDir, 'settings.json'), 'utf8')).toBe(before);
+		expect((await answer(await fetch(`${pinned}/api/settings`, { headers: { cookie } }))).body).toMatchObject(chosen);
+	});
+
+	it('draws the list with the defaults for a browser without a cookie, and as remembered for one with', async () => {
+		expect(cards(await (await fetch(`${pinned}/`)).text())).toEqual(['The Long Dark Road']);
+		const own = await (await fetch(`${pinned}/`, { headers: { cookie: 'canvas-view=|title' } })).text();
+		expect(cards(own)).toEqual(['Broken Record', 'Lonely Expansion', 'The Long Dark Road', 'Windows Only Game']);
+	});
+
+	it('locks again', async () => {
+		const res = await send(pinned, 'POST', '/api/settings/lock', undefined, { cookie: await unlock(pinned) });
+		const removed = res.headers.get('set-cookie') ?? '';
+		expect(await answer(res)).toEqual({ status: 204, body: null });
+		expect(removed).toMatch(/^canvas-settings=;/);
+		expect(removed).toContain('Max-Age=0');
+		expect((await answer(await fetch(`${pinned}/api/settings`))).status).toBe(401);
+	});
+
+	it('reports the settings in its health', async () => {
+		const settings = async (at: string) => ((await (await fetch(`${at}/healthz`)).json()) as { settings: string }).settings;
+		expect(await settings(base)).toBe('off');
+		expect(await settings(pinned)).toBe('ok');
+		expect(await settings(stuck)).toBe('unwritable');
+	});
+
+	// Review focus 4
+	it('refuses to save where the folder cannot be written', async () => {
+		const cookie = await unlock(stuck);
+		expect((await answer(await fetch(`${stuck}/api/settings`, { headers: { cookie } }))).body).toMatchObject({ writable: false });
+		const res = await send(stuck, 'PUT', '/api/settings', chosen, { cookie });
+		expect(await answer(res)).toEqual({ status: 500, body: { error: 'settings-unwritable' } });
+	});
+});
+
 describe('the routes', () => {
 	it('reports its health', async () => {
 		const body = await (await fetch(`${base}/healthz`)).json();
@@ -292,7 +477,8 @@ describe('the routes', () => {
 			index: { entries: 4 },
 			rebuild: { lastResult: 'ok', lastError: null },
 			login: 'ok',
-			cache: 'written'
+			cache: 'written',
+			settings: 'off'
 		});
 		expect(body.version).toMatch(/^\d+\.\d+\.\d+$/);
 		expect(body.index.ageSeconds).toBeLessThan(60);
@@ -618,6 +804,8 @@ describe('the routes', () => {
 		expect(output).toContain('rebuild finished');
 		expect(output).not.toContain(PASSWORD);
 		expect(output).not.toMatch(/token-\d/);
+		// The Canvases with a PIN ran before, in "the settings".
+		expect(output).not.toContain(PIN);
 	});
 });
 

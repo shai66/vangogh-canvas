@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ageInDays, builtTime, builtWhen, isStale } from './age';
+import { ageInDays, builtTime, builtWhen, dayWhen, isStale } from './age';
 
 const now = Date.parse('2026-10-03T12:00:00.000Z');
 
@@ -33,5 +33,10 @@ describe('the age of the library', () => {
 		expect(builtWhen(built, 'Europe/Bratislava')).toBe('30 September, 06:30');
 		// Past midnight on a 24-hour clock, and a day of one digit without a nought.
 		expect(builtWhen(new Date('2026-10-01T00:05:00.000Z'), 'UTC')).toBe('1 October, 00:05');
+	});
+
+	it('writes a day as the foot writes a date, in the time zone it is given', () => {
+		expect(dayWhen(new Date('2026-11-19T10:00:00Z'), 'UTC')).toBe('19 November');
+		expect(dayWhen(new Date('2026-11-19T23:30:00Z'), 'Europe/Bratislava')).toBe('20 November');
 	});
 });

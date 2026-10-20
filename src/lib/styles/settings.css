@@ -1,0 +1,275 @@
+/* The settings (0.11.0, spec 2026-10-20-canvas-settings-design.md): the PIN prompt, a small sheet of its own,
+   and the settings sheet over the list, the sheet of a game's detail, narrower, with Canvas's night at its top. */
+
+/* The PIN prompt, centred in the window: the night, with the sheet's edge and shadow. */
+dialog.pin {
+	width: min(380px, 100% - 32px);
+	max-width: none;
+	margin: auto;
+	border-radius: var(--radius-sheet);
+	background: var(--night);
+	box-shadow:
+		0 0 0 1px var(--night-line),
+		0 40px 120px rgb(0 0 0 / 0.7);
+}
+dialog.pin[open] {
+	animation: detail-in 220ms var(--ease-out);
+}
+/* The content fills the sheet: a click on it is never a click beside it. */
+.pin-inner {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	padding: 34px 28px 24px;
+	text-align: center;
+}
+.pin-inner .detail-close-holder {
+	position: absolute;
+	inset: 0 0 auto auto;
+}
+.pin-badge {
+	display: grid;
+	place-items: center;
+	width: 52px;
+	height: 52px;
+	border-radius: 50%;
+	background: var(--night-control);
+	color: var(--accent);
+	font-size: 26px;
+}
+.pin-title {
+	margin-top: 16px;
+	font-size: 21px;
+	font-stretch: 110%;
+	font-weight: 700;
+	letter-spacing: -0.01em;
+}
+.pin-text {
+	margin-top: 6px;
+	color: var(--starlight-dim);
+	font-size: 14.5px;
+	text-wrap: pretty;
+}
+.pin-form {
+	display: flex;
+	flex-direction: column;
+	width: 100%;
+	margin-top: 20px;
+}
+/* Large and centred, with wide letter spacing. The spacing after the last character is given back on the left,
+   so the characters stand in the middle. */
+.pin-field {
+	width: 100%;
+	height: 52px;
+	padding: 0 12px 0 calc(12px + 0.35em);
+	border-radius: var(--radius-control);
+	border: 1px solid var(--night-edge);
+	background: var(--night-control);
+	font-size: 22px;
+	letter-spacing: 0.35em;
+	text-align: center;
+}
+.pin-field.is-wrong {
+	border-color: var(--danger);
+}
+.pin-error {
+	min-height: 20px;
+	margin: 8px 0 10px;
+	font-size: 13.5px;
+	line-height: 20px;
+	color: var(--danger);
+}
+.pin-unlock {
+	width: 100%;
+	height: 46px;
+}
+.pin-hint {
+	margin-top: 16px;
+	font-size: 12.5px;
+	color: var(--starlight-faint);
+	text-wrap: pretty;
+}
+
+/* The settings sheet. On a phone it fills the screen, as narrow.css makes every .detail-inner do. */
+.settings-inner {
+	width: min(780px, 100% - 48px);
+}
+.settings-head {
+	padding: 40px 88px 0 44px;
+}
+/* A change could not be saved, or the folder cannot be written: under the head, as wide as the panels. */
+.settings-notice {
+	max-width: none;
+	margin: 22px 44px 0;
+}
+/* The panels are the glance panels' boxes: the raised night at 0.82, the night line as edge. */
+.settings-panel {
+	margin: 22px 44px 0;
+	padding: 20px 22px 8px;
+	border-radius: 13px;
+	background: color-mix(in srgb, var(--night-raised) 82%, transparent);
+	border: 1px solid var(--night-line);
+}
+.settings-panel + .settings-panel {
+	margin-top: 16px;
+}
+.settings-panel .section-title {
+	padding: 0;
+	margin-bottom: 4px;
+	flex-wrap: wrap;
+}
+/* A row: its name on the left, its chips on the right, a faint line between rows. */
+.set-row {
+	display: grid;
+	grid-template-columns: 120px minmax(0, 1fr);
+	align-items: center;
+	gap: 8px 16px;
+	padding: 14px 0;
+}
+.set-row + .set-row {
+	border-top: 1px solid var(--night-line);
+}
+.set-k {
+	font-size: 14px;
+	color: var(--starlight);
+}
+.set-hint {
+	align-self: center;
+	margin-left: 4px;
+	font-size: 13px;
+	color: var(--starlight-faint);
+}
+/* Its room is kept while a platform is chosen. */
+.set-hint.is-hidden {
+	visibility: hidden;
+}
+.set-note {
+	padding: 2px 0 14px;
+	font-size: 13px;
+	color: var(--starlight-faint);
+}
+/* The theo panel: the words on the left, the switch on the right. */
+.set-switch-row {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 16px;
+	padding: 14px 0 18px;
+}
+.set-switch-label {
+	font-size: 14px;
+	color: var(--starlight);
+}
+.set-switch-text {
+	margin-top: 4px;
+	font-size: 13px;
+	color: var(--starlight-dim);
+	text-wrap: pretty;
+}
+.set-switch-text a {
+	white-space: nowrap;
+	color: var(--starlight-dim);
+	text-underline-offset: 3px;
+}
+.set-switch-text a:hover {
+	color: var(--starlight);
+}
+.set-switch-text a .ic {
+	margin-left: 3px;
+	font-size: 13px;
+}
+/* The switch: 50 by 30, a knob of 22. Off: the control colour and a dim knob. On: yellow, the knob in ink, 20 px on. */
+.switch {
+	position: relative;
+	width: 50px;
+	height: 30px;
+	padding: 0;
+	border-radius: 15px;
+	border: 1px solid var(--night-edge);
+	background: var(--night-control);
+	transition: background-color 150ms var(--ease-out), border-color 150ms var(--ease-out);
+}
+.switch:hover {
+	border-color: var(--starlight-faint);
+}
+.switch .knob {
+	position: absolute;
+	top: 3px;
+	left: 3px;
+	width: 22px;
+	height: 22px;
+	border-radius: 50%;
+	background: var(--starlight-dim);
+	transition: translate 150ms var(--ease-out), background-color 150ms var(--ease-out);
+}
+.switch[aria-checked='true'] {
+	border-color: var(--accent);
+	background: var(--accent);
+}
+.switch[aria-checked='true'] .knob {
+	translate: 20px 0;
+	background: var(--accent-ink);
+}
+/* The foot of the sheet: "Saved", until when this browser is unlocked, and "Lock" on the right. */
+.settings-foot {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 10px 18px;
+	margin-top: 28px;
+	padding: 18px 44px 26px;
+	border-top: 1px solid var(--night-line);
+	font-size: 13.5px;
+	color: var(--starlight-dim);
+}
+/* Its room is kept while it is not shown: it only shows. */
+.settings-foot .saved {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	color: var(--accent);
+	font-weight: 600;
+	visibility: hidden;
+}
+.settings-foot .saved.is-shown {
+	visibility: visible;
+}
+.settings-lock {
+	margin-left: auto;
+}
+.settings-lock .ic {
+	font-size: 16px;
+}
+
+@media (max-width: 760px) {
+	.settings-head {
+		padding: 20px 64px 0 16px;
+	}
+	.settings-foot {
+		padding: 16px 16px 24px;
+	}
+	.settings-notice,
+	.settings-panel {
+		margin-left: 16px;
+		margin-right: 16px;
+	}
+	.settings-panel {
+		padding: 16px 16px 4px;
+	}
+}
+/* On a phone, and in a narrow window, the name of a row stands above its chips. */
+@media (max-width: 640px) {
+	.set-row {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	dialog.pin[open] {
+		animation: none;
+	}
+	.switch,
+	.switch .knob {
+		transition: none;
+	}
+}

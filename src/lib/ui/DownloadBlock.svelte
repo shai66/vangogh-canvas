@@ -13,6 +13,7 @@
 		runFile,
 		sharedVersion,
 		systemsOf,
+		theoShown,
 		totalBytes,
 		visibleFiles
 	} from '$lib/download/plan';
@@ -26,6 +27,7 @@
 	import MacCaution from './MacCaution.svelte';
 	import PlatformSwitch from './PlatformSwitch.svelte';
 	import PlatformTabs from './PlatformTabs.svelte';
+	import TheoPanel from './TheoPanel.svelte';
 
 	interface Props {
 		detail: Detail;
@@ -34,8 +36,10 @@
 		onsystem?: (os: Os | null) => void;
 		/** Tests hand in their own. */
 		starter?: Starter;
+		/** True while the settings switch the theo command on. */
+		theo?: boolean;
 	}
-	let { detail, visitor, onsystem, starter = browserStarter }: Props = $props();
+	let { detail, visitor, onsystem, starter = browserStarter, theo = false }: Props = $props();
 
 	const PANEL = 'files-panel';
 
@@ -307,6 +311,11 @@
 				{/if}
 			</div>
 		</div>
+	{/if}
+
+	{#if theoShown(theo, kind, detail.downloadLanguage)}
+		<!-- Between the files and the extras, for a game with files at a computer (0.11.0). -->
+		<TheoPanel id={detail.id} />
 	{/if}
 
 	{#if detail.extras.length > 0}
