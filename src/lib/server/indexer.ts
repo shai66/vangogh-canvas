@@ -413,6 +413,7 @@ export async function buildIndex(
 			screenshots: product?.screenshots ?? [],
 			backdrop: product?.backdrop ?? null,
 			macNotice: product?.macNotice ?? null,
+			dos: product?.dos ?? false,
 			requirements: product?.requirements ?? {},
 			storeUrl: product?.storeUrl ?? null,
 			rating: product?.rating ?? null,

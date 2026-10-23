@@ -26,6 +26,13 @@ export function parsePictures(args: readonly string[]): Picture[] {
 		if (!url || (url.protocol !== 'http:' && url.protocol !== 'https:')) {
 			throw new Error(`The address of "${name}" is not a full http or https address: ${address}`);
 		}
+		const tab = settingsTab(url);
+		if (tab === 'batocera') {
+			throw new Error(`The tab "batocera" of "${name}" shows the address of a Batocera box, so it is not pictured.`);
+		}
+		if (tab !== null && !SETTINGS_TABS.includes(tab)) {
+			throw new Error(`The tab "${tab}" of "${name}" is not one of ${SETTINGS_TABS.join(', ')}.`);
+		}
 		if (pictures.length > 0 && url.origin !== pictures[0].url.origin) {
 			throw new Error(`All addresses must be on one Canvas: ${pictures[0].url.origin} and ${url.origin}.`);
 		}
@@ -57,6 +64,42 @@ export function healthProblem(health: unknown, expected: string): string | null 
 /** True for an address that opens a sheet over the list: a game, a collection, the glance. */
 export function opensSheet(url: URL): boolean {
 	return url.pathname !== '/';
+}
+
+/** The tabs of the settings sheet, by the names they show. */
+const SETTINGS_TABS = ['library', 'downloads', 'batocera', 'server'];
+
+/** True for the settings sheet, which opens behind the PIN. */
+export function isSettings(url: URL): boolean {
+	return url.pathname === '/settings';
+}
+
+/** The tab a settings address asks for by its hash, as `/settings#server`; null for the sheet's first tab or another address. */
+export function settingsTab(url: URL): string | null {
+	if (!isSettings(url) || url.hash.length <= 1) return null;
+	const hash = url.hash.slice(1);
+	try {
+		return decodeURIComponent(hash).toLowerCase();
+	} catch {
+		// Not a name any tab has: refused as an unknown tab.
+		return hash.toLowerCase();
+	}
+}
+
+/** Null for a PIN Canvas could take; otherwise what to tell the person. */
+export function pinProblem(pin: string): string | null {
+	return /^\d{4,8}$/.test(pin) ? null : "SETTINGS_PIN must be the settings' PIN: 4 to 8 digits.";
+}
+
+/** vangogh's address in a picture of the Server tab: the example stack's, so that no address of a home network reaches the README. */
+export const VANGOGH_STAND_IN = 'http://vangogh:1853';
+
+/** The answer of `/api/settings/status` with the stand-in in place of vangogh's address; any other answer as it is. */
+export function withStandIn(status: unknown): unknown {
+	if (typeof status !== 'object' || status === null || !('vangogh' in status)) return status;
+	const vangogh = (status as { vangogh: unknown }).vangogh;
+	if (typeof vangogh !== 'object' || vangogh === null || !('url' in vangogh)) return status;
+	return { ...status, vangogh: { ...vangogh, url: VANGOGH_STAND_IN } };
 }
 
 const ALL_OS = ['windows', 'macos', 'linux'];

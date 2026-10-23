@@ -2,12 +2,12 @@
 // file of this shape. Text that comes from GOG (titles, genres, descriptions)
 // is not here: it is shown as it is.
 
-import { upperFirst } from './format';
+import type { FailReason, JobView, StepName } from './batocera';
+import { formatSize, upperFirst } from './format';
 import type { GenreGroup } from './genres';
 import type { MatchField } from './search/query';
 import type { Together } from './search/state';
 import type { CollectionKind, JoinedGroup, Os, RatingBody } from './types';
-import type { Visitor } from './visitor';
 
 const plural = (n: number, one: string, many: string): string => (n === 1 ? `1 ${one}` : `${n} ${many}`);
 
@@ -58,6 +58,190 @@ const REQUIREMENT_ROWS = new Map<string, string>([
 	['storage', 'Storage'],
 	['other', 'Other']
 ]);
+
+/**
+ * Why a send stopped, as sections 3 and 9.3 of the spec word it; fetch, checksum, copy, in-the-way and login are Claude's
+ * wording, and so are box-room and unrar since 0.12.1, approved by the user (2026-10-23).
+ */
+function reasonOf(r: FailReason): string {
+	switch (r.code) {
+		case 'box-down':
+			return 'Batocera does not answer. Turn it on, then send again.';
+		case 'box-room':
+			return `Batocera has ${formatSize(r.free)} free, and the send needs ${formatSize(r.need)} while it unpacks.`;
+		case 'fetch':
+			return 'The installer could not be fetched from vangogh.';
+		case 'checksum':
+			return 'A file from vangogh was damaged on the way.';
+		case 'unpack':
+			return 'This installer could not be unpacked.';
+		case 'unrar':
+			return "This installer needs RAR support, which Batocera's innoextract does not have.";
+		case 'copy':
+			return 'The copy to Batocera broke off.';
+		case 'in-the-way':
+			return `A folder is in the way on Batocera: ${r.path}. Remove it there, then send again.`;
+		case 'key-changed':
+			return "Batocera's key has changed. If it was reinstalled, test the connection again in settings.";
+		case 'login':
+			return 'Batocera refused the login. Test the connection again in settings.';
+	}
+}
+
+const ahead = (n: number): string => (n <= 1 ? 'One other game is being sent first.' : `${n} other games are being sent first.`);
+const minutesLeft = (n: number): string => (n === 1 ? 'about 1 minute left' : `about ${n} minutes left`);
+const percentText = (n: number): string => `${n} %`;
+
+/** The last sentence of the "i" of a game on the box: Claude's wording, approved by the user (2026-10-21). */
+const SETTINGS_HINT = 'Some games need extra settings in Batocera before they run well, such as the controls.';
+
+const STEP: Record<StepName, string> = {
+	copy: 'Copying to Batocera',
+	unpack: 'Unpacking on Batocera',
+	reload: "Reloading Batocera's list"
+};
+
+/** Step 1 while it waits for Batocera before the copy: chosen by the user from three options (2026-10-21). */
+const WAITING_FOR_BOX = 'Waiting for Batocera';
+
+/** What a failed send left on the box: nothing, or, after a failed update, the older version (the user, 2026-10-21). */
+const LEFT_NOTHING = 'Nothing was left on the box.';
+const LEFT_OLDER = 'The older version stays.';
+const NOT_KNOWN = 'The reason is not known.';
+
+/** The two sentences of the note of a failed send (spec 2026-10-21, section 5.3); `older` for a failed update. */
+function failedNote(r: FailReason | null, older: boolean): { bold: string; plain: string } {
+	const left = older ? LEFT_OLDER : LEFT_NOTHING;
+	if (!r) return { bold: NOT_KNOWN, plain: left };
+	switch (r.code) {
+		case 'box-down':
+			return { bold: 'Batocera does not answer.', plain: 'Turn it on, then send again.' };
+		// Short forms in the note, the full text in its "i": the user's choice (2026-10-23).
+		case 'box-room':
+			return { bold: 'Batocera has no room to unpack it.', plain: `${formatSize(r.free)} free, ${formatSize(r.need)} needed.` };
+		case 'unrar':
+			return { bold: 'This installer needs RAR support.', plain: left };
+		case 'fetch':
+		case 'checksum':
+		case 'unpack':
+		case 'copy':
+			return { bold: reasonOf(r), plain: left };
+		case 'in-the-way':
+			return { bold: 'A folder is in the way on Batocera.', plain: 'Remove it there, then send again.' };
+		case 'key-changed':
+			return { bold: "Batocera's key has changed.", plain: 'Test the connection again in settings.' };
+		case 'login':
+			return { bold: 'Batocera refused the login.', plain: 'Test the connection again in settings.' };
+	}
+}
+
+/** The "i" of the note of a failed send: the reason in full, then what is left on the box. */
+function failedInfo(r: FailReason | null, older: boolean): string {
+	return `${r ? reasonOf(r) : NOT_KNOWN} ${older ? LEFT_OLDER : LEFT_NOTHING}`;
+}
+
+const BATOCERA = {
+	name: 'Batocera',
+	/** The labels of the main button on Batocera. */
+	send: 'Send to Batocera',
+	stop: 'Stop sending',
+	play: 'Play on the TV',
+	/** While Play waits for the box's answer; Claude's wording, approved by the user (2026-10-21). */
+	starting: 'Starting…',
+	/** The state in the row of the menu, where a system has its files. */
+	menu: {
+		no: 'Not there yet',
+		offWakes: 'Off, Canvas wakes it',
+		off: 'Off',
+		waiting: 'Waiting',
+		sending: 'Sending',
+		on: 'On Batocera',
+		newer: 'Newer version',
+		marked: "Doesn't run there"
+	},
+	/** The line beside the button: bold, then plain. */
+	windowsVersion: (size: string) => `Windows version, ${size}`,
+	dosGame: (size: string) => `DOS game, ${size}`,
+	/** Claude's wording since 0.12.1, approved by the user (2026-10-23). */
+	notThere: 'Canvas copies the installers to Batocera, which unpacks them.',
+	offWakes: 'Batocera is off. Canvas wakes it, then copies the game.',
+	waiting: 'Waiting to be sent',
+	ahead,
+	closeThis: 'You can close this: the server goes on.',
+	onBox: 'On Batocera',
+	newer: (box: string, archive: string) => `Batocera has ${box}; vangogh has ${archive}.`,
+	/** A newer version whose version text is the same, or not known: GOG changed the files under it. Claude's wording. */
+	newerFiles: "vangogh's installer files have changed since it was sent.",
+	marked: "Doesn't run on Batocera",
+	/** The flag at the end of the line, with the settings unlocked: its name and its tooltip (spec 2026-10-21, 6.3). */
+	markIt: "Doesn't run? Mark it",
+	unmark: 'Take the mark back',
+	minutesLeft,
+	/** The plain line while a send waits for Batocera: whether Canvas woke the box for the send. */
+	box: { no: 'Batocera is on', waking: 'Batocera is waking up', awake: 'Batocera is awake' } satisfies Record<JobView['waking'], string>,
+	/** Under the system the game went to; "DOS" is Claude's wording, the spec gives "Windows" only. Then the hint. */
+	inList: (system: 'windows' | 'dos') => `It is in Batocera's list, under ${system === 'dos' ? 'DOS' : 'Windows'}. ${SETTINGS_HINT}`,
+	listLater: `It shows in Batocera's list once the game on the TV is closed. ${SETTINGS_HINT}`,
+	/** The seconds of the countdown as a clock: "9:41". */
+	clock: (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`,
+	keepOn: 'Keep it on',
+	keptOn: 'Batocera stays on.',
+	runningTitle: 'A game is running on the TV.',
+	runningText: 'Close it and start this one?',
+	force: 'Close it and play',
+	cancel: 'Cancel',
+	newerTitle: 'vangogh has a newer version.',
+	savesStay: 'Saves stay as they are.',
+	update: 'Update on Batocera',
+	noScreenTitle: 'Batocera sees no screen.',
+	/** A start Batocera did not make (section 5): Claude's wording, approved by the user (2026-10-23). */
+	notStartedTitle: 'The game did not start on the TV.',
+	notStartedPlain: 'Press Play again.',
+	goneTitle: 'The game is no longer on Batocera.',
+	/** A Play that found the box off, with waking off (section 5). */
+	downTitle: 'Batocera does not answer.',
+	downText: 'Turn it on, then press Play.',
+	failedTitle: 'The send stopped.',
+	reason: reasonOf,
+	retry: 'Try again',
+	/** A phone where the game is marked and the settings are locked (section 7.6). */
+	markedNote: 'It was tried on the box and marked in Canvas.',
+	/** The line beside the main button and the one note under it, direction B (spec 2026-10-21, sections 3 to 5). */
+	notYet: 'Not on Batocera yet.',
+	turnOn: 'Turn Batocera on to send.',
+	step: (step: StepName, n: number) => `${STEP[step]}, ${n} of 3`,
+	waitingStep: (n: number) => `${WAITING_FOR_BOX}, ${n} of 3`,
+	/** A send's numbers in the line, "55 % · about 11 minutes left", and the same as the bar's value text; no minutes while they are null. */
+	numbers: (percent: number, minutes: number | null) => (minutes === null ? percentText(percent) : `${percentText(percent)} · ${minutesLeft(minutes)}`),
+	barText: (percent: number, minutes: number | null) => (minutes === null ? percentText(percent) : `${percentText(percent)}, ${minutesLeft(minutes)}`),
+	sentDay: (day: string | null) => (day ? `Sent on ${day}.` : 'Sent by Canvas.'),
+	byHand: 'Put there by hand.',
+	hidden: 'Hidden for everyone else.',
+	startingLine: 'Starting the game on the TV…',
+	closingLine: 'Closing the other game first…',
+	wakingLine: 'Waking Batocera to play…',
+	startedLine: 'Started. Pick up the remote.',
+	/** The "i": its name, and its words. */
+	moreName: 'More about this',
+	versionOf: (version: string) => `Version ${version}.`,
+	hint: SETTINGS_HINT,
+	handInfo: 'Canvas leaves a game put there by hand as it is.',
+	/** The TV at the line's left: its name, and its tooltips. */
+	tvName: "Batocera's state",
+	tvOn: 'Batocera is on.',
+	tvWoken: 'Batocera is on. Canvas woke it for this send.',
+	tvWaking: 'Batocera is waking up. Canvas woke it for this send.',
+	tvWakingPlay: 'Batocera is waking up. Canvas woke it to start the game.',
+	tvCounting: (time: string) => `Batocera is on. Canvas woke it for this send, so it shuts down in ${time}.`,
+	tvOffPlay: 'Batocera is off. Canvas wakes it to play.',
+	tvUnknown: 'Canvas has not looked at Batocera yet.',
+	/** The notes. */
+	shutsDown: (time: string) => `Batocera shuts down in ${time}.`,
+	wokeForSend: 'Canvas woke it for this send.',
+	noScreenPlain: 'Turn the TV on, then restart Batocera.',
+	failedNote,
+	failedInfo
+};
 
 export const t = {
 	name: 'Canvas',
@@ -234,6 +418,8 @@ export const t = {
 		again: 'Download again',
 		/** The switch beside the main button, and its menu. */
 		another: 'Download for another system',
+		/** The same, while the menu has Batocera in it (0.12.0). */
+		anotherOrBatocera: 'Other systems and Batocera',
 		thisComputer: 'This computer',
 		files: (n: number) => plural(n, 'file', 'files'),
 		summary: (n: number, size: string) => `${plural(n, 'file', 'files')}, ${size}`,
@@ -251,9 +437,13 @@ export const t = {
 		keepTogether: 'Keep the other files in the same folder.',
 		nothingHappens:
 			'Only one file arrived? Your browser stopped the others. Allow multiple downloads for this site (the browser asks in the address bar), or download the files one by one below.',
-		notForTitle: (visitor: Visitor) =>
-			visitor === 'other' ? 'Choose the files for your system.' : `Not available for ${osName[visitor as Os]}.`,
+		notForTitle: (platform: Os | 'batocera' | 'other') =>
+			platform === 'other'
+				? 'Choose the files for your system.'
+				: `Not available for ${platform === 'batocera' ? BATOCERA.name : osName[platform]}.`,
 		notForText: (systems: Os[]) => `This game exists for ${list(systems.map((os) => osName[os]))}. The files are listed below.`,
+		/** Claude's words from the user's idea (2026-10-21). */
+		notForBatoceraText: 'This game has no Windows version. The files are listed below.',
 		dlcOnlyTitle: 'Only DLC of this game is in the archive.',
 		dlcOnlyText: 'The files are listed below.',
 		phoneTitle: 'Installers are meant for a computer.',
@@ -296,6 +486,9 @@ export const t = {
 		/** The name of the button, for a screen reader. */
 		copyLabel: 'Copy the command'
 	},
+
+	/** Send to Batocera in a game's detail (0.12.0, sections 3, 5 and 7). */
+	batocera: BATOCERA,
 
 	glance: {
 		/** The title of the way in, shown on hover. */
@@ -380,6 +573,8 @@ export const t = {
 		/** The foot of the sheet: "Unlocked in this browser until 19 November". */
 		until: (day: string) => `Unlocked in this browser until ${day}`,
 		lock: 'Lock',
+		/** The tabs of the sheet (spec 2026-10-21, section 3). */
+		tabs: { library: 'Library', downloads: 'Downloads', batocera: 'Batocera', server: 'Server' },
 		/** The panel of the library defaults, its note after the title, and its rows. */
 		opens: 'How the library opens',
 		opensNote: 'in a browser that has not chosen its own view',
@@ -397,10 +592,132 @@ export const t = {
 		theoSwitch: "Show the theo command in a game's detail",
 		theoText: 'theo installs games from vangogh and starts them, on macOS and Linux.',
 		theoLink: 'theo on GitHub',
+		/** The panel of the preferred platform (0.12.0, section 8). */
+		preferred: 'Preferred platform',
+		preferredNote: "what a game's main button starts on",
+		preferredRow: 'Starts on',
+		preferredAuto: 'Autoselect',
+		preferredBatocera: 'Batocera',
+		/** The title of the Batocera chip while Batocera is not set up; Claude's wording, for the user to confirm. */
+		preferredNotReady: 'Batocera: once it is set up in the Batocera tab',
+		preferredText:
+			"Autoselect starts on the visitor's own system, as before. Another choice applies when the game has it, else Autoselect. A phone or tablet starts on Batocera whenever Batocera is set up.",
+		/** The panel of Batocera (0.12.0, section 9). */
+		batocera: 'Batocera',
+		batoceraNote: 'for sending games to a Batocera box by the TV',
+		/** Batocera is experimental: the tag after the title and the sentence under the switch, Claude's wording chosen by the user (2026-10-21). */
+		batoceraTag: 'Experimental',
+		batoceraExperimental: 'Experimental: most games need settings in Batocera before they run well, and some do not run at all.',
+		batoceraSwitch: 'Send games to Batocera',
+		/** Claude's wording since 0.12.1, approved by the user (2026-10-23). */
+		batoceraText:
+			"Adds Batocera to a game's download menu once the connection test below has passed. Canvas copies the game's Windows installers to the box, which unpacks them; a DOS game goes to Batocera's DOS system.",
+		batoceraLink: 'About Batocera',
+		batoceraAddress: 'Address',
+		batoceraAddressHint: 'Batocera shows it in its menu, under Network settings.',
+		batoceraUser: 'User',
+		batoceraPassword: 'Password',
+		batoceraPasswordSaved: 'Saved. Type to change it.',
+		batoceraPasswordHint: [
+			{ plain: 'Canvas starts with ', bold: 'linux' },
+			{ plain: ", Batocera's own default. With Enforce security on, Batocera shows its password under Security.", bold: '' }
+		] satisfies TextPart[],
+		batoceraConnection: 'Connection',
+		batoceraTest: 'Test connection',
+		/** The five lines of the connection test (section 9.3): before a test, passed, and failed or a warning. */
+		batoceraCheck: {
+			before: ['Batocera answers', 'The login works', 'Canvas can write games to the box', "Free space and Batocera's version", 'EmulationStation answers'],
+			answers: (address: string) => `Batocera answers at ${address}`,
+			noAnswer: (address: string) => `Nothing answers at ${address}. Is Batocera on, and is the address right?`,
+			login: 'The login works',
+			refused: 'The login was refused. Check the user and the password.',
+			/** Line 2 when the box answers and its SSH does not start; Claude's wording. */
+			noSsh: 'Batocera answers, but its SSH did not start within 20 seconds.',
+			writes: 'Canvas can write games to roms/windows and roms/dos',
+			/** The box's own reason after the colon, when it gave one. */
+			cannotWrite: (folder: string, reason: string | null) => (reason ? `Canvas cannot write to ${folder}: ${reason}` : `Canvas cannot write to ${folder}.`),
+			/** Line 3 when the box has no innoextract (0.12.1); Claude's wording, approved by the user (2026-10-23). */
+			noInnoextract: 'Batocera has no innoextract, which unpacking a game needs.',
+			space: (free: string, version: string) => `${free} free, Batocera ${version}`,
+			noSpace: 'Canvas could not read the free space or the version.',
+			es: 'EmulationStation answers',
+			noEs: 'EmulationStation did not answer. Games still arrive; they show after Batocera restarts.',
+			mac: (mac: string) => `The box's network card is saved for waking it: ${mac}`
+		},
+		batoceraWake: 'Wake Batocera when sending',
+		batoceraWakeText:
+			"When the box is off, Canvas wakes it over the network while it fetches the game. Needs a cable, Wake-on-LAN on the box, and Canvas on the host's network (see the README).",
+		batoceraTestWake: 'Test wake',
+		/** The one line of the wake test (section 9.5); "did not shut down" is Claude's wording. */
+		batoceraWakeLine: {
+			before: 'Canvas shuts Batocera down, then wakes it. Takes about a minute.',
+			down: 'Batocera is shutting down…',
+			waking: 'Woke it, waiting for an answer…',
+			woke: (seconds: number) => `Batocera woke and answered after ${seconds === 1 ? '1 second' : `${seconds} seconds`}.`,
+			noAnswer: "No answer after 3 minutes. Is Canvas on the host's network, and Wake-on-LAN on in the box?",
+			busy: 'A game is running on the TV. Try again when it is closed.',
+			notDown: 'Batocera did not shut down within a minute. Try again, or turn it off and on by hand.'
+		},
+		batoceraShutdown: 'Shut down after sending',
+		batoceraShutdownText:
+			'Only when Canvas woke Batocera for the send. It waits 10 minutes, so the game can still be started, and never shuts down while a game runs.',
 		/** The red notices under the head: the folder cannot be written, a change got no answer, or Canvas refused it. */
 		unwritable: 'Canvas cannot save settings: the folder /settings cannot be written. Give the container a volume there, as the README shows.',
 		unreachable: 'Canvas did not answer. The change was not saved.',
-		refused: 'Canvas refused the change. The README says why, under "The settings page".'
+		refused: 'Canvas refused the change. The README says why, under "The settings page".',
+		/** In the foot, where "Saved" shows, after a change that could not be saved; Claude's wording (spec 2026-10-21, section 3). */
+		notSaved: 'Not saved',
+		/** The panel "This Canvas" of the Server tab (spec 2026-10-21, section 4); its words are Claude's. */
+		facts: {
+			title: 'This Canvas',
+			note: 'what the server says now',
+			version: 'Version',
+			running: 'Running',
+			vangogh: 'vangogh',
+			library: 'Library',
+			batocera: 'Batocera',
+			upToDate: 'Up to date',
+			/** A link to the release, as the foot's notice. */
+			isOut: (version: string) => `${version} is out`,
+			checked: (when: string) => `checked ${when}`,
+			checkOff: 'Update check off',
+			since: (when: string) => `since ${when}`,
+			/** When something happened: "today at 11:04", else "21 October at 11:04". */
+			today: (time: string) => `today at ${time}`,
+			onDay: (day: string, time: string) => `${day} at ${time}`,
+			/** How long Canvas has run: minutes under an hour, hours under two days, then days. */
+			minutes: (n: number) => plural(n, 'minute', 'minutes'),
+			hours: (n: number) => plural(n, 'hour', 'hours'),
+			days: (n: number) => plural(n, 'day', 'days'),
+			signedIn: 'Signed in',
+			loginRefused: 'Login refused',
+			games: (games: number, collections: number) => `${plural(games, 'game', 'games')}, ${plural(collections, 'collection', 'collections')}`,
+			/** "read today at 11:04, next at 04:30", or "read 30 September, next at 04:30"; without a library yet, the next read only. */
+			read: (when: string | null, next: string) => (when ? `read ${when}, next at ${next}` : `next at ${next}`),
+			reading: 'reading…',
+			/** Its reason is the title. */
+			readFailed: 'the last read failed',
+			batoceraOff: 'Off',
+			batoceraNotSetUp: 'Not set up',
+			batoceraSetUp: 'Set up',
+			jobs: (n: number) => (n === 0 ? 'no send running' : n === 1 ? '1 send waiting or running' : `${n} sends waiting or running`),
+			readNow: 'Read now',
+			readingNow: 'Reading…'
+		},
+		/** The panel "Server" of the Server tab (section 5): the texts under the rows are the spec's. */
+		server: 'Server',
+		serverNote: 'what Canvas does on its own',
+		rebuild: 'Daily rebuild',
+		rebuildText: "Canvas reads vangogh's library again every day at this time, after vangogh's own sync at night.",
+		zone: 'Time zone',
+		zoneNow: (summer: boolean, offset: string) => (summer ? `It follows summer time: now ${offset}.` : `Now ${offset}.`),
+		zoneText: 'Canvas shows its times in it: when the library was read, when a game went to Batocera.',
+		updates: 'Check for updates',
+		updatesText: 'Canvas asks GitHub once a day whether a newer Canvas is out, and its foot says so.',
+		/** After each text: "Starts from REBUILD_AT in the stack.", the name of the variable as code. */
+		from: { before: 'Starts from ', after: ' in the stack.' },
+		/** The names of the stack's variables the three settings start from. */
+		fromName: { rebuild: 'REBUILD_AT', zone: 'TZ', updates: 'VERSION_CHECK' }
 	},
 
 	/** The page while there is no library: reading, or why the last reading failed (0.10.2). */
@@ -435,5 +752,7 @@ export const VANGOGH_URL = 'https://github.com/arelate/vangogh';
 export const SOURCE_URL = 'https://github.com/shai66/vangogh-canvas';
 /** theo, which installs games from vangogh (0.11.0). */
 export const THEO_URL = 'https://github.com/arelate/theo';
+/** Batocera, which plays games on the TV (0.12.0). */
+export const BATOCERA_URL = 'https://batocera.org';
 /** The page of a release on GitHub. */
 export const releaseUrl = (version: string): string => `${SOURCE_URL}/releases/tag/v${version}`;

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { JobView } from '$lib/batocera';
 import type { Detail, FileEntry } from '$lib/types';
 import {
 	blockKind,
@@ -8,8 +9,11 @@ import {
 	dlcFor,
 	discouraged,
 	firstTab,
+	goesToBatocera,
 	isPrimary,
+	justSent,
 	macNote,
+	missingFor,
 	notePlace,
 	partLabel,
 	runFile,
@@ -60,6 +64,7 @@ function detail(over: Partial<Detail> = {}): Detail {
 		backdrop: null,
 		releaseYear: null,
 		macNotice: null,
+		dos: false,
 		requirements: {},
 		storeUrl: null,
 		rating: null,
@@ -129,6 +134,25 @@ describe('systemsOf and firstTab', () => {
 
 	it('lists the systems in the fixed order, DLC-only systems included', () => {
 		expect(systemsOf(game)).toEqual(['windows', 'macos', 'linux']);
+	});
+
+	it('opens on the preferred system when the main button starts on it, else as without one', () => {
+		const both = detail({ downloads: { windows: [file()], linux: [file()] } });
+		expect(firstTab(both, 'windows', 'linux')).toBe('linux');
+		expect(firstTab(both, 'other', 'linux')).toBe('linux');
+		// The button does not start on a system the game has DLC files for only, nor does the tab.
+		expect(firstTab(game, 'windows', 'macos')).toBe('windows');
+		// Batocera has no tab; a phone has no button.
+		expect(firstTab(both, 'linux', 'batocera')).toBe('linux');
+		expect(firstTab(both, 'phone', 'linux')).toBe('windows');
+		expect(firstTab(both, 'linux', 'auto')).toBe('linux');
+	});
+
+	it('opens on Windows while the main button is on Batocera, which sends the Windows files', () => {
+		const both = detail({ downloads: { windows: [file()], macos: [file()] } });
+		expect(firstTab(both, 'macos', 'batocera', true)).toBe('windows');
+		expect(firstTab(both, 'macos', 'auto', true)).toBe('windows');
+		expect(firstTab(both, 'macos', 'batocera', false)).toBe('macos');
 	});
 
 	it('opens on the visitor’s system when the game has it, otherwise on the first', () => {
@@ -344,5 +368,122 @@ describe('theoShown', () => {
 			expect(theoShown(true, kind, null)).toBe(false);
 		}
 		expect(theoShown(true, 'mine', 'Deutsch')).toBe(false);
+	});
+});
+
+describe('where the main button starts, with Batocera and the preferred platform', () => {
+	const both = detail({ os: ['windows', 'macos'], downloads: { windows: [file()], macos: [file()] } });
+
+	it('starts on Batocera on a phone once it is set up', () => {
+		expect(buttonTarget(both, 'phone', null, 'auto', true)).toBe('batocera');
+		expect(buttonTarget(both, 'phone', null, 'auto', false)).toBeNull();
+		expect(buttonTarget(both, 'phone', null, 'windows', false)).toBeNull();
+	});
+
+	it('starts on the preferred platform when the game has it', () => {
+		expect(buttonTarget(both, 'macos', null, 'windows', false)).toBe('windows');
+		// No Linux files: the visitor's own system, as without a preferred platform.
+		expect(buttonTarget(both, 'macos', null, 'linux', false)).toBe('macos');
+		expect(buttonTarget(both, 'macos', null, 'batocera', true)).toBe('batocera');
+		// Batocera not set up, or the game cannot go: as Autoselect.
+		expect(buttonTarget(both, 'macos', null, 'batocera', false)).toBe('macos');
+		expect(buttonTarget(both, 'macos', null, 'auto', true)).toBe('macos');
+	});
+
+	it('starts a marked game as with Autoselect, and lets an unlocked browser pick Batocera', () => {
+		expect(buttonTarget(both, 'macos', null, 'batocera', true, true)).toBe('macos');
+		expect(buttonTarget(both, 'macos', 'batocera', 'batocera', true, true)).toBe('batocera');
+		// A phone has no choice: the button disabled, as section 7.6 says.
+		expect(buttonTarget(both, 'phone', null, 'auto', true, true)).toBe('batocera');
+	});
+
+	it('a pick wins over the preferred platform', () => {
+		expect(buttonTarget(both, 'macos', 'macos', 'batocera', true)).toBe('macos');
+		expect(buttonTarget(both, 'macos', 'batocera', 'windows', true)).toBe('batocera');
+		// Batocera cannot be picked where it cannot go.
+		expect(buttonTarget(both, 'macos', 'batocera', 'windows', false)).toBe('windows');
+	});
+
+	it('takes a game to Batocera when it has Windows files of its own', () => {
+		expect(goesToBatocera(both)).toBe(true);
+		expect(goesToBatocera(detail({ downloads: { macos: [file()] } }))).toBe(false);
+		expect(goesToBatocera(detail({ downloads: {}, dlc: [{ title: 'Extra', downloads: { windows: [file()] } }] }))).toBe(false);
+		expect(goesToBatocera(detail({ complete: false }))).toBe(false);
+		expect(goesToBatocera(detail({ kind: 'orphaned-dlc' }))).toBe(false);
+	});
+});
+
+describe('missingFor, the platform the note "Not available for" names', () => {
+	const windows = detail();
+	const mac = detail({ os: ['macos'], downloads: { macos: [file()] } });
+	const macAndLinux = detail({ os: ['macos', 'linux'], downloads: { macos: [file()], linux: [file()] } });
+
+	it('names the visitor\'s own system with Autoselect when the game does not have it', () => {
+		expect(missingFor(windows, 'macos', 'auto', false, false)).toBe('macos');
+		expect(missingFor(mac, 'macos', 'auto', false, false)).toBeNull();
+	});
+
+	it('names the preferred system when the game does not have it, whatever the visitor sits at', () => {
+		expect(missingFor(windows, 'macos', 'windows', false, false)).toBeNull();
+		expect(missingFor(macAndLinux, 'macos', 'windows', false, false)).toBe('windows');
+		expect(missingFor(macAndLinux, 'other', 'windows', true, false)).toBe('windows');
+	});
+
+	it('names Batocera, once it is set up, when the game has no Windows version', () => {
+		expect(missingFor(windows, 'macos', 'batocera', true, false)).toBeNull();
+		expect(missingFor(mac, 'macos', 'batocera', true, false)).toBe('batocera');
+		// A marked game has a Windows version: the menu row says that it does not run there.
+		expect(missingFor(windows, 'macos', 'batocera', true, true)).toBeNull();
+	});
+
+	it('takes Batocera that is not set up for Autoselect', () => {
+		expect(missingFor(windows, 'macos', 'batocera', false, false)).toBe('macos');
+		expect(missingFor(mac, 'macos', 'batocera', false, false)).toBeNull();
+	});
+
+	it('asks a system Canvas cannot name to choose, with Autoselect', () => {
+		expect(missingFor(windows, 'other', 'auto', false, false)).toBe('other');
+	});
+
+	it('names nothing where the block has a note of its own', () => {
+		for (const preferred of ['auto', 'windows', 'batocera'] as const) {
+			expect(missingFor(mac, 'phone', preferred, true, false)).toBeNull();
+			expect(missingFor(detail({ complete: false, hasFiles: false, downloads: {} }), 'macos', preferred, true, false)).toBeNull();
+			expect(missingFor(detail({ hasFiles: false, downloads: {} }), 'macos', preferred, true, false)).toBeNull();
+			const onlyDlc = detail({ downloads: {}, dlc: [{ title: 'Extra', downloads: { linux: [file()] } }] });
+			expect(missingFor(onlyDlc, 'macos', preferred, true, false)).toBeNull();
+		}
+	});
+});
+
+function job(over: Partial<JobView> = {}): JobView {
+	return {
+		id: 'job-1',
+		state: 'running',
+		ahead: 0,
+		step: 'copy',
+		stepNumber: 1,
+		steps: 3,
+		overall: 0.42,
+		bytesDone: 8.4 * GB,
+		bytesAll: 20 * GB,
+		minutesLeft: 11,
+		waking: 'no',
+		waitingForBox: false,
+		reason: null,
+		endedAt: null,
+		listLater: false,
+		...over
+	};
+}
+
+describe('justSent', () => {
+	it('is true for ten minutes after a send ended', () => {
+		const now = Date.parse('2026-10-20T21:20:00Z');
+		expect(justSent(job({ state: 'done', endedAt: '2026-10-20T21:14:03Z' }), now)).toBe(true);
+		expect(justSent(job({ state: 'done', endedAt: '2026-10-20T21:09:59Z' }), now)).toBe(false);
+		expect(justSent(job({ state: 'failed', endedAt: '2026-10-20T21:19:00Z' }), now)).toBe(false);
+		expect(justSent(job({ state: 'running' }), now)).toBe(false);
+		expect(justSent(null, now)).toBe(false);
 	});
 });

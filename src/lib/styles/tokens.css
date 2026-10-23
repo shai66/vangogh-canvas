@@ -18,6 +18,8 @@
 	--accent: #f5bd1f;
 	--accent-ink: #1b1604;
 	--accent-wash: rgb(245 189 31 / 0.14);
+	/* A soft green: "this is fine", in a pill of the settings. */
+	--ok: #7fd1a4;
 	/* Geranium red: something is wrong. */
 	--danger: #f0553f;
 	--danger-wash: rgb(240 85 63 / 0.14);

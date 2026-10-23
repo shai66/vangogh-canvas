@@ -43,7 +43,8 @@ export function wallClock(date: Date, timeZone: string): { day: string; time: st
 
 /** Decides when rebuilds happen: at start, once a day, and after failures. */
 export class Scheduler {
-	readonly #deps: SchedulerDeps;
+	/** Replaced, with a new time and zone, by `reschedule`. */
+	#deps: SchedulerDeps;
 	#retries = 0;
 	/** True once a rejected login had its one retry. */
 	#authRetried = false;
@@ -71,6 +72,19 @@ export class Scheduler {
 		this.#tickTimer = null;
 		this.#clearRetry();
 		this.#deps.rebuilder.onResult = null;
+	}
+
+	/**
+	 * Takes a new time and zone, as at a start: today's daily rebuild counts as done when the new time is already past
+	 * on the new zone's clock, and is still to come when it is ahead. Never starts a rebuild. Spec of the settings tabs,
+	 * section 8.2.
+	 */
+	reschedule(rebuildAt: string, timeZone: string): void {
+		// The same time and zone change nothing: a save of another setting must not count a daily rebuild that is due as done.
+		if (rebuildAt === this.#deps.rebuildAt && timeZone === this.#deps.timeZone) return;
+		this.#deps = { ...this.#deps, rebuildAt, timeZone };
+		const { day, time } = wallClock((this.#deps.now ?? (() => new Date()))(), timeZone);
+		this.#lastDailyDay = time >= rebuildAt ? day : null;
 	}
 
 	/** Looks at the clock. Public so that a test can call it. */

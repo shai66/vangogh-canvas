@@ -44,6 +44,16 @@ describe('VangoghClient', () => {
 		expect(fake.logins).toBe(1);
 	});
 
+	it("asks vangogh for a product's checksums", async () => {
+		fake.data.checksums = { '1001': { '/downloads/the_long_dark_road/en1installer0': 'abc123' } };
+		expect(await client().checksums('1001')).toEqual({ '/downloads/the_long_dark_road/en1installer0': 'abc123' });
+		expect(fake.requests).toContain('GET /api/gog/checksums/1001');
+	});
+
+	it('answers no checksums when vangogh has none', async () => {
+		expect(await client().checksums('1001')).toEqual({});
+	});
+
 	it('gives null for metadata that does not exist', async () => {
 		expect(await client().metadata('gog-details', '1003')).toBeNull();
 	});

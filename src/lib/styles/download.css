@@ -147,6 +147,26 @@
 .menu .flag.is-sure {
 	color: var(--danger);
 }
+/* Batocera after the systems (0.12.0): a thin line, then its row, its state where a system has its files. With
+   the 2 px between the rows, the line has 4 px above and below. */
+.menu-sep {
+	height: 1px;
+	margin: 2px 8px;
+	background: var(--night-line);
+}
+.menu .n.stack {
+	justify-items: end;
+}
+.menu .n.is-on {
+	color: var(--accent);
+}
+.menu [aria-disabled='true'] {
+	opacity: 0.42;
+	cursor: default;
+}
+.menu [aria-disabled='true']:hover {
+	background: none;
+}
 /* What is known against the macOS installer. Under the main button it has a line of its
    own, and keeps its room while the button is on another system: choosing a system moves
    nothing. In the file list it is set as the other notes there. */
@@ -185,6 +205,21 @@
 }
 .caution.dl-note .ic {
 	font-size: 16px;
+}
+.caution.bato-quiet {
+	margin-top: 14px;
+	align-items: baseline;
+	color: var(--starlight-faint);
+}
+.caution.bato-quiet .ic {
+	align-self: flex-start;
+	margin-top: 2px;
+	color: var(--starlight-faint);
+}
+.caution.bato-quiet .link-button {
+	margin-left: -2px;
+	padding: 4px;
+	font-size: 13px;
 }
 .notice + .dl-main {
 	margin-top: 16px;
@@ -231,6 +266,323 @@
 }
 .notice-bad .ic {
 	color: var(--danger);
+}
+/* Batocera's note under the main button (spec 2026-10-21, section 4): one shape and one height whatever its text and
+   buttons, so that a note coming, going or changing moves what lies under it by one amount. Its icon, its text of two
+   lines at most and its buttons in one row, centred on it; on a phone the buttons under the text (narrow.css). */
+.bato-note {
+	display: grid;
+	grid-template-columns: 20px minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 0 12px;
+	width: min(560px, 100%);
+	max-width: none;
+	height: calc(24px + 2 * 1.45 * 14px);
+}
+.bato-note + .notice {
+	margin-top: 12px;
+}
+.bato-icon {
+	display: grid;
+	flex: none;
+}
+.bato-icon.is-turning .ic {
+	animation: turn 1.1s linear infinite;
+}
+@keyframes turn {
+	to {
+		rotate: 360deg;
+	}
+}
+.bato-note .ic {
+	margin-top: 0;
+}
+/* Canvas's words are chosen to fit two lines at both sizes: the cut after the second is a guard, and N7's "i" holds
+   its words in full. */
+.bato-note-text {
+	margin: 0;
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	line-clamp: 2;
+	overflow: hidden;
+}
+/* The countdown's clock in tabular figures, so its width never changes. */
+.bato-note-text strong {
+	font-variant-numeric: tabular-nums;
+}
+.bato-acts {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+/* N7's "i" in the look of the line's: the colour of the note's own icon is not its. */
+.bato-note .tip-btn .ic {
+	color: inherit;
+}
+/* While Play waits for the box's answer the main button waits as a disabled one does, and keeps its focus. */
+.split > .btn[aria-disabled='true'] {
+	opacity: 0.6;
+	cursor: progress;
+}
+/* The button of a game marked "Doesn't run on Batocera" is not waiting for anything. */
+.bato-off:disabled {
+	cursor: default;
+}
+/* The line beside the main button while the detail shows Batocera (spec 2026-10-21, section 3): a room of one size
+   whatever the state, the lock or the system the button is on, the button's height on a computer, 18 px after the
+   arrow. On Batocera the TV stands at its left, the flag's slot and the "i"'s at its right end, and a send's bar at its
+   foot; on a system it holds the system's text from its left edge. Under the button on a phone (narrow.css). */
+.dl-main .bato-line {
+	--slot: 30px;
+	position: relative;
+	display: flex;
+	align-items: center;
+	width: 380px;
+	max-width: none;
+	height: 54px;
+}
+/* A game in several files: the system's text takes three lines, and the room keeps them in every state. */
+.dl-main .bato-line.is-tall {
+	height: calc(1.4 * 15.5px + 2 * 1.4 * 14px);
+}
+.bato-line-row {
+	position: relative;
+	flex: 1;
+	min-width: 0;
+}
+.bato-line-text {
+	display: block;
+	padding-left: 30px;
+	padding-right: var(--slot);
+}
+.bato-line.has-flag .bato-line-text {
+	padding-right: calc(2 * var(--slot) + 4px);
+}
+/* The locked phone's line has no icons at its end. */
+.bato-prohibit ~ .bato-line-text {
+	padding-right: 0;
+}
+/* Each line one line, never more: every text Canvas puts there fits the narrowest room, and the ellipsis is a guard. */
+.dl-main .bato-line .bato-bold,
+.bato-plain {
+	display: block;
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+/* While a send is fresh: the yellow check after the bold words. */
+.bato-check {
+	margin-left: 6px;
+	color: var(--accent);
+}
+.bato-check .ic {
+	font-size: 15px;
+	vertical-align: -2px;
+}
+/* The TV, or the sign of a marked game on a locked phone, at the row's left; the slots at its right end. Each is
+   centred on the row's two lines, without a transform of its own: the tooltips of all three lie in one stacking order. */
+.bato-tv,
+.bato-prohibit {
+	position: absolute;
+	left: -3px;
+	top: 0;
+	bottom: 0;
+	display: flex;
+	align-items: center;
+}
+/* As wide as the TV's button, so its sign stands where the TV would. */
+.bato-prohibit {
+	width: 26px;
+	justify-content: center;
+	color: var(--starlight-dim);
+}
+.bato-prohibit .ic {
+	font-size: 17px;
+}
+/* The box's state by the TV's colour: dim while it is on, yellow while Canvas wakes it, faint while it is off or not
+   yet known. The flag, once marked, is red. */
+.tip-btn.is-dim {
+	color: var(--starlight-dim);
+}
+.tip-btn.is-yellow,
+.tip-btn.is-yellow:hover {
+	color: var(--accent);
+}
+.tip-btn.is-faint {
+	color: var(--starlight-faint);
+}
+.tip-btn.is-marked,
+.tip-btn.is-marked:hover {
+	color: var(--danger);
+}
+.bato-slots {
+	position: absolute;
+	right: 0;
+	top: 0;
+	bottom: 0;
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+.bato-slot {
+	display: grid;
+	place-items: center;
+	width: var(--slot);
+	height: 26px;
+}
+/* A send's bar at the room's foot, from where the text starts to the "i"'s slot: the whole send. */
+.bato-line-bar {
+	position: absolute;
+	left: 30px;
+	right: calc(var(--slot) + 4px);
+	bottom: 0;
+	height: 4px;
+	border-radius: 2px;
+	background: var(--night-line);
+	overflow: hidden;
+}
+.bato-line-bar > span {
+	display: block;
+	height: 100%;
+	border-radius: inherit;
+	background: var(--accent);
+	transition: width 600ms var(--ease-out);
+}
+@media (prefers-reduced-motion: reduce) {
+	.bato-icon.is-turning .ic {
+		animation: none;
+	}
+	.bato-line-bar > span {
+		transition: none;
+	}
+}
+/* Icon buttons with a tooltip: the TV, the "i" and the flag of a game's detail (TipButton.svelte), in the look of the
+   tooltip of "Settings" in the foot. The tooltip shows while it is open (tip.svelte.ts), never by CSS alone. */
+.tip {
+	position: relative;
+	display: inline-flex;
+	vertical-align: middle;
+}
+.tip-btn {
+	position: relative;
+	display: inline-grid;
+	place-items: center;
+	width: 26px;
+	height: 26px;
+	padding: 0;
+	border: 0;
+	border-radius: 7px;
+	background: none;
+	color: var(--starlight-faint);
+	cursor: pointer;
+}
+.tip-btn .ic {
+	font-size: 17px;
+}
+/* Lit where there is a pointer: a touch would leave it lit. */
+@media (hover: hover) {
+	.tip-btn:hover {
+		color: var(--starlight);
+		background: var(--night-control);
+	}
+}
+.tip-btn:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 1px;
+}
+/* Its hit area is 30 by 44 px, so those of the flag and the "i", 34 px apart, meet at the gap between their slots.
+   A phone's is 44 by 44 (narrow.css). */
+.tip-btn::after {
+	content: '';
+	position: absolute;
+	inset: -9px -2px;
+}
+/* It lies over the page, above the icon and from its right edge, so nothing moves when it shows. Hidden, it keeps
+   its box: it only shows. */
+.tip-text {
+	position: absolute;
+	z-index: 25;
+	right: -8px;
+	bottom: calc(100% + 12px);
+	width: max-content;
+	max-width: min(280px, calc(100vw - 32px));
+	padding: 9px 12px;
+	border-radius: var(--radius-control);
+	border: 1px solid var(--night-edge);
+	background: var(--night-control);
+	box-shadow: 0 12px 32px rgb(0 0 0 / 0.45);
+	font-size: 13px;
+	font-weight: 400;
+	line-height: 1.5;
+	color: var(--starlight);
+	text-align: left;
+	white-space: normal;
+	visibility: hidden;
+	opacity: 0;
+	transition: opacity 150ms var(--ease-out), visibility 150ms var(--ease-out);
+}
+.tip.is-left .tip-text {
+	right: auto;
+	left: -8px;
+}
+/* Below the icon when the window has no room for it above. */
+.tip.is-below .tip-text {
+	bottom: auto;
+	top: calc(100% + 12px);
+}
+/* The arrow at its foot, over the middle of the icon. */
+.tip::after {
+	content: '';
+	position: absolute;
+	z-index: 26;
+	left: calc(50% - 5px);
+	bottom: calc(100% + 7px);
+	width: 10px;
+	height: 10px;
+	rotate: 45deg;
+	background: var(--night-control);
+	border-right: 1px solid var(--night-edge);
+	border-bottom: 1px solid var(--night-edge);
+	visibility: hidden;
+	opacity: 0;
+	transition: opacity 150ms var(--ease-out), visibility 150ms var(--ease-out);
+}
+.tip.is-below::after {
+	bottom: auto;
+	top: calc(100% + 7px);
+	border: 0;
+	border-left: 1px solid var(--night-edge);
+	border-top: 1px solid var(--night-edge);
+}
+/* The gap between the icon and the tooltip belongs to the tooltip, so the pointer can move onto it and keep it. */
+.tip-text::before {
+	content: '';
+	position: absolute;
+	inset: 100% 0 auto;
+	height: 12px;
+}
+.tip.is-below .tip-text::before {
+	inset: auto 0 100%;
+}
+.tip.is-open .tip-text,
+.tip.is-open::after {
+	visibility: visible;
+	opacity: 1;
+}
+/* An open tooltip lies over one that still fades out beside it. */
+.tip.is-open .tip-text {
+	z-index: 27;
+}
+.tip.is-open::after {
+	z-index: 28;
+}
+@media (prefers-reduced-motion: reduce) {
+	.tip-text,
+	.tip::after {
+		transition: none;
+	}
 }
 .dl-list {
 	margin-top: 28px;

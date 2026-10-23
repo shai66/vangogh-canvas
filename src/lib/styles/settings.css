@@ -91,9 +91,14 @@ dialog.pin[open] {
 	text-wrap: pretty;
 }
 
-/* The settings sheet. On a phone it fills the screen, as narrow.css makes every .detail-inner do. */
+/* The settings sheet. On a phone it fills the screen, as narrow.css makes every .detail-inner do. On a computer it
+   reaches the window's bottom, without a margin or rounded corners there, so its foot stands in one place in every tab
+   (0.12.0, spec 2026-10-21-canvas-settings-tabs-design.md, section 3). */
 .settings-inner {
 	width: min(780px, 100% - 48px);
+	margin-bottom: 0;
+	border-bottom-left-radius: 0;
+	border-bottom-right-radius: 0;
 }
 .settings-head {
 	padding: 40px 88px 0 44px;
@@ -102,6 +107,38 @@ dialog.pin[open] {
 .settings-notice {
 	max-width: none;
 	margin: 22px 44px 0;
+}
+/* From the tabs down the sheet is at least as high as the window: a short tab can be scrolled until its tabs are held
+   at the top, so a tab chosen from the held row moves nothing. A pixel more, since the sheet scrolls by whole pixels
+   and the tabs start between two. The section grows, so the foot stays at the bottom. */
+.settings-body {
+	display: flex;
+	flex-direction: column;
+	min-height: calc(100dvh + 1px);
+	margin-top: 18px;
+}
+.settings-section {
+	flex: 1;
+}
+/* The tabs of the file list (download.css), their first words where the panels' edges are. Held at the top while a
+   section scrolls under it, and only then with the sheet's night behind them, so no text runs through them. */
+.settings-tabs {
+	position: sticky;
+	top: 0;
+	z-index: 3;
+	padding: 0 32px;
+}
+.settings-tabs.is-held {
+	background: var(--night);
+}
+.settings-tabs .tabs {
+	padding: 0;
+}
+.settings-tabs .tabs button .ic {
+	font-size: 17px;
+}
+.settings-tabs .tabs button[aria-selected='true'] .ic {
+	color: var(--accent);
 }
 /* The panels are the glance panels' boxes: the raised night at 0.82, the night line as edge. */
 .settings-panel {
@@ -118,6 +155,19 @@ dialog.pin[open] {
 	padding: 0;
 	margin-bottom: 4px;
 	flex-wrap: wrap;
+}
+/* Batocera is experimental: a yellow pill after the panel's title, as high as the cards' pills. */
+.section-title .set-tag {
+	align-self: center;
+	padding: 0 7px;
+	height: 17px;
+	border-radius: 9px;
+	background: color-mix(in srgb, var(--accent) 16%, transparent);
+	color: var(--accent);
+	font-size: 12px;
+	line-height: 17px;
+	font-weight: 600;
+	white-space: nowrap;
 }
 /* A row: its name on the left, its chips on the right, a faint line between rows. */
 .set-row {
@@ -211,28 +261,273 @@ dialog.pin[open] {
 	translate: 20px 0;
 	background: var(--accent-ink);
 }
-/* The foot of the sheet: "Saved", until when this browser is unlocked, and "Lock" on the right. */
+/* The Batocera chip of "Preferred platform" waits until Batocera is set up (0.12.0, section 8). */
+.settings-panel button.chip[aria-disabled='true'] {
+	opacity: 0.42;
+	cursor: default;
+}
+.settings-panel button.chip[aria-disabled='true']:not([aria-pressed='true']):hover {
+	color: var(--starlight-dim);
+	border-color: var(--night-edge);
+}
+.settings-panel .btn:disabled {
+	cursor: default;
+}
+/* The panel "Batocera" (0.12.0, section 9): while it is off the rows stay where they are, dimmed and not usable. */
+.settings-panel .is-off {
+	opacity: 0.42;
+}
+/* Its rows have their name at the top, beside a text box of 40 px or the small button. */
+.bato-settings .set-row {
+	align-items: start;
+}
+.bato-settings .set-row > .set-k {
+	padding-top: 10px;
+}
+.bato-settings .set-row > .set-k-button {
+	padding-top: 6px;
+}
+.set-field {
+	display: grid;
+	justify-items: start;
+	gap: 6px;
+	min-width: 0;
+}
+.set-field .set-hint {
+	margin-left: 0;
+}
+.set-input {
+	width: min(100%, 300px);
+	height: 40px;
+	padding: 0 12px;
+	border-radius: var(--radius-control);
+	border: 1px solid var(--night-edge);
+	background: var(--night);
+	color: var(--starlight);
+}
+.set-input:hover {
+	border-color: var(--starlight-faint);
+}
+.set-input:focus-visible {
+	outline-offset: 1px;
+	border-color: transparent;
+}
+.set-input::placeholder {
+	color: var(--starlight-faint);
+}
+/* What Canvas cannot take is not saved, and waits to be mended. */
+.set-input[aria-invalid='true'] {
+	border-color: var(--danger);
+}
+/* 16 px on a touch screen: a phone zooms into a field whose text is smaller when it gets the focus. */
+@media (pointer: coarse) {
+	.set-input {
+		font-size: 16px;
+	}
+}
+/* The lines of the connection test and of the wake test: there before a test, each in the room of its longest text. */
+.set-checks {
+	display: grid;
+	gap: 7px;
+	margin: 12px 0 0;
+	padding: 0;
+	list-style: none;
+	font-size: 13.5px;
+	color: var(--starlight-dim);
+}
+.set-checks > li {
+	display: flex;
+	align-items: flex-start;
+	gap: 9px;
+}
+.set-checks .bato-icon {
+	margin-top: 1px;
+	font-size: 17px;
+}
+.set-checks .stack {
+	flex: 1;
+	min-width: 0;
+}
+.set-checks .is-todo {
+	color: var(--starlight-faint);
+}
+.set-checks .is-todo .ic {
+	opacity: 0.55;
+}
+.set-checks .is-ok .ic {
+	color: var(--accent);
+}
+.set-checks .is-bad {
+	color: var(--starlight);
+}
+.set-checks .is-bad .ic {
+	color: var(--danger);
+}
+.set-checks .is-warn .ic {
+	color: var(--starlight);
+}
+.set-checks .check-mac {
+	color: var(--starlight-faint);
+	font-variant-numeric: tabular-nums;
+}
+/* Its room is kept before a test. */
+.set-checks .check-mac.is-hidden {
+	visibility: hidden;
+}
+/* "Test wake" and its one line, under the words of the switch. */
+.set-act {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 10px 14px;
+	margin-top: 12px;
+}
+.set-act .set-checks {
+	margin: 0;
+}
+/* The Server tab (spec 2026-10-21, sections 4 and 5). "This Canvas": what the server says, as rows of a name and its
+   value, as the settings' rows are, and fainter what goes with it. */
+.set-facts {
+	display: grid;
+	grid-template-columns: 120px minmax(0, 1fr);
+	gap: 0 16px;
+	margin: 4px 0 12px;
+}
+.set-facts dt,
+.set-facts dd {
+	margin: 0;
+	padding: 10px 0;
+	border-top: 1px solid var(--night-line);
+	font-size: 14px;
+}
+.set-facts dt:first-of-type,
+.set-facts dt:first-of-type + dd {
+	border-top: 0;
+}
+.set-facts dt {
+	color: var(--starlight);
+}
+.set-facts dd {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	align-items: start;
+	gap: 4px 10px;
+	color: var(--starlight-dim);
+	font-variant-numeric: tabular-nums;
+}
+/* A fact's value and what goes with it stay on one line, whatever the server says, so a row keeps its height: what does
+   not fit ends in an ellipsis, and its title says all of it. The value gives way last. */
+.set-line {
+	display: flex;
+	align-items: baseline;
+	gap: 10px;
+	min-width: 0;
+}
+.set-facts .set-value {
+	display: inline-flex;
+	flex: none;
+	align-items: baseline;
+	gap: 10px;
+	min-width: 0;
+	max-width: 100%;
+}
+.set-text,
+.set-faint {
+	min-width: 0;
+	max-width: 100%;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+.set-faint {
+	color: var(--starlight-faint);
+	font-size: 13px;
+}
+/* A small pill after a value: green when it is fine, yellow for a newer Canvas (a link to it), red when it is not. */
+.set-pill {
+	align-self: center;
+	padding: 0 7px;
+	height: 17px;
+	border-radius: 9px;
+	background: color-mix(in srgb, var(--ok) 14%, transparent);
+	color: var(--ok);
+	font-size: 12px;
+	line-height: 17px;
+	font-weight: 600;
+	white-space: nowrap;
+}
+.set-pill.is-new {
+	background: color-mix(in srgb, var(--accent) 16%, transparent);
+	color: var(--accent);
+	text-decoration: none;
+}
+.set-pill.is-bad {
+	background: var(--danger-wash);
+	color: var(--danger);
+}
+/* "Read now", at the end of the library's line: both its words in one room, so it keeps its width while it reads. */
+.set-read-now {
+	align-self: center;
+}
+.set-read-now .ic {
+	font-size: 15px;
+}
+.set-read-now .stack {
+	justify-items: center;
+}
+/* "Starts from REBUILD_AT in the stack.": the name as the stack has it. */
+.set-from {
+	font-size: 12.5px;
+	color: var(--starlight-faint);
+}
+.set-from code {
+	font-family: inherit;
+	color: var(--starlight-dim);
+}
+.set-field input[type='time'] {
+	max-width: 150px;
+}
+.set-field select.set-input {
+	max-width: 300px;
+	font: inherit;
+	appearance: auto;
+}
+/* The foot of the sheet: "Saved", until when this browser is unlocked, and "Lock" on the right. Held at the window's
+   bottom, with the sheet's night behind it. */
 .settings-foot {
+	position: sticky;
+	bottom: 0;
+	z-index: 3;
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
 	gap: 10px 18px;
-	margin-top: 28px;
-	padding: 18px 44px 26px;
+	margin-top: 22px;
+	padding: 14px 44px 16px;
 	border-top: 1px solid var(--night-line);
+	background: var(--night);
 	font-size: 13.5px;
 	color: var(--starlight-dim);
 }
-/* Its room is kept while it is not shown: it only shows. */
-.settings-foot .saved {
+/* "Saved" and "Not saved" in one room, kept while neither is shown: they only show. */
+.settings-foot .saved-room {
+	display: inline-grid;
+}
+.settings-foot .saved-room > span {
+	grid-area: 1 / 1;
 	display: inline-flex;
 	align-items: center;
 	gap: 6px;
-	color: var(--accent);
 	font-weight: 600;
 	visibility: hidden;
 }
-.settings-foot .saved.is-shown {
+.settings-foot .saved {
+	color: var(--accent);
+}
+.settings-foot .not-saved {
+	color: var(--danger);
+}
+.settings-foot .saved-room > .is-shown {
 	visibility: visible;
 }
 .settings-lock {
@@ -246,8 +541,28 @@ dialog.pin[open] {
 	.settings-head {
 		padding: 20px 64px 0 16px;
 	}
+	/* The tabs without their icons, spread over the width up to the close button's room: the button stays over the row's
+	   right end while the row is held, and no tab lies under it. */
+	.settings-body {
+		margin-top: 12px;
+	}
+	.settings-tabs {
+		padding: 0 8px;
+	}
+	.settings-tabs .tabs {
+		justify-content: space-between;
+		gap: 0;
+		padding-right: 52px;
+	}
+	.settings-tabs .tabs button {
+		padding: 13px 8px 12px;
+	}
+	.settings-tabs .tabs button .ic {
+		display: none;
+	}
 	.settings-foot {
-		padding: 16px 16px 24px;
+		padding: 10px 16px 12px;
+		row-gap: 6px;
 	}
 	.settings-notice,
 	.settings-panel {
@@ -258,10 +573,42 @@ dialog.pin[open] {
 		padding: 16px 16px 4px;
 	}
 }
-/* On a phone, and in a narrow window, the name of a row stands above its chips. */
+/* On a phone, and in a narrow window, the name of a row stands above its chips. A fact's value, what goes with it and
+   "Read now" each have a line of their own, so a value that comes moves nothing. */
 @media (max-width: 640px) {
 	.set-row {
 		grid-template-columns: minmax(0, 1fr);
+	}
+	.set-facts {
+		grid-template-columns: minmax(0, 1fr);
+	}
+	.set-facts dd {
+		grid-template-columns: minmax(0, 1fr);
+		justify-items: start;
+		border-top: 0;
+		padding-top: 0;
+	}
+	.set-line {
+		display: grid;
+		justify-items: start;
+		gap: 4px;
+	}
+	.set-read-now {
+		margin-top: 6px;
+	}
+	.bato-settings .set-row > .set-k {
+		padding-top: 0;
+	}
+}
+/* A narrow phone, down to 320 px: the tabs in smaller type and closer together, so the four fit beside the close
+   button's corner. The first tab's words stay where the panels' edges are. */
+@media (max-width: 370px) {
+	.settings-tabs {
+		padding-left: 11px;
+	}
+	.settings-tabs .tabs button {
+		padding: 13px 5px 12px;
+		font-size: 13px;
 	}
 }
 @media (prefers-reduced-motion: reduce) {

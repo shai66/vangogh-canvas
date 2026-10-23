@@ -47,6 +47,7 @@ function detail(e: ListEntry, o: Partial<Detail> = {}): Detail {
 		screenshots: [],
 		backdrop: null,
 		macNotice: null,
+		dos: false,
 		requirements: {},
 		storeUrl: null,
 		rating: null,

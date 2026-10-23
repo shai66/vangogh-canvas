@@ -16,11 +16,14 @@ describe('the motion of the page', () => {
 		expect(sheets.find(([name]) => name === 'tokens.css')?.[1]).toContain('--ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);');
 	});
 
-	it('eases every transition and animation with it; only the running title is linear', () => {
+	it('eases every transition and animation with it; only the running title and the turning icon are linear', () => {
 		for (const [name, css] of sheets) {
 			for (const line of css.split('\n').filter((l) => /^\s*(transition|animation):/.test(l))) {
 				if (/:\s*none;/.test(line)) continue;
-				expect(line.includes('var(--ease-out)') || line.includes('title-run'), `${name}: ${line.trim()}`).toBe(true);
+				// The turning icon turns at an even speed: the main button's "Starting…", the connection test and "Read now"
+				// (0.12.0). The note of Batocera no longer turns (spec 2026-10-21, section 4).
+				const turning = name === 'download.css' && /animation: turn /.test(line);
+				expect(line.includes('var(--ease-out)') || line.includes('title-run') || turning, `${name}: ${line.trim()}`).toBe(true);
 			}
 		}
 	});

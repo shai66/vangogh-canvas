@@ -135,6 +135,8 @@ export interface Detail extends Omit<ListEntry, 'dlc'> {
 	backdrop: string | null;
 	/** What GOG says about the macOS installer of the game ("Mac notice"), as plain text. Null when GOG says nothing. */
 	macNotice: string | null;
+	/** True when the game runs in DOSBox. */
+	dos: boolean;
 	/** GOG's system requirements. Empty when GOG lists none. */
 	requirements: Requirements;
 	/** The game's page on GOG.com, always an https address on www.gog.com, or null. */

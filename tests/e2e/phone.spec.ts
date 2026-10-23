@@ -1,33 +1,5 @@
-import type { Locator, Page } from '@playwright/test';
-import { expect, test, UA } from './helpers';
-
-/**
- * How many pixels of a control a finger can reach: from the middle of its box, walk
- * up and down (or left and right) while the element under that point is the control or
- * inside it. A pseudo-element of the control is hit as the control itself.
- */
-async function reach(page: Page, locator: Locator): Promise<{ height: number; width: number }> {
-	const handle = await locator.first().elementHandle();
-	expect(handle).not.toBeNull();
-	return page.evaluate((node) => {
-		const box = node!.getBoundingClientRect();
-		const cx = box.left + box.width / 2;
-		const cy = box.top + box.height / 2;
-		const hits = (x: number, y: number) => {
-			const found = document.elementFromPoint(x, y);
-			return !!found && (found === node || node!.contains(found));
-		};
-		const walk = (dx: number, dy: number) => {
-			let n = 0;
-			while (n < 200 && hits(cx + dx * (n + 1), cy + dy * (n + 1))) n++;
-			return n;
-		};
-		return {
-			height: 1 + walk(0, -1) + walk(0, 1),
-			width: 1 + walk(-1, 0) + walk(1, 0)
-		};
-	}, handle);
-}
+import type { Page } from '@playwright/test';
+import { expect, reach, test, UA } from './helpers';
 
 test.describe('on a phone, the page does not zoom or keep a pointer look', () => {
 	test.use({ userAgent: UA.phone, viewport: { width: 390, height: 844 }, hasTouch: true });

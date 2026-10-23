@@ -321,3 +321,93 @@ describe('Scheduler', () => {
 		scheduler.stop();
 	});
 });
+
+// Spec of the settings tabs, section 8.2: a new time or zone is scheduled as at a start.
+describe('Scheduler.reschedule', () => {
+	/** A scheduler of 04:30 in UTC, whose clock reads `clock.at`. */
+	function onClock(at: string) {
+		const clock = { at: new Date(at) };
+		const rebuilder: Rebuilding & { starts: number } = {
+			starts: 0,
+			onResult: null,
+			start() {
+				this.starts++;
+				return 'started';
+			}
+		};
+		const scheduler = new Scheduler({ rebuilder, rebuildAt: '04:30', timeZone: 'UTC', log: silentLogger, now: () => clock.at });
+		return { clock, rebuilder, scheduler };
+	}
+
+	/** Started at 02:00, then today's daily rebuild at 04:30; the clock is at 10:00. */
+	function afterTodaysRead() {
+		const s = onClock('2026-09-29T02:00:00Z');
+		s.scheduler.start();
+		s.clock.at = new Date('2026-09-29T04:30:00Z');
+		s.scheduler.tick();
+		expect(s.rebuilder.starts).toBe(2);
+		s.clock.at = new Date('2026-09-29T10:00:00Z');
+		return s;
+	}
+
+	it('waits for tomorrow when the new time is already past', () => {
+		const { clock, rebuilder, scheduler } = afterTodaysRead();
+		scheduler.reschedule('03:00', 'UTC');
+		scheduler.tick();
+		expect(rebuilder.starts).toBe(2);
+		clock.at = new Date('2026-09-30T03:00:00Z');
+		scheduler.tick();
+		expect(rebuilder.starts).toBe(3);
+		scheduler.stop();
+	});
+
+	it('runs today when the new time is still ahead, and not at once', () => {
+		const { clock, rebuilder, scheduler } = afterTodaysRead();
+		scheduler.reschedule('18:00', 'UTC');
+		scheduler.tick();
+		expect(rebuilder.starts).toBe(2);
+		clock.at = new Date('2026-09-29T18:00:00Z');
+		scheduler.tick();
+		scheduler.tick();
+		expect(rebuilder.starts).toBe(3);
+		scheduler.stop();
+	});
+
+	it("reads the new time on the new zone's clock", () => {
+		const { clock, rebuilder, scheduler } = onClock('2026-09-29T01:00:00Z');
+		scheduler.start();
+		// 11:00 in Tokyo, while UTC's 04:30 is still ahead.
+		clock.at = new Date('2026-09-29T02:00:00Z');
+		scheduler.reschedule('09:00', 'Asia/Tokyo');
+		scheduler.tick();
+		// 23:59 in Tokyo.
+		clock.at = new Date('2026-09-29T14:59:00Z');
+		scheduler.tick();
+		expect(rebuilder.starts).toBe(1);
+		// 09:00 in Tokyo the next day.
+		clock.at = new Date('2026-09-30T00:00:00Z');
+		scheduler.tick();
+		expect(rebuilder.starts).toBe(2);
+		scheduler.stop();
+	});
+
+	it('never starts a read itself', () => {
+		const { rebuilder, scheduler } = afterTodaysRead();
+		for (const [time, zone] of [['03:00', 'UTC'], ['18:00', 'UTC'], ['09:00', 'Asia/Tokyo'], ['10:00', 'UTC']]) {
+			scheduler.reschedule(time, zone);
+			expect(rebuilder.starts, `${time} ${zone}`).toBe(2);
+		}
+		scheduler.stop();
+	});
+
+	// A save of another setting reschedules with the same values: a daily rebuild that is due must stay due.
+	it('keeps a daily rebuild that is due when the time and the zone stay the same', () => {
+		const { clock, rebuilder, scheduler } = onClock('2026-09-29T02:00:00Z');
+		scheduler.start();
+		clock.at = new Date('2026-09-29T04:30:10Z');
+		scheduler.reschedule('04:30', 'UTC');
+		scheduler.tick();
+		expect(rebuilder.starts).toBe(2);
+		scheduler.stop();
+	});
+});

@@ -1,4 +1,4 @@
-# vangogh and Canvas in one stack. Tested with vangogh v1.2.20; other
+# vangogh and Canvas in one stack. Tested with vangogh v1.2.21; other
 # versions were not checked.
 #
 # 1. Copy this file into a folder of its own as compose.yml, and put the
@@ -53,11 +53,17 @@ services:
     restart: unless-stopped
     depends_on:
       - vangogh
+    # Waking a Batocera box needs the host's network. Uncomment
+    # network_mode and the second VANGOGH_URL, and comment out ports and the
+    # first VANGOGH_URL: Canvas then listens on the host at port 1854, and
+    # the service name vangogh no longer resolves.
+    # network_mode: host
     ports:
       - "${CANVAS_PORT:-1854}:1854"
     environment:
       # The service name resolves on the stack's network: no host address needed.
       VANGOGH_URL: http://vangogh:1853
+      # VANGOGH_URL: http://127.0.0.1:1853
       VANGOGH_USERNAME: ${VANGOGH_USERNAME:?set VANGOGH_USERNAME in .env}
       VANGOGH_PASSWORD: ${VANGOGH_PASSWORD:?set VANGOGH_PASSWORD in .env}
       REBUILD_AT: ${REBUILD_AT:-04:30}

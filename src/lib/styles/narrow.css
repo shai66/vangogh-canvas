@@ -168,6 +168,39 @@
 		width: 44px;
 		height: 44px;
 	}
+	/* The icon buttons with a tooltip are drawn 26 px: a finger reaches 44 by 44. */
+	.tip-btn::after {
+		inset: -9px;
+	}
+	/* The line under the button (spec 2026-10-21, 3.1), 12 px below it, as wide as the block: its two lines at the top
+	   and the room of the bar under them, and slots a finger reaches. */
+	.dl-main .bato-line {
+		--slot: 44px;
+		flex-basis: 100%;
+		width: 100%;
+		height: calc(1.4 * 15.5px + 1.4 * 14px + 10px);
+		align-items: flex-start;
+	}
+	.dl-main .bato-line.is-tall {
+		height: calc(1.4 * 15.5px + 2 * 1.4 * 14px + 10px);
+	}
+	/* Batocera's note (spec 2026-10-21, section 4): the buttons under its two lines, 10 px below them, and their room
+	   kept when it has none, so it is as high in every state. N7's "i" leads them, so the text keeps its width; its
+	   tooltip starts from the icon's left edge, where the window has room for it. */
+	.bato-note {
+		grid-template-columns: 20px minmax(0, 1fr);
+		grid-template-rows: calc(2 * 1.45 * 14px) auto;
+		align-items: start;
+		height: calc(24px + 2 * 1.45 * 14px + 10px + 40px);
+	}
+	.bato-acts {
+		grid-column: 2;
+		margin-top: 10px;
+	}
+	.bato-note .tip-text {
+		right: auto;
+		left: -8px;
+	}
 	.os-toggle {
 		height: 44px;
 	}

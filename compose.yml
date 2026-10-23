@@ -4,6 +4,11 @@ services:
     image: vangogh-canvas:local
     container_name: vangogh-canvas
     restart: unless-stopped
+    # CANVAS_NETWORK=host, in .env or as a variable of the stack, puts Canvas
+    # on the host's network, which waking Batocera needs. Canvas then
+    # listens on the host at port 1854, and ports and CANVAS_PORT no longer
+    # apply.
+    network_mode: ${CANVAS_NETWORK:-bridge}
     ports:
       - "${CANVAS_PORT:-1854}:1854"
     environment:

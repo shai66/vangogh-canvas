@@ -45,6 +45,8 @@ export interface ApiProductOptions {
 	backdrop?: string;
 	/** The date of the original release, as GOG writes it: "2002-09-27T00:00:00+02:00". */
 	released?: string;
+	/** Written as the top-level `isUsingDosBox`. */
+	dos?: boolean;
 	/** The field `additionalRequirements`: HTML with notes of all kinds, GOG's "Mac notice" among them. */
 	additional?: string;
 	/** The address of the game's page on GOG.com, `_links.store.href`. */
@@ -71,6 +73,7 @@ export function apiProduct(o: ApiProductOptions): unknown {
 		overview: '',
 		featuresDescription: '',
 		additionalRequirements: o.additional ?? '',
+		...(o.dos ? { isUsingDosBox: true } : {}),
 		_embedded: {
 			product: {
 				title: o.title,

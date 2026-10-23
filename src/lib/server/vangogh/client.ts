@@ -43,6 +43,8 @@ export interface VangoghSource {
 	availableProducts(): Promise<unknown>;
 	metadata(type: MetadataType, id: string): Promise<unknown | null>;
 	filenames(id: string): Promise<Record<string, string>>;
+	/** The MD5 of each file of a product, by manual URL. Empty when vangogh has none. */
+	checksums?(productId: string): Promise<Record<string, string>>;
 	/** The name of a file when it is on disk, null when it is not. */
 	fileOnDisk(address: FileAddress): Promise<string | null>;
 }
@@ -308,6 +310,18 @@ export class VangoghClient implements VangoghSource, VangoghFiles {
 			}
 		}
 		return names;
+	}
+
+	async checksums(productId: string): Promise<Record<string, string>> {
+		validateId(productId);
+		const body = await this.#json(`/api/gog/checksums/${encodeURIComponent(productId)}`);
+		const sums: Record<string, string> = {};
+		if (body !== null && typeof body === 'object' && !Array.isArray(body)) {
+			for (const [manualUrl, md5] of Object.entries(body)) {
+				if (typeof md5 === 'string' && md5 !== '') sums[manualUrl] = md5;
+			}
+		}
+		return sums;
 	}
 
 	async image(

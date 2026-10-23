@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { Target } from '$lib/download/plan';
 	import { t } from '$lib/strings';
 	import type { Os } from '$lib/types';
 	import Icon from './Icon.svelte';
@@ -6,8 +7,8 @@
 	interface Props {
 		/** The systems to choose from: those the game itself has files for. */
 		systems: Os[];
-		/** The one the main button downloads for now. */
-		target: Os;
+		/** What the main button is for now: a system, or Batocera. */
+		target: Target;
 		/** The visitor's own system, which the menu marks. Null when it is none of these. */
 		own: Os | null;
 		/** What a system holds: "3 files, 7.5 GB". */
@@ -16,9 +17,15 @@
 		primary: boolean;
 		/** The system whose row carries the sign of a note, and whether GOG itself says it. Null when there is no note. */
 		flag: { os: Os; sure: boolean } | null;
-		onpick: (os: Os) => void;
+		/** The row of Batocera after the systems, with its state; null while Batocera is not shown (spec 0.12.0, section 7.1). */
+		batocera: { text: string; on: boolean; disabled: boolean } | null;
+		onpick: (target: Target) => void;
 	}
-	let { systems, target, own, summary, primary, flag, onpick }: Props = $props();
+	let { systems, target, own, summary, primary, flag, batocera, onpick }: Props = $props();
+
+	const name = $derived(batocera ? t.download.anotherOrBatocera : t.download.another);
+	/** Every state the row of Batocera can say, in one place, so that the menu keeps its width while it changes. */
+	const states = Object.values(t.batocera.menu);
 
 	let open = $state(false);
 	let arrow: HTMLButtonElement;
@@ -29,8 +36,8 @@
 		if (refocus) arrow.focus();
 	}
 
-	function pick(os: Os) {
-		onpick(os);
+	function pick(to: Target) {
+		onpick(to);
 		close(true);
 	}
 
@@ -98,15 +105,15 @@
 	type="button"
 	aria-haspopup="menu"
 	aria-expanded={open}
-	title={t.download.another}
+	title={name}
 	onclick={() => (open = !open)}
 	onkeydown={keydown}
 >
-	<Icon name="down" /><span class="sr">{t.download.another}</span>
+	<Icon name="down" /><span class="sr">{name}</span>
 </button>
 {#if open}
 	<!-- svelte-ignore a11y_interactive_supports_focus -->
-	<div class="menu" role="menu" aria-label={t.download.another} bind:this={menu} onkeydown={keydown}>
+	<div class="menu" role="menu" aria-label={name} bind:this={menu} onkeydown={keydown}>
 		{#each systems as os (os)}
 			<button type="button" role="menuitemradio" aria-checked={os === target} tabindex="-1" onclick={() => pick(os)}>
 				<Icon name={os} />
@@ -121,5 +128,27 @@
 				<span class="check"><Icon name="check" /></span>
 			</button>
 		{/each}
+		{#if batocera}
+			{@const off = batocera.disabled}
+			<div class="menu-sep" role="separator"></div>
+			<!-- A row that cannot be picked stays in the keys' way, as a menu's disabled item does. -->
+			<button
+				type="button"
+				role="menuitemradio"
+				aria-checked={target === 'batocera'}
+				aria-disabled={off || undefined}
+				tabindex="-1"
+				onclick={() => off || pick('batocera')}
+			>
+				<Icon name="tv" />
+				<span class="name">{t.batocera.name}</span>
+				<span class="n stack" class:is-on={batocera.on}>
+					{#each states as text (text)}
+						<span class:on={text === batocera.text} aria-hidden={text !== batocera.text}>{text}</span>
+					{/each}
+				</span>
+				<span class="check"><Icon name="check" /></span>
+			</button>
+		{/if}
 	</div>
 {/if}

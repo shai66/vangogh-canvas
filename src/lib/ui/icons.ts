@@ -2,17 +2,21 @@
 // <svg> with a 256 by 256 view box, drawn in the current text colour.
 
 import airplaneTiltSvg from '@phosphor-icons/core/regular/airplane-tilt.svg?raw';
+import arrowsClockwiseSvg from '@phosphor-icons/core/regular/arrows-clockwise.svg?raw';
 import arrowUpRightSvg from '@phosphor-icons/core/regular/arrow-up-right.svg?raw';
 import binocularsSvg from '@phosphor-icons/core/regular/binoculars.svg?raw';
 import bookBookmarkSvg from '@phosphor-icons/core/regular/book-bookmark.svg?raw';
 import bookOpenSvg from '@phosphor-icons/core/regular/book-open.svg?raw';
+import booksSvg from '@phosphor-icons/core/regular/books.svg?raw';
 import boxingGloveSvg from '@phosphor-icons/core/regular/boxing-glove.svg?raw';
 import campfireSvg from '@phosphor-icons/core/regular/campfire.svg?raw';
 import cardsSvg from '@phosphor-icons/core/regular/cards.svg?raw';
 import castleTurretSvg from '@phosphor-icons/core/regular/castle-turret.svg?raw';
 import chartBarSvg from '@phosphor-icons/core/regular/chart-bar.svg?raw';
 import chartLineUpSvg from '@phosphor-icons/core/regular/chart-line-up.svg?raw';
+import checkCircleSvg from '@phosphor-icons/core/regular/check-circle.svg?raw';
 import checkSvg from '@phosphor-icons/core/regular/check.svg?raw';
+import circleNotchSvg from '@phosphor-icons/core/regular/circle-notch.svg?raw';
 import citySvg from '@phosphor-icons/core/regular/city.svg?raw';
 import closeSvg from '@phosphor-icons/core/regular/x.svg?raw';
 import compassSvg from '@phosphor-icons/core/regular/compass.svg?raw';
@@ -22,6 +26,7 @@ import crosshairSvg from '@phosphor-icons/core/regular/crosshair.svg?raw';
 import cursorClickSvg from '@phosphor-icons/core/regular/cursor-click.svg?raw';
 import desktopSvg from '@phosphor-icons/core/regular/desktop.svg?raw';
 import detectiveSvg from '@phosphor-icons/core/regular/detective.svg?raw';
+import devicesSvg from '@phosphor-icons/core/regular/devices.svg?raw';
 import downSvg from '@phosphor-icons/core/regular/caret-down.svg?raw';
 import downloadSvg from '@phosphor-icons/core/regular/download-simple.svg?raw';
 import eyeSlashSvg from '@phosphor-icons/core/regular/eye-slash.svg?raw';
@@ -29,6 +34,9 @@ import eyeSvg from '@phosphor-icons/core/regular/eye.svg?raw';
 import filmStripSvg from '@phosphor-icons/core/regular/film-strip.svg?raw';
 import filterSvg from '@phosphor-icons/core/regular/funnel.svg?raw';
 import flagCheckeredSvg from '@phosphor-icons/core/regular/flag-checkered.svg?raw';
+import flagFillSvg from '@phosphor-icons/core/fill/flag-fill.svg?raw';
+import flagSvg from '@phosphor-icons/core/regular/flag.svg?raw';
+import gameControllerSvg from '@phosphor-icons/core/regular/game-controller.svg?raw';
 import gearSixSvg from '@phosphor-icons/core/regular/gear-six.svg?raw';
 import ghostSvg from '@phosphor-icons/core/regular/ghost.svg?raw';
 import giftSvg from '@phosphor-icons/core/regular/gift.svg?raw';
@@ -36,6 +44,7 @@ import githubLogoSvg from '@phosphor-icons/core/regular/github-logo.svg?raw';
 import globeHemisphereWestSvg from '@phosphor-icons/core/regular/globe-hemisphere-west.svg?raw';
 import hammerSvg from '@phosphor-icons/core/regular/hammer.svg?raw';
 import handFistSvg from '@phosphor-icons/core/regular/hand-fist.svg?raw';
+import hardDrivesSvg from '@phosphor-icons/core/regular/hard-drives.svg?raw';
 import hourglassMediumSvg from '@phosphor-icons/core/regular/hourglass-medium.svg?raw';
 import imageSvg from '@phosphor-icons/core/regular/image.svg?raw';
 import infoSvg from '@phosphor-icons/core/regular/info.svg?raw';
@@ -47,11 +56,16 @@ import linuxSvg from '@phosphor-icons/core/fill/linux-logo-fill.svg?raw';
 import macosSvg from '@phosphor-icons/core/fill/apple-logo-fill.svg?raw';
 import magicWandSvg from '@phosphor-icons/core/regular/magic-wand.svg?raw';
 import mapTrifoldSvg from '@phosphor-icons/core/regular/map-trifold.svg?raw';
+import minusCircleSvg from '@phosphor-icons/core/regular/minus-circle.svg?raw';
 import monitorSvg from '@phosphor-icons/core/regular/monitor.svg?raw';
 import multiplayerSvg from '@phosphor-icons/core/fill/users-three-fill.svg?raw';
 import musicNotesSvg from '@phosphor-icons/core/regular/music-notes.svg?raw';
 import packageSvg from '@phosphor-icons/core/regular/package.svg?raw';
 import planetSvg from '@phosphor-icons/core/regular/planet.svg?raw';
+import playSvg from '@phosphor-icons/core/regular/play.svg?raw';
+import plugsConnectedSvg from '@phosphor-icons/core/regular/plugs-connected.svg?raw';
+import powerSvg from '@phosphor-icons/core/regular/power.svg?raw';
+import prohibitSvg from '@phosphor-icons/core/regular/prohibit.svg?raw';
 import puzzlePieceSvg from '@phosphor-icons/core/regular/puzzle-piece.svg?raw';
 import rightSvg from '@phosphor-icons/core/regular/caret-right.svg?raw';
 import runSvg from '@phosphor-icons/core/fill/play-circle-fill.svg?raw';
@@ -63,14 +77,17 @@ import skullSvg from '@phosphor-icons/core/regular/skull.svg?raw';
 import stackSvg from '@phosphor-icons/core/regular/stack.svg?raw';
 import stairsSvg from '@phosphor-icons/core/regular/stairs.svg?raw';
 import steeringWheelSvg from '@phosphor-icons/core/regular/steering-wheel.svg?raw';
+import stopCircleSvg from '@phosphor-icons/core/regular/stop-circle.svg?raw';
 import strategySvg from '@phosphor-icons/core/regular/strategy.svg?raw';
 import swordSvg from '@phosphor-icons/core/regular/sword.svg?raw';
+import televisionSimpleSvg from '@phosphor-icons/core/regular/television-simple.svg?raw';
 import terminalWindowSvg from '@phosphor-icons/core/regular/terminal-window.svg?raw';
 import timerSvg from '@phosphor-icons/core/regular/timer.svg?raw';
 import userCircleSvg from '@phosphor-icons/core/regular/user-circle.svg?raw';
 import userFocusSvg from '@phosphor-icons/core/regular/user-focus.svg?raw';
 import warningSvg from '@phosphor-icons/core/fill/warning-fill.svg?raw';
 import windowsSvg from '@phosphor-icons/core/fill/windows-logo-fill.svg?raw';
+import xCircleSvg from '@phosphor-icons/core/regular/x-circle.svg?raw';
 
 /** What is between <svg> and </svg>. */
 function inner(svg: string): string {
@@ -147,7 +164,26 @@ export const ICONS = {
 	gear: inner(gearSixSvg),
 	lock: inner(lockKeySvg),
 	terminal: inner(terminalWindowSvg),
-	copy: inner(copySvg)
+	copy: inner(copySvg),
+	// Send to Batocera (0.12.0).
+	tv: inner(televisionSimpleSvg),
+	play: inner(playSvg),
+	stopCircle: inner(stopCircleSvg),
+	power: inner(powerSvg),
+	spinner: inner(circleNotchSvg),
+	update: inner(arrowsClockwiseSvg),
+	controller: inner(gameControllerSvg),
+	prohibit: inner(prohibitSvg),
+	flag: inner(flagSvg),
+	flagFill: inner(flagFillSvg),
+	plug: inner(plugsConnectedSvg),
+	devices: inner(devicesSvg),
+	ok: inner(checkCircleSvg),
+	fail: inner(xCircleSvg),
+	pending: inner(minusCircleSvg),
+	// The tabs of the settings (0.12.0).
+	books: inner(booksSvg),
+	hardDrives: inner(hardDrivesSvg)
 } as const;
 
 export type IconName = keyof typeof ICONS;

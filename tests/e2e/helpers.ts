@@ -1,4 +1,4 @@
-import { expect, test as base, type Page } from '@playwright/test';
+import { expect, test as base, type Locator, type Page } from '@playwright/test';
 
 export const UA = {
 	windows: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36',
@@ -49,4 +49,32 @@ export function arrived(page: Page): Promise<unknown> {
 	return page.locator('dialog.detail').evaluate((node) =>
 		Promise.all(node.getAnimations({ subtree: true }).map((animation) => animation.finished))
 	);
+}
+
+/**
+ * How many pixels of a control a finger can reach: from the middle of its box, walk
+ * up and down (or left and right) while the element under that point is the control or
+ * inside it. A pseudo-element of the control is hit as the control itself.
+ */
+export async function reach(page: Page, locator: Locator): Promise<{ height: number; width: number }> {
+	const handle = await locator.first().elementHandle();
+	expect(handle).not.toBeNull();
+	return page.evaluate((node) => {
+		const box = node!.getBoundingClientRect();
+		const cx = box.left + box.width / 2;
+		const cy = box.top + box.height / 2;
+		const hits = (x: number, y: number) => {
+			const found = document.elementFromPoint(x, y);
+			return !!found && (found === node || node!.contains(found));
+		};
+		const walk = (dx: number, dy: number) => {
+			let n = 0;
+			while (n < 200 && hits(cx + dx * (n + 1), cy + dy * (n + 1))) n++;
+			return n;
+		};
+		return {
+			height: 1 + walk(0, -1) + walk(0, 1),
+			width: 1 + walk(-1, 0) + walk(1, 0)
+		};
+	}, handle);
 }

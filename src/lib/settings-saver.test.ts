@@ -1,22 +1,29 @@
 import { describe, expect, it } from 'vitest';
-import { NO_SETTINGS, type Settings, type SettingsAnswer } from './settings';
+import { applyBody, NO_SETTINGS, toAnswer, type SettingsBody } from './settings';
 import { SettingsSaver, sendSettings, type SaveResult } from './settings-saver';
 
 /** A send whose answers the test gives by hand, in the order the sends were made. */
 function fakeSend() {
-	const sends: { next: Settings; answer: (result: SaveResult) => void }[] = [];
-	const send = (next: Settings) => new Promise<SaveResult>((resolve) => sends.push({ next, answer: resolve }));
+	const sends: { next: SettingsBody; answer: (result: SaveResult) => void }[] = [];
+	const send = (next: SettingsBody) => new Promise<SaveResult>((resolve) => sends.push({ next, answer: resolve }));
 	return { sends, send };
 }
+
+const STACK = { rebuildAt: '04:30', timeZone: 'UTC', versionCheck: true };
 
 /** Lets every promise that can settle settle. */
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-const state = (sort: Settings['defaults']['sort'], theo = false): Settings => ({ defaults: { ...NO_SETTINGS.defaults, sort }, theo });
-const saved = (next: Settings): SaveResult => {
-	const answer: SettingsAnswer = { ...next, unlockedUntil: '2026-11-19T10:00:00.000Z', writable: true };
-	return { kind: 'saved', answer };
-};
+const state = (sort: SettingsBody['defaults']['sort'], theo = false): SettingsBody => ({
+	defaults: { ...NO_SETTINGS.defaults, sort },
+	theo,
+	preferred: 'auto',
+	batocera: { on: false, address: '', user: 'root', wake: false, shutdown: false }
+});
+const saved = (next: SettingsBody): SaveResult => ({
+	kind: 'saved',
+	answer: toAnswer(applyBody(NO_SETTINGS, next), '2026-11-19T10:00:00.000Z', true, STACK, STACK)
+});
 
 describe('the saver of the settings', () => {
 	it('sends one change and gives its result', async () => {
@@ -76,10 +83,21 @@ describe('sending the settings', () => {
 	/** A fetch that answers with this status and no body. */
 	const answering = (status: number) => (() => Promise.resolve(new Response(null, { status }))) as unknown as typeof fetch;
 
+	it('sends the whole body', async () => {
+		const sent: unknown[] = [];
+		const fetcher = ((_: string, init: RequestInit) => {
+			sent.push(JSON.parse(String(init.body)));
+			return Promise.resolve(new Response(null, { status: 400 }));
+		}) as unknown as typeof fetch;
+		const next: SettingsBody = { ...state('year'), preferred: 'batocera', batocera: { ...state('year').batocera, on: true, password: 'pa ss' } };
+		await sendSettings(next, fetcher);
+		expect(sent).toEqual([next]);
+	});
+
 	it('says Canvas refused the change when it answers 403 or 404', async () => {
-		expect(await sendSettings(NO_SETTINGS, answering(403))).toEqual({ kind: 'forbidden' });
-		expect(await sendSettings(NO_SETTINGS, answering(404))).toEqual({ kind: 'forbidden' });
+		expect(await sendSettings(state('title'), answering(403))).toEqual({ kind: 'forbidden' });
+		expect(await sendSettings(state('title'), answering(404))).toEqual({ kind: 'forbidden' });
 		// Settings the server does not take stay a refusal of their own.
-		expect(await sendSettings(NO_SETTINGS, answering(400))).toEqual({ kind: 'refused' });
+		expect(await sendSettings(state('title'), answering(400))).toEqual({ kind: 'refused' });
 	});
 });

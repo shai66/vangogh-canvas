@@ -1,7 +1,18 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { parseState } from '$lib/search/state';
 import { REMEMBER_COOKIE, rememberedCookie } from '$lib/remember';
-import { listCookie, opensSheet, parsePictures, healthProblem } from './screenshots-plan.ts';
+import {
+	listCookie,
+	opensSheet,
+	parsePictures,
+	healthProblem,
+	isSettings,
+	settingsTab,
+	pinProblem,
+	withStandIn,
+	VANGOGH_STAND_IN
+} from './screenshots-plan.ts';
 
 const CANVAS = 'http://canvas.test';
 
@@ -51,6 +62,24 @@ describe('reading the pictures to take', () => {
 			);
 		}
 	);
+
+	it('refuses a tab of the settings that the sheet does not have', () => {
+		expect(() => parsePictures([`settings=${CANVAS}/settings#network`])).toThrow(
+			'The tab "network" of "settings" is not one of library, downloads, batocera, server.'
+		);
+	});
+
+	it("refuses the Batocera tab, which shows the box's address", () => {
+		expect(() => parsePictures([`settings=${CANVAS}/settings#batocera`])).toThrow(
+			'The tab "batocera" of "settings" shows the address of a Batocera box, so it is not pictured.'
+		);
+	});
+
+	it('refuses a tab whose name cannot be read', () => {
+		expect(() => parsePictures([`settings=${CANVAS}/settings#%`])).toThrow(
+			'The tab "%" of "settings" is not one of library, downloads, batocera, server.'
+		);
+	});
 
 	it('refuses addresses on two origins', () => {
 		expect(() => parsePictures([`library=${CANVAS}/`, 'game=http://other.test/game/1'])).toThrow(
@@ -134,9 +163,56 @@ describe('which addresses open a sheet', () => {
 		['/game/1', true],
 		['/collection/p1', true],
 		['/glance', true],
+		['/settings', true],
 		['/', false],
 		['/?sort=recent', false]
 	])('%s: %s', (path, sheet) => {
 		expect(opensSheet(new URL(path, CANVAS))).toBe(sheet);
+	});
+});
+
+describe('the settings sheet', () => {
+	it.each([
+		['/settings', true],
+		['/settings#server', true],
+		['/', false],
+		['/game/1#server', false]
+	])('%s is the settings: %s', (path, settings) => {
+		expect(isSettings(new URL(path, CANVAS))).toBe(settings);
+	});
+
+	it.each([
+		['/settings#server', 'server'],
+		['/settings#Server', 'server'],
+		['/settings', null],
+		['/game/1#server', null]
+	])('%s asks for the tab %s', (path, tab) => {
+		expect(settingsTab(new URL(path, CANVAS))).toBe(tab);
+	});
+
+	it.each(['2468', '12345678'])('takes the PIN %s', (pin) => {
+		expect(pinProblem(pin)).toBeNull();
+	});
+
+	it.each(['', '123', '123456789', '12a4', ' 2468'])('refuses the PIN "%s"', (pin) => {
+		expect(pinProblem(pin)).toBe("SETTINGS_PIN must be the settings' PIN: 4 to 8 digits.");
+	});
+
+	it("puts the stand-in in place of vangogh's address and keeps the rest", () => {
+		const status = { version: '0.12.0', vangogh: { url: 'http://10.0.0.5:1853', login: 'ok' }, jobs: 0 };
+		expect(withStandIn(status)).toEqual({
+			version: '0.12.0',
+			vangogh: { url: VANGOGH_STAND_IN, login: 'ok' },
+			jobs: 0
+		});
+	});
+
+	it.each([null, 'text', {}, { vangogh: null }, { vangogh: { login: 'ok' } }])('leaves %j as it is', (status) => {
+		expect(withStandIn(status)).toEqual(status);
+	});
+
+	it("is the address of vangogh in the example stack", () => {
+		const stack = readFileSync(new URL('../examples/compose.vangogh-stack.yml', import.meta.url), 'utf8');
+		expect(stack).toContain(`VANGOGH_URL: ${VANGOGH_STAND_IN}`);
 	});
 });

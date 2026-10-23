@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { genreName } from '$lib/genres';
+	import type { Preferred } from '$lib/settings';
 	import { t } from '$lib/strings';
 	import type { Collection, Detail, ListEntry, Os } from '$lib/types';
 	import type { Visitor } from '$lib/visitor';
@@ -28,8 +29,12 @@
 		onswap?: (event: MouseEvent, href: string) => void;
 		/** True while the settings switch the theo command on. */
 		theo?: boolean;
+		/** Batocera and the preferred platform, as the settings say them for this browser (0.12.0). */
+		batocera?: { ready: boolean; preferred: Preferred; unlocked: boolean; wakeOn: boolean; marked: boolean } | null;
+		/** The time zone the day of a send to Batocera is written in. */
+		timeZone?: string;
 	}
-	let { detail, visitor, onclose, ontag, collection = null, collectionGames = [], shelfOpen = false, onswap = () => {}, theo = false }: Props = $props();
+	let { detail, visitor, onclose, ontag, collection = null, collectionGames = [], shelfOpen = false, onswap = () => {}, theo = false, batocera = null, timeZone = 'UTC' }: Props = $props();
 
 	const developers = $derived(detail.developers.join(', '));
 	const hasMakers = $derived(developers !== '' || detail.publisher !== '');
@@ -102,7 +107,7 @@
 				<p class="relation">{t.detail.orphan(detail.requires)}</p>
 			{/if}
 		</div>
-		<div class="dl-slot"><DownloadBlock {detail} {visitor} onsystem={blockShows} {theo} /></div>
+		<div class="dl-slot"><DownloadBlock {detail} {visitor} onsystem={blockShows} {theo} {batocera} {timeZone} /></div>
 	</div>
 
 	{#if collection}

@@ -1,6 +1,9 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { createLogger } from './log';
+import { VangoghClient } from './vangogh/client';
+import { startFakeVangogh } from './testing/fake-vangogh';
+import { batoceraLibrary } from './testing/batocera-library';
 import { RebuildFailed, buildIndex, fileId } from './indexer';
 import { apiProduct, details, extra, file, POSTER, records } from './testing/fixtures';
 import {
@@ -40,7 +43,7 @@ describe('buildIndex', () => {
 			['2002', 'orphaned-dlc'],
 			['1003', 'game']
 		]);
-		expect(index.schema).toBe(8);
+		expect(index.schema).toBe(9);
 		expect(index.builtAt).toBe('2026-09-29T02:30:00.000Z');
 	});
 
@@ -923,6 +926,48 @@ describe('buildIndex', () => {
 				logger().log
 			)
 		).rejects.toBeInstanceOf(VangoghAuthError);
+	});
+});
+
+describe('buildIndex and the Batocera library', () => {
+	async function indexOfBatocera() {
+		const fake = await startFakeVangogh(batoceraLibrary());
+		try {
+			const client = new VangoghClient({ url: fake.url, username: 'api', password: 'secret' });
+			return await buildIndex(client, logger().log);
+		} finally {
+			await fake.close();
+		}
+	}
+
+	it('carries dos into the detail', async () => {
+		const index = await indexOfBatocera();
+		expect(index.details['3003'].dos).toBe(true);
+		expect(index.details['3001'].dos).toBe(false);
+	});
+
+	it('holds a Windows game with its DLC, a DOS game and a game with no Windows files', async () => {
+		const index = await indexOfBatocera();
+		expect(index.entries.map((e) => e.id)).toEqual(['3001', '3003', '3004']);
+		const game = index.details['3001'];
+		expect(game.title).toBe('Night Harbour');
+		expect(game.releaseYear).toBe(1999);
+		expect(game.downloads.windows?.map((f) => f.filename)).toEqual(['setup_night_harbour_1.2.exe']);
+		expect(game.dlc.map((d) => [d.title, d.downloads.windows?.length])).toEqual([['Night Harbour: Lighthouse', 1]]);
+		expect(index.details['3003'].downloads.windows).toHaveLength(1);
+		expect(index.details['3004'].downloads.windows).toBeUndefined();
+		expect(index.details['3004'].downloads.macos).toHaveLength(1);
+	});
+
+	it('keeps a file target for every installer, the DLC one included', async () => {
+		const index = await indexOfBatocera();
+		expect(Object.values(index.files).map((f) => f.filename).sort()).toEqual([
+			'cellar_quest_1.0.pkg',
+			'mac_only_tale_1.0.pkg',
+			'setup_cellar_quest_1.0.exe',
+			'setup_night_harbour_1.2.exe',
+			'setup_night_harbour_lighthouse_1.2.exe'
+		]);
 	});
 });
 

@@ -3,9 +3,22 @@
 // Each argument is name=address, quoted so that the shell keeps an address whole, and gives
 // screenshots/<name>.jpg. The addresses come at run time, so this file names no Canvas and no game.
 // It stops, and writes nothing, when that Canvas does not run the version of package.json.
+// An address /settings#<tab> pictures that tab of the settings sheet: the script asks for the PIN, or takes
+// SETTINGS_PIN, and shows the example stack's address in place of vangogh's.
 import { readFile, writeFile } from 'node:fs/promises';
 import { chromium, type Page } from '@playwright/test';
-import { listCookie, opensSheet, parsePictures, healthProblem, type Picture } from './screenshots-plan.ts';
+import {
+	listCookie,
+	opensSheet,
+	parsePictures,
+	healthProblem,
+	isSettings,
+	settingsTab,
+	pinProblem,
+	withStandIn,
+	VANGOGH_STAND_IN,
+	type Picture
+} from './screenshots-plan.ts';
 
 // Playwright hides the scrollbars by default (--hide-scrollbars), as a Mac does, so the page is 1658 wide and the picture is the whole window; the framing depends on it.
 const WIDTH = 1658;
@@ -73,7 +86,72 @@ async function settle(page: Page): Promise<void> {
 	);
 }
 
-async function shoot(page: Page, picture: Picture): Promise<Buffer> {
+/** Asks for the PIN in the terminal without showing it, as a password prompt does. */
+function askPin(): Promise<string> {
+	return new Promise((resolve) => {
+		const input = process.stdin;
+		let pin = '';
+		const onData = (keys: string) => {
+			for (const key of keys) {
+				if (key === '\u0003') {
+					process.stdout.write('\n');
+					process.exit(130);
+				}
+				if (key === '\r' || key === '\n') {
+					input.setRawMode(false);
+					input.pause();
+					input.off('data', onData);
+					process.stdout.write('\n');
+					resolve(pin);
+					return;
+				}
+				pin = key === '\u007f' ? pin.slice(0, -1) : pin + key;
+			}
+		};
+		process.stdout.write('PIN of the settings: ');
+		input.setRawMode(true);
+		input.setEncoding('utf8');
+		input.on('data', onData);
+		input.resume();
+	});
+}
+
+async function settingsPin(): Promise<string> {
+	const pin =
+		process.env.SETTINGS_PIN ??
+		(process.stdin.isTTY ? await askPin() : fail('Set SETTINGS_PIN, or run this in a terminal to be asked for the PIN.'));
+	const problem = pinProblem(pin);
+	if (problem) fail(problem);
+	return pin;
+}
+
+/** Unlocks the settings with the PIN prompt that /settings shows, then chooses the tab the address asks for. */
+async function openSettings(page: Page, picture: Picture, pin: string): Promise<void> {
+	const field = page.locator('form.pin-form input');
+	if (await field.isVisible()) {
+		await field.fill(pin);
+		await field.press('Enter');
+	}
+	const tabs = page.getByRole('tablist');
+	await tabs.waitFor({ timeout: 10_000 }).catch(() => {
+		throw new Error('did not unlock the settings. Is the PIN right?');
+	});
+	const tab = settingsTab(picture.url);
+	if (tab === null) return;
+	await tabs.getByRole('tab', { name: new RegExp(`^${tab}$`, 'i') }).click();
+	// The tab's facts come from the server: the stand-in shows once they are in.
+	if (tab === 'server') await page.getByText(VANGOGH_STAND_IN).waitFor({ timeout: 10_000 });
+}
+
+async function shoot(page: Page, picture: Picture, pin: string | null): Promise<Buffer> {
+	if (isSettings(picture.url)) {
+		await page.route('**/api/settings/status', async (route) => {
+			const response = await route.fetch();
+			// A locked browser is refused, and the refusal goes through as it is.
+			if (!response.ok()) return route.fulfill({ response });
+			await route.fulfill({ response, json: withStandIn(await response.json()) });
+		});
+	}
 	const response = await page.goto(picture.url.href, { waitUntil: 'networkidle', timeout: LIMIT });
 	if (!response || !response.ok()) throw new Error(`answered ${response ? response.status() : 'nothing'}.`);
 	if (opensSheet(picture.url)) {
@@ -86,6 +164,7 @@ async function shoot(page: Page, picture: Picture): Promise<Buffer> {
 			.catch(() => false);
 		if (!sheet) throw new Error('opened no sheet. Is it still in the library?');
 	}
+	if (isSettings(picture.url) && pin !== null) await openSettings(page, picture, pin);
 	await withLimit(settle(page), `did not settle within ${LIMIT / 1000} seconds.`);
 	return page.screenshot({ type: 'jpeg', quality: QUALITY });
 }
@@ -98,27 +177,29 @@ try {
 }
 const origin = pictures[0].url.origin;
 await checkVersion(origin);
+const pin = pictures.some((p) => isSettings(p.url)) ? await settingsPin() : null;
 
 const shots = new Map<string, Buffer>();
 let failure: string | null = null;
 const browser = await chromium.launch();
+const cookie = listCookie(pictures);
 try {
-	const context = await browser.newContext({
-		viewport: { width: WIDTH, height: HEIGHT },
-		deviceScaleFactor: 1,
-		userAgent: USER_AGENT
-	});
-	const cookie = listCookie(pictures);
-	if (cookie) await context.addCookies([{ ...cookie, url: origin }]);
 	for (const picture of pictures) {
+		// A browser of its own for each picture, so that the settings unlocked for one never show in another.
+		const context = await browser.newContext({
+			viewport: { width: WIDTH, height: HEIGHT },
+			deviceScaleFactor: 1,
+			userAgent: USER_AGENT
+		});
+		if (cookie) await context.addCookies([{ ...cookie, url: origin }]);
 		const page = await context.newPage();
 		try {
-			shots.set(picture.name, await shoot(page, picture));
+			shots.set(picture.name, await shoot(page, picture, pin));
 		} catch (error) {
 			failure = `${picture.name}: ${picture.url.href} ${(error as Error).message}`;
 			break;
 		} finally {
-			await page.close();
+			await context.close();
 		}
 	}
 } finally {

@@ -24,6 +24,12 @@ describe('mapApiProduct', () => {
 		expect(game.screenshots).toEqual([SHOT.one, SHOT.two]);
 	});
 
+	it('reads isUsingDosBox as dos', () => {
+		expect(mapApiProduct(apiProduct({ title: 'Cellar', dos: true })).dos).toBe(true);
+		expect(mapApiProduct(apiProduct({ title: 'Cellar' })).dos).toBe(false);
+		expect(mapApiProduct({ ...(apiProduct({ title: 'Cellar' }) as object), isUsingDosBox: 'yes' }).dos).toBe(false);
+	});
+
 	it('reads the series of the record, and null without one', () => {
 		expect(mapApiProduct(apiProduct({ title: 'Dusk One', series: { id: 77, name: 'Dusk' } })).series).toEqual({ id: '77', name: 'Dusk' });
 		expect(game.series).toBeNull();
@@ -133,6 +139,7 @@ describe('mapApiProduct', () => {
 				backdrop: null,
 				releaseYear: null,
 				macNotice: null,
+				dos: false,
 				requirements: {},
 				storeUrl: null,
 				series: null,

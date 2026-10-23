@@ -1,3 +1,5 @@
+import type { JobView } from '$lib/batocera';
+import type { Preferred } from '$lib/settings';
 import { ALL_OS, type Detail, type FileEntry, type Os } from '$lib/types';
 import type { Visitor } from '$lib/visitor';
 
@@ -41,9 +43,16 @@ export function theoShown(theo: boolean, kind: BlockKind, downloadLanguage: stri
 	return theo && (kind === 'mine' || kind === 'not-mine' || kind === 'other') && downloadLanguage === null;
 }
 
-/** The tab the file list opens on: the visitor's system when the game has it. */
-export function firstTab(detail: Detail, visitor: Visitor): Os | null {
+/**
+ * The tab the file list opens on: Windows while the main button is on Batocera, which sends the Windows
+ * files (2026-10-22); the preferred system when the main button starts on it (button and tab start
+ * together); else the visitor's system when the game has it, else the first.
+ */
+export function firstTab(detail: Detail, visitor: Visitor, preferred: Preferred = 'auto', onBatocera = false): Os | null {
 	const systems = systemsOf(detail);
+	if (onBatocera && systems.includes('windows')) return 'windows';
+	const starts = visitor !== 'phone' && preferred !== 'auto' && preferred !== 'batocera' && buttonSystems(detail).includes(preferred);
+	if (starts) return preferred;
 	return systems.find((os) => os === visitor) ?? systems[0] ?? null;
 }
 
@@ -52,18 +61,73 @@ export function buttonSystems(detail: Detail): Os[] {
 	return ALL_OS.filter((os) => (detail.downloads[os]?.length ?? 0) > 0);
 }
 
+/** What the main button is for: a system's files, or Batocera (0.12.0). */
+export type Target = Os | 'batocera';
+
 /**
- * The system the main button downloads for, or null when there is no button.
- * It is the visitor's own when the game has it, otherwise the first the game
- * has, until the visitor picks another with the switch. Nothing remembers the
- * pick: a detail that is opened again starts from here.
+ * Where the main button is, or null when there is no button (spec 0.12.0, section 7.2). On a phone or a
+ * tablet it is Batocera's while `batocera` is true, and there is none otherwise. On a computer it is the
+ * pick of the switch or of a tab, else the preferred platform of the settings when the game has it, else
+ * the visitor's own system when the game has it, else the first the game has. `batocera` is true while
+ * Batocera is set up and the game can go to it for this browser. A game marked "Doesn't run on Batocera"
+ * never starts on it, though an unlocked browser can pick it (section 7.6). Nothing remembers the pick: a
+ * detail that is opened again starts from here.
  */
-export function buttonTarget(detail: Detail, visitor: Visitor, picked: Os | null = null): Os | null {
+export function buttonTarget(
+	detail: Detail,
+	visitor: Visitor,
+	picked: Target | null = null,
+	preferred: Preferred = 'auto',
+	batocera = false,
+	marked = false
+): Target | null {
 	const kind = blockKind(detail, visitor);
-	if (kind === 'unread' || kind === 'no-files' || kind === 'phone' || kind === 'dlc-only') return null;
+	if (kind === 'phone') return batocera ? 'batocera' : null;
+	if (kind === 'unread' || kind === 'no-files' || kind === 'dlc-only') return null;
 	const offered = buttonSystems(detail);
-	if (picked && offered.includes(picked)) return picked;
+	const has = (target: Target) => (target === 'batocera' ? batocera : offered.includes(target));
+	if (picked && has(picked)) return picked;
+	if (preferred !== 'auto' && has(preferred) && !(preferred === 'batocera' && marked)) return preferred;
 	return offered.find((os) => os === visitor) ?? offered[0] ?? null;
+}
+
+/**
+ * True when the game can go to Batocera, apart from the mark and the settings (spec 0.12.0, section 2.1):
+ * a complete game with Windows files of its own, as the server's `canGo` has it.
+ */
+export function goesToBatocera(detail: Detail): boolean {
+	return detail.kind === 'game' && detail.complete && (detail.downloads.windows?.length ?? 0) > 0;
+}
+
+/**
+ * The platform the note "Not available for …" names, or null for no note (2026-10-21): the one the main button is
+ * expected to start on, when the game does not have it. That is the preferred platform; Autoselect, and Batocera
+ * while it is not set up, mean the visitor's own system, and `other` asks to choose the files. Batocera is had by a
+ * game that can go to it, and a marked game has no note. Decided by the settings and the game, never by a pick, so
+ * picking moves nothing. A phone, a record that could not be read, a game without files and one with DLC files only
+ * keep their own notes.
+ */
+export function missingFor(
+	detail: Detail,
+	visitor: Visitor,
+	preferred: Preferred,
+	batoceraReady: boolean,
+	marked: boolean
+): Os | 'batocera' | 'other' | null {
+	const kind = blockKind(detail, visitor);
+	if (kind !== 'mine' && kind !== 'not-mine' && kind !== 'other') return null;
+	if (preferred === 'batocera' && batoceraReady) return marked || goesToBatocera(detail) ? null : 'batocera';
+	if (preferred !== 'auto' && preferred !== 'batocera') return buttonSystems(detail).includes(preferred) ? null : preferred;
+	return kind === 'mine' ? null : kind === 'other' ? 'other' : (visitor as Os);
+}
+
+const JUST_SENT_MS = 10 * 60_000;
+
+/** True for ten minutes after a send ended as sent: the check after "On Batocera" shows (spec 2026-10-21, section 3.2). */
+export function justSent(job: JobView | null, now: number): boolean {
+	if (job?.state !== 'done' || !job.endedAt) return false;
+	const ended = Date.parse(job.endedAt);
+	return Number.isFinite(ended) && now - ended < JUST_SENT_MS;
 }
 
 /**

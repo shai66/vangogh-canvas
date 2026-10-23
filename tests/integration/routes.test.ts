@@ -97,6 +97,9 @@ async function firstFile(): Promise<string> {
 	return detail.downloads.windows![0].fileId;
 }
 
+/** A time as `Date.prototype.toISOString` writes it. */
+const ISO_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+
 /** The key in `fake.data.files` of the first Windows file of 1001. */
 const FIRST_FILE_KEY = '1001/installer/downloads/the_long_dark_road/en1installer0';
 
@@ -235,9 +238,9 @@ describe('the pages, as the server draws them', () => {
 		expect(text).toContain('Strategy 2 Adventure 1 Role-playing 1');
 	});
 
-	it('leaves the cached index as it was: its schema is still 8', async () => {
+	it('leaves the cached index as it was: its schema is 9', async () => {
 		const cached = JSON.parse(await readFile(join(cacheDir, 'index.json'), 'utf8')) as { schema: number };
-		expect(cached.schema).toBe(8);
+		expect(cached.schema).toBe(9);
 	});
 
 	it('gives the name of the system the visitor sits at to the download block', async () => {
@@ -288,7 +291,18 @@ describe('the pages, as the server draws them', () => {
 });
 
 describe('the settings', () => {
-	const chosen = { defaults: { os: ['macos'], sort: 'recent', grouped: false, hide18: false }, theo: true };
+	const chosen = {
+		defaults: { os: ['macos'], sort: 'recent', grouped: false, hide18: false },
+		theo: true,
+		preferred: 'windows',
+		batocera: { on: false, address: '', user: 'root', wake: false, shutdown: false }
+	};
+	/** Batocera's part of `chosen` as the server keeps it: Batocera's own password, nothing tested. */
+	const chosenBox = { ...chosen.batocera, ready: false, hostKey: null, mac: null };
+	/** No Server setting changed in the sheet. */
+	const NONE = { rebuildAt: null, timeZone: null, versionCheck: null };
+	/** The Server settings of the stack of these Canvases: no REBUILD_AT and no TZ, and the update check off. */
+	const STACK = { rebuildAt: '04:30', timeZone: 'UTC', versionCheck: false };
 	let folder: string;
 	let settingsDir: string;
 	let pinnedChild: ChildProcess | undefined;
@@ -308,6 +322,8 @@ describe('the settings', () => {
 			VANGOGH_USERNAME: 'api',
 			VANGOGH_PASSWORD: PASSWORD,
 			VERSION_CHECK: 'off',
+			// The settings may switch the check on: it must never reach GitHub.
+			VERSION_CHECK_URL: `${fake.url}/releases/latest`,
 			SETTINGS_PIN: PIN
 		};
 		const pinnedPort = await freePort();
@@ -415,16 +431,126 @@ describe('the settings', () => {
 		const first = await answer(await fetch(`${pinned}/api/settings`, { headers: { cookie } }));
 		expect(first).toEqual({
 			status: 200,
-			body: { defaults: NOTHING_REMEMBERED, theo: false, writable: true, unlockedUntil: expect.any(String) }
+			body: {
+				defaults: NOTHING_REMEMBERED,
+				theo: false,
+				preferred: 'auto',
+				batocera: { on: false, address: '', user: 'root', ready: false, hostKey: null, mac: null, wake: false, shutdown: false, passwordSaved: true },
+				notRunning: [],
+				server: NONE,
+				writable: true,
+				unlockedUntil: expect.any(String),
+				inEffect: STACK,
+				stack: STACK
+			}
 		});
 		// About 30 days on.
 		const ahead = Date.parse((first.body as { unlockedUntil: string }).unlockedUntil) - Date.now();
 		expect(Math.abs(ahead - 2_592_000_000)).toBeLessThan(60_000);
 
 		const saved = await answer(await send(pinned, 'PUT', '/api/settings', chosen, { cookie }));
-		expect(saved).toEqual({ status: 200, body: { ...chosen, writable: true, unlockedUntil: expect.any(String) } });
-		expect(JSON.parse(await readFile(join(settingsDir, 'settings.json'), 'utf8'))).toEqual({ version: 1, ...chosen });
+		expect(saved).toEqual({
+			status: 200,
+			body: {
+				...chosen,
+				batocera: { ...chosenBox, passwordSaved: true },
+				notRunning: [],
+				server: NONE,
+				writable: true,
+				unlockedUntil: expect.any(String),
+				inEffect: STACK,
+				stack: STACK
+			}
+		});
+		expect(JSON.parse(await readFile(join(settingsDir, 'settings.json'), 'utf8'))).toEqual({
+			version: 1,
+			...chosen,
+			batocera: { ...chosenBox, password: 'linux' },
+			notRunning: [],
+			server: NONE
+		});
 		expect((await answer(await fetch(`${pinned}/api/settings`, { headers: { cookie } }))).body).toMatchObject(chosen);
+	});
+
+	it('keeps the Server settings, and answers the values in effect', async () => {
+		const cookie = await unlock(pinned);
+		const server = { rebuildAt: '05:15', timeZone: 'Europe/Berlin', versionCheck: null };
+		const inEffect = { ...STACK, rebuildAt: '05:15', timeZone: 'Europe/Berlin' };
+		const saved = await answer(await send(pinned, 'PUT', '/api/settings', { ...chosen, server }, { cookie }));
+		expect(saved).toMatchObject({ status: 200, body: { server, inEffect } });
+		// A body without a server part, as an older open page sends it, keeps what is saved.
+		const kept = await answer(await send(pinned, 'PUT', '/api/settings', chosen, { cookie }));
+		expect(kept).toMatchObject({ status: 200, body: { server, inEffect } });
+		// Back to what the tests that follow expect.
+		expect((await send(pinned, 'PUT', '/api/settings', { ...chosen, server: NONE }, { cookie })).status).toBe(200);
+	});
+
+	// Spec of the settings tabs, section 4: the facts of "This Canvas", behind the unlock.
+	it("answers the server's status while unlocked", async () => {
+		expect(await answer(await fetch(`${base}/api/settings/status`))).toEqual({ status: 404, body: { error: 'settings-off' } });
+		expect(await answer(await fetch(`${pinned}/api/settings/status`))).toEqual({ status: 401, body: { error: 'locked' } });
+		const cookie = await unlock(pinned);
+		const index = (await (await fetch(`${pinned}/api/index`)).json()) as IndexPayload;
+		const status = await answer(await fetch(`${pinned}/api/settings/status`, { headers: { cookie } }));
+		expect(status).toEqual({
+			status: 200,
+			body: {
+				version: expect.stringMatching(/^\d+\.\d+\.\d+$/),
+				// The check is off in this stack.
+				update: null,
+				startedAt: expect.stringMatching(ISO_TIME),
+				vangogh: { url: fake.url, login: 'ok' },
+				library: {
+					games: index.entries.length,
+					collections: index.collections.length,
+					builtAt: index.builtAt,
+					nextAt: '04:30',
+					rebuild: { running: false, lastResult: 'ok', lastError: null }
+				},
+				batocera: 'off',
+				jobs: 0,
+				timeZone: 'UTC'
+			}
+		});
+		const server = { rebuildAt: '05:45', timeZone: null, versionCheck: null };
+		expect((await send(pinned, 'PUT', '/api/settings', { ...chosen, server }, { cookie })).status).toBe(200);
+		const moved = await answer(await fetch(`${pinned}/api/settings/status`, { headers: { cookie } }));
+		expect(moved).toMatchObject({ status: 200, body: { library: { nextAt: '05:45' } } });
+		// Back to what the tests that follow expect.
+		expect((await send(pinned, 'PUT', '/api/settings', { ...chosen, server: NONE }, { cookie })).status).toBe(200);
+	});
+
+	it("answers Batocera's settings without the password", async () => {
+		const cookie = await unlock(pinned);
+		const text = await (await fetch(`${pinned}/api/settings`, { headers: { cookie } })).text();
+		expect(JSON.parse(text).batocera.passwordSaved).toBe(true);
+		expect(text).not.toContain('linux');
+	});
+
+	it('keeps the password when a save sends none', async () => {
+		const cookie = await unlock(pinned);
+		const moved = { ...chosen, batocera: { ...chosen.batocera, on: true, address: '10.0.0.22' } };
+		expect((await send(pinned, 'PUT', '/api/settings', moved, { cookie })).status).toBe(200);
+		const file = await readFile(join(settingsDir, 'settings.json'), 'utf8');
+		expect(file).toContain('"password":"linux"');
+		expect(JSON.parse(file).batocera).toMatchObject({ address: '10.0.0.22', ready: false });
+		// Switched on and never tested.
+		expect(((await (await fetch(`${pinned}/healthz`)).json()) as { batocera: string }).batocera).toBe('not-set-up');
+		// Back to what the tests that follow expect.
+		expect((await send(pinned, 'PUT', '/api/settings', chosen, { cookie })).status).toBe(200);
+	});
+
+	it('never puts a saved password into the page of an unlocked browser', async () => {
+		const cookie = await unlock(pinned);
+		const password = 'quiet harbour 7319';
+		const typed = { ...chosen, batocera: { ...chosen.batocera, password } };
+		expect((await send(pinned, 'PUT', '/api/settings', typed, { cookie })).status).toBe(200);
+		expect(JSON.parse(await readFile(join(settingsDir, 'settings.json'), 'utf8')).batocera.password).toBe(password);
+		const html = await (await fetch(`${pinned}/settings`, { headers: { cookie } })).text();
+		// The page carries the settings for its sheet, but not the password.
+		expect(html).toContain('passwordSaved');
+		expect(html).not.toContain(password);
+		expect(await (await fetch(`${pinned}/api/settings`, { headers: { cookie } })).text()).not.toContain(password);
 	});
 
 	it('refuses settings that are not valid, and keeps what it had', async () => {
@@ -460,6 +586,12 @@ describe('the settings', () => {
 		expect(await settings(stuck)).toBe('unwritable');
 	});
 
+	it('reports Batocera off in its health without a PIN, and with the switch off', async () => {
+		const batocera = async (at: string) => ((await (await fetch(`${at}/healthz`)).json()) as { batocera: string }).batocera;
+		expect(await batocera(base)).toBe('off');
+		expect(await batocera(pinned)).toBe('off');
+	});
+
 	// Review focus 4
 	it('refuses to save where the folder cannot be written', async () => {
 		const cookie = await unlock(stuck);
@@ -482,6 +614,9 @@ describe('the routes', () => {
 		});
 		expect(body.version).toMatch(/^\d+\.\d+\.\d+$/);
 		expect(body.index.ageSeconds).toBeLessThan(60);
+		// Noted once, when the server started.
+		expect(body.startedAt).toMatch(ISO_TIME);
+		expect(Date.parse(body.startedAt)).toBeLessThanOrEqual(Date.now());
 		// The check runs 10 seconds after start.
 		await waitFor(async () => ((await (await fetch(`${base}/healthz`)).json()) as { update: { latest: string | null } }).update?.latest !== null, 'the version check');
 		const later = await (await fetch(`${base}/healthz`)).json();

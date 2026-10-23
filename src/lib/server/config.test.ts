@@ -20,7 +20,10 @@ describe('loadConfig', () => {
 			versionCheck: true,
 			versionCheckUrl: 'https://api.github.com/repos/shai66/vangogh-canvas/releases/latest',
 			settingsPin: null,
-			settingsDir: '/settings'
+			settingsDir: '/settings',
+			batoceraPort: 22,
+			wakeTo: null,
+			shutdownSeconds: 600
 		});
 	});
 
@@ -60,6 +63,15 @@ describe('loadConfig', () => {
 		expect(loadConfig({ ...required, VERSION_CHECK: 'off', VERSION_CHECK_URL: 'ftp://x' }).versionCheck).toBe(false);
 	});
 
+	it('reads the address of the version check with the check off too, and checks it only while the check is on', () => {
+		expect(loadConfig({ ...required, VERSION_CHECK: 'off', VERSION_CHECK_URL: 'http://127.0.0.1:9/latest' }).versionCheckUrl).toBe('http://127.0.0.1:9/latest');
+		// The settings may switch the check on later: then it asks GitHub.
+		expect(loadConfig({ ...required, VERSION_CHECK: 'off', VERSION_CHECK_URL: 'ftp://x' }).versionCheckUrl).toBe(
+			'https://api.github.com/repos/shai66/vangogh-canvas/releases/latest'
+		);
+		expect(() => loadConfig({ ...required, VERSION_CHECK_URL: 'ftp://x' })).toThrow('VERSION_CHECK_URL must be an http or https address');
+	});
+
 	it('leaves settings off when SETTINGS_PIN is unset or empty', () => {
 		expect(loadConfig(required).settingsPin).toBeNull();
 		expect(loadConfig({ ...required, SETTINGS_PIN: '  ' }).settingsPin).toBeNull();
@@ -78,6 +90,40 @@ describe('loadConfig', () => {
 	it('keeps the settings in /settings unless SETTINGS_DIR says otherwise', () => {
 		expect(loadConfig(required).settingsDir).toBe('/settings');
 		expect(loadConfig({ ...required, SETTINGS_DIR: '/data/canvas' }).settingsDir).toBe('/data/canvas');
+	});
+
+	it("reads the settings of Batocera's work and of its tests", () => {
+		const config = loadConfig({
+			...required,
+			BATOCERA_PORT: '2222',
+			BATOCERA_WAKE_TO: '127.0.0.1:40009',
+			BATOCERA_SHUTDOWN_SECONDS: '4'
+		});
+		expect(config).toMatchObject({
+			batoceraPort: 2222,
+			wakeTo: '127.0.0.1:40009',
+			shutdownSeconds: 4
+		});
+	});
+
+	it('refuses a BATOCERA_PORT that is not a port number', () => {
+		for (const port of ['70000', 'abc', '0'])
+			expect(() => loadConfig({ ...required, BATOCERA_PORT: port }), port).toThrow('BATOCERA_PORT must be a port number');
+	});
+
+	it('refuses a BATOCERA_SHUTDOWN_SECONDS that is not a whole number of at least 1', () => {
+		for (const seconds of ['0', '1.5', 'abc'])
+			expect(() => loadConfig({ ...required, BATOCERA_SHUTDOWN_SECONDS: seconds }), seconds).toThrow(
+				'BATOCERA_SHUTDOWN_SECONDS must be a whole number of seconds'
+			);
+	});
+
+	it('refuses a BATOCERA_SHUTDOWN_SECONDS above a day, which a timer cannot wait', () => {
+		expect(loadConfig({ ...required, BATOCERA_SHUTDOWN_SECONDS: '86400' }).shutdownSeconds).toBe(86400);
+		for (const seconds of ['86401', '99999999999'])
+			expect(() => loadConfig({ ...required, BATOCERA_SHUTDOWN_SECONDS: seconds }), seconds).toThrow(
+				'BATOCERA_SHUTDOWN_SECONDS must be a whole number of seconds'
+			);
 	});
 
 	it('names every missing required variable', () => {

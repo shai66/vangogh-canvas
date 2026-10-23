@@ -36,6 +36,8 @@ export interface MappedProduct {
 	backdrop: string | null;
 	releaseYear: number | null;
 	macNotice: string | null;
+	/** True when GOG runs the game in DOSBox, `isUsingDosBox`. */
+	dos: boolean;
 	requirements: Requirements;
 	storeUrl: string | null;
 	series: Series | null;
@@ -291,6 +293,7 @@ export function mapApiProduct(raw: unknown): MappedProduct {
 		// When the game first came out. `gogReleaseDate`, next to it, is when it came to GOG.
 		releaseYear: yearOf(obj(embedded.product).globalReleaseDate),
 		macNotice: macNoticeOf(root.additionalRequirements),
+		dos: root.isUsingDosBox === true,
 		requirements: requirementsOf(embedded.supportedOperatingSystems),
 		storeUrl: storeUrlOf(links.store),
 		series: seriesOf(embedded.series),

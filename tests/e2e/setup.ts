@@ -1,10 +1,14 @@
 import { spawn, type ChildProcess } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { NOTHING_REMEMBERED } from '../../src/lib/remember';
+import { NO_BATOCERA, NO_SETTINGS, type Settings } from '../../src/lib/settings';
+import { batoceraLibrary, fakeInstaller } from '../../src/lib/server/testing/batocera-library';
+import { startFakeBatocera } from '../../src/lib/server/testing/fake-batocera';
 import { fixtureData, startFakeVangogh, type FakeData } from '../../src/lib/server/testing/fake-vangogh';
 import { apiProduct, details, extra, file, POSTER } from '../../src/lib/server/testing/fixtures';
 
@@ -358,6 +362,93 @@ function settingsLibrary(): FakeData {
 	return data;
 }
 
+/** A Windows game of the Batocera tests: in `parts` files when more than one, with its makers and its description when given. */
+interface BatoceraGame {
+	title: string;
+	delayMs: number;
+	parts?: number;
+	developers?: string[];
+	publisher?: string;
+	description?: string;
+}
+
+/** A description as long as a real game's: its detail scrolls the line beside the button up to the window's top on a phone. */
+const LONG_DESCRIPTION = Array.from(
+	{ length: 6 },
+	(_, i) => `<p>${`Chapter ${i + 1}. The keeper of the tin lantern walks the shore at dusk, counts the boats that come home and writes their names into a book that nobody reads. `.repeat(3)}</p>`
+).join('');
+
+/**
+ * The Windows games of the Batocera tests, each for one test, which leaves it changed (sent, marked, newer).
+ * Their installers are fake ones, as in batoceraLibrary(); `delayMs` makes the unpacking of a slow one last.
+ * 3014 has a head as long as a real game's, a title on two lines and its makers; 3015 is in two files, for the room
+ * of the line beside the button of a game in several files; 3016 has a long description.
+ */
+const BATOCERA_GAMES = {
+	'3005': { title: 'Tide Runner', delayMs: 5000 },
+	'3006': { title: 'Ember Hollow', delayMs: 5000 },
+	'3007': { title: 'Glass Orchard', delayMs: 0 },
+	'3008': { title: 'Pale Lantern', delayMs: 0 },
+	'3009': { title: 'Copper Bell', delayMs: 0 },
+	'3010': { title: 'Silver Reel', delayMs: 0 },
+	'3011': { title: 'Moss Garden', delayMs: 0 },
+	'3012': { title: 'Quiet Signal', delayMs: 0 },
+	'3013': { title: 'Fern Lattice', delayMs: 0 },
+	'3014': {
+		title: 'The Keeper of the Northern Lighthouse',
+		delayMs: 0,
+		developers: ['Harbourlight Interactive'],
+		publisher: 'Northern Sound Publishing'
+	},
+	'3015': { title: 'Tin Lantern', delayMs: 0, parts: 2 },
+	'3016': { title: 'Long Shore', delayMs: 0, description: LONG_DESCRIPTION }
+} satisfies Record<string, BatoceraGame>;
+
+/** The installer file name of a game of BATOCERA_GAMES, as vangogh names it. */
+export const installerOf = (id: keyof typeof BATOCERA_GAMES): string => `setup_game_${id}_1.0.exe`;
+
+/** The fake installer's JSON with a wait before it is unpacked. */
+function slowInstaller(body: Buffer, delayMs: number): Buffer {
+	return Buffer.from(JSON.stringify({ ...JSON.parse(body.toString('utf8')), delayMs }));
+}
+
+const md5 = (body: Buffer): string => createHash('md5').update(body).digest('hex');
+
+/**
+ * The library of the Batocera tests: batoceraLibrary() with pictures a browser shows, Night Harbour's unpacking
+ * lasting a while so that a test sees the send under way, and the games of BATOCERA_GAMES.
+ */
+function batoceraE2eLibrary(): FakeData {
+	const data = batoceraLibrary();
+	for (const id of Object.keys(data.images)) data.images[id] = { type: 'image/png', body: PIXEL };
+	const harbour = '/downloads/night_harbour/en1installer0';
+	const harbourKey = `3001/installer${harbour}`;
+	data.files[harbourKey] = { ...data.files[harbourKey], body: slowInstaller(data.files[harbourKey].body, 2500) };
+	data.checksums!['3001'][harbour] = md5(data.files[harbourKey].body);
+	for (const [id, game] of Object.entries(BATOCERA_GAMES) as [keyof typeof BATOCERA_GAMES, BatoceraGame][]) {
+		const { title, delayMs, parts = 1, developers, publisher, description } = game;
+		const installer = fakeInstaller({ [`game_${id}.exe`]: title, 'data.pak': 'data' });
+		const first = delayMs > 0 ? slowInstaller(installer, delayMs) : installer;
+		(data.library as unknown[]).push({ id, tt: title, os: [1] });
+		data.metadata[`gog-api-products/${id}`] = apiProduct({ title, genres: ['Adventure'], os: ['windows'], developers, publisher, description });
+		// The parts of a game in several files are named as GOG names them: "Tin Lantern (Part 1 of 2)".
+		const windows: unknown[] = [];
+		data.filenames[id] = {};
+		data.checksums![id] = {};
+		for (let part = 0; part < parts; part++) {
+			const manualUrl = `/downloads/game_${id}/en1installer${part}`;
+			const name = part === 0 ? installerOf(id) : `setup_game_${id}_1.0-${part}.bin`;
+			const body = part === 0 ? first : Buffer.from(`part ${part + 1} of ${title}`);
+			windows.push(file(manualUrl, parts > 1 ? `${title} (Part ${part + 1} of ${parts})` : title, '1 MB', '1.0'));
+			data.filenames[id][manualUrl] = name;
+			data.files[`${id}/installer${manualUrl}`] = { name, body };
+			data.checksums![id][manualUrl] = md5(body);
+		}
+		data.metadata[`gog-details/${id}`] = details({ english: { windows } });
+	}
+	return data;
+}
+
 function freePort(): Promise<number> {
 	return new Promise((resolve, reject) => {
 		const server = createServer();
@@ -380,14 +471,20 @@ async function waitFor(url: string, wanted: number, output: () => string): Promi
 }
 
 /**
- * Starts six fake vangoghs and seven copies of the built app:
+ * Starts seven fake vangoghs, a fake Batocera box and nine copies of the built app:
  *   CANVAS_URL        a Canvas with the library of the fixtures
  *   CANVAS_EMPTY_URL  a Canvas whose vangogh is not there, so it has no library yet
  *   CANVAS_MAC_URL    a Canvas with the two games of macLibrary()
  *   CANVAS_RICH_URL   a Canvas with the three games of richLibrary()
  *   CANVAS_COLLECTIONS_URL  a Canvas with the seventeen games of collectionLibrary()
- *   CANVAS_SETTINGS_URL     a Canvas with a PIN, 2468, and the library of settingsLibrary()
+ *   CANVAS_SETTINGS_URL     a Canvas with a PIN, 2468, and the library of settingsLibrary(). Its vangogh's control
+ *                           address is FAKE_SETTINGS_CONTROL.
  *   CANVAS_THEO_URL         the same, with a vangogh of its own and theo switched on before it starts
+ *   CANVAS_BATOCERA_URL     a Canvas with a PIN, 2468, the library of batoceraE2eLibrary(), and Batocera set up with
+ *                           the fake box before it starts, waking and "Shut down after sending" on, a countdown of 4 s.
+ *                           The box's folder is FAKE_BATOCERA_ROOT, its control address FAKE_BATOCERA_CONTROL.
+ *   CANVAS_BATOCERA_DETAIL_URL  the same, with folders of its own, for the tests of a game's detail with Batocera: their
+ *                           pages answer every ask about Batocera themselves, so it never reaches the box.
  */
 export default async function setup(): Promise<() => Promise<void>> {
 	if (!existsSync('build/index.js')) throw new Error('run "npm run build" first');
@@ -445,9 +542,12 @@ export default async function setup(): Promise<() => Promise<void>> {
 	const macFake = await startFakeVangogh(macLibrary());
 	const richFake = await startFakeVangogh(rich);
 	const collectionsFake = await startFakeVangogh(collectionLibrary());
-	const settingsFake = await startFakeVangogh(settingsLibrary());
+	// Its list of products can be slowed from a test, so that "Read now" is seen reading.
+	const settingsFake = await startFakeVangogh(settingsLibrary(), { control: true });
 	// 1001 keeps its extras in this library too: the extras' panel stands under the theo panel.
 	const theoFake = await startFakeVangogh(settingsLibrary());
+	const batoceraFake = await startFakeVangogh(batoceraE2eLibrary());
+	const box = await startFakeBatocera({ control: true, bootMs: 300 });
 
 	const cache = await mkdtemp(join(tmpdir(), 'canvas-e2e-'));
 	const children: ChildProcess[] = [];
@@ -470,6 +570,8 @@ export default async function setup(): Promise<() => Promise<void>> {
 	const collectionsPort = await freePort();
 	const settingsPort = await freePort();
 	const theoPort = await freePort();
+	const batoceraPort = await freePort();
+	const batoceraDetailPort = await freePort();
 	launch({
 		PORT: String(port),
 		VANGOGH_URL: fake.url,
@@ -488,7 +590,9 @@ export default async function setup(): Promise<() => Promise<void>> {
 		SETTINGS_PIN: '2468',
 		SETTINGS_DIR: join(cache, 'settings'),
 		TZ: 'UTC',
-		VERSION_CHECK: 'off'
+		VERSION_CHECK: 'off',
+		// The settings may switch the check on: it must never reach GitHub, here and in the other Canvases with a PIN.
+		VERSION_CHECK_URL: `${settingsFake.url}/releases/latest`
 	});
 	// The theo tests need theo on without depending on the tests of the settings: it is in the file before Canvas reads it.
 	await mkdir(join(cache, 'theo'), { recursive: true });
@@ -500,8 +604,47 @@ export default async function setup(): Promise<() => Promise<void>> {
 		SETTINGS_PIN: '2468',
 		SETTINGS_DIR: join(cache, 'theo'),
 		TZ: 'UTC',
-		VERSION_CHECK: 'off'
+		VERSION_CHECK: 'off',
+		VERSION_CHECK_URL: `${theoFake.url}/releases/latest`
 	});
+	// Batocera set up with the fake box, as after a passed connection test: in the file before Canvas reads it.
+	const batocera: Settings = {
+		...NO_SETTINGS,
+		batocera: {
+			...NO_BATOCERA,
+			on: true,
+			address: '127.0.0.1',
+			user: box.user,
+			password: box.password,
+			ready: true,
+			hostKey: box.fingerprint,
+			mac: box.mac,
+			wake: true,
+			shutdown: true
+		},
+		notRunning: []
+	};
+	// The Canvas of the detail's tests has a folder of each kind of its own: its settings change without the others'.
+	for (const [folder, port] of [
+		['batocera', batoceraPort],
+		['batocera-detail', batoceraDetailPort]
+	] as const) {
+		await mkdir(join(cache, folder), { recursive: true });
+		await writeFile(join(cache, folder, 'settings.json'), JSON.stringify({ version: 1, ...batocera }));
+		launch({
+			PORT: String(port),
+			VANGOGH_URL: batoceraFake.url,
+			CACHE_DIR: join(cache, `${folder}-cache`),
+			SETTINGS_PIN: '2468',
+			SETTINGS_DIR: join(cache, folder),
+			BATOCERA_PORT: String(box.port),
+			BATOCERA_WAKE_TO: `127.0.0.1:${box.wakePort}`,
+			BATOCERA_SHUTDOWN_SECONDS: '4',
+			TZ: 'UTC',
+			VERSION_CHECK: 'off',
+			VERSION_CHECK_URL: `${batoceraFake.url}/releases/latest`
+		});
+	}
 
 	process.env.CANVAS_URL = `http://127.0.0.1:${port}`;
 	process.env.CANVAS_EMPTY_URL = `http://127.0.0.1:${emptyPort}`;
@@ -510,6 +653,11 @@ export default async function setup(): Promise<() => Promise<void>> {
 	process.env.CANVAS_COLLECTIONS_URL = `http://127.0.0.1:${collectionsPort}`;
 	process.env.CANVAS_SETTINGS_URL = `http://127.0.0.1:${settingsPort}`;
 	process.env.CANVAS_THEO_URL = `http://127.0.0.1:${theoPort}`;
+	process.env.CANVAS_BATOCERA_URL = `http://127.0.0.1:${batoceraPort}`;
+	process.env.CANVAS_BATOCERA_DETAIL_URL = `http://127.0.0.1:${batoceraDetailPort}`;
+	process.env.FAKE_BATOCERA_ROOT = box.root;
+	process.env.FAKE_BATOCERA_CONTROL = box.control ?? '';
+	process.env.FAKE_SETTINGS_CONTROL = settingsFake.control ?? '';
 	try {
 		await waitFor(`${process.env.CANVAS_URL}/healthz`, 200, () => output);
 		await waitFor(`${process.env.CANVAS_EMPTY_URL}/healthz`, 503, () => output);
@@ -518,6 +666,8 @@ export default async function setup(): Promise<() => Promise<void>> {
 		await waitFor(`${process.env.CANVAS_COLLECTIONS_URL}/healthz`, 200, () => output);
 		await waitFor(`${process.env.CANVAS_SETTINGS_URL}/healthz`, 200, () => output);
 		await waitFor(`${process.env.CANVAS_THEO_URL}/healthz`, 200, () => output);
+		await waitFor(`${process.env.CANVAS_BATOCERA_URL}/healthz`, 200, () => output);
+		await waitFor(`${process.env.CANVAS_BATOCERA_DETAIL_URL}/healthz`, 200, () => output);
 	} catch (error) {
 		for (const child of children) child.kill('SIGKILL');
 		await fake.close();
@@ -526,6 +676,8 @@ export default async function setup(): Promise<() => Promise<void>> {
 		await collectionsFake.close();
 		await settingsFake.close();
 		await theoFake.close();
+		await batoceraFake.close();
+		await box.close();
 		throw error;
 	}
 
@@ -537,6 +689,8 @@ export default async function setup(): Promise<() => Promise<void>> {
 		await collectionsFake.close();
 		await settingsFake.close();
 		await theoFake.close();
+		await batoceraFake.close();
+		await box.close();
 		await rm(cache, { recursive: true, force: true });
 	};
 }

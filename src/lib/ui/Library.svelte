@@ -10,7 +10,7 @@
 	 * a refused save; undefined until then. For the same reason: a list of another route would start from the
 	 * settings the server drew the page with. Written in the browser only.
 	 */
-	let learnedSettings: { settings: Settings; writable: boolean } | undefined;
+	let learnedSettings: { settings: SettingsAnswer; writable: boolean } | undefined;
 </script>
 
 <script lang="ts">
@@ -20,7 +20,7 @@
 	import { gamesOf } from '$lib/collections';
 	import { nextRemembered, recall, rememberedCookie, type Remembered } from '$lib/remember';
 	import { DEFAULT_STATE, parseState, toParams, type ViewState } from '$lib/search/state';
-	import type { Settings, SettingsAnswer, SettingsInfo } from '$lib/settings';
+	import type { SettingsAnswer, SettingsInfo } from '$lib/settings';
 	import { t } from '$lib/strings';
 	import type { Collection, Detail, Glance, ListEntry } from '$lib/types';
 	import { View } from '$lib/view.svelte';
@@ -403,8 +403,9 @@
 	let until = $state(learnedUntil === undefined ? settings.unlockedUntil : learnedUntil);
 	/** True when the settings were locked while their sheet was open: the PIN prompt says so. */
 	let lockedAgain = $state(false);
+	/** The settings as the server holds them, without the password: from the layout while this browser is unlocked, or from an answer; null until then. */
 	// svelte-ignore state_referenced_locally
-	let current = $state<Settings>(learnedSettings?.settings ?? { defaults, theo: settings.theo });
+	let current = $state<SettingsAnswer | null>(learnedSettings?.settings ?? settings.answer);
 	// svelte-ignore state_referenced_locally
 	let writable = $state(learnedSettings?.writable ?? settings.writable);
 	/** True from "Lock" until the sheet has closed: the PIN prompt does not take its place on the way. */
@@ -414,8 +415,8 @@
 	});
 
 	/** What the server holds, and whether it can write it, as an answer told it or a refused change showed it. */
-	function learn(next: Settings, canWrite: boolean) {
-		const held = { defaults: $state.snapshot(next.defaults), theo: next.theo };
+	function learn(next: SettingsAnswer, canWrite: boolean) {
+		const held = $state.snapshot(next);
 		current = held;
 		writable = canWrite;
 		learnedSettings = { settings: held, writable: canWrite };
@@ -519,7 +520,7 @@
 
 <!-- One sheet for a game, a collection, the library at a glance and the settings: a game opened from a collection takes its place without the sheet closing. -->
 <Sheet
-	open={detail !== null || collection !== null || (glanceOpen && glance !== null) || (settingsOpen && until !== null)}
+	open={detail !== null || collection !== null || (glanceOpen && glance !== null) || (settingsOpen && until !== null && current !== null)}
 	onclose={close}
 	class="detail"
 	label={detail?.title ?? collection?.name ?? (glanceOpen ? t.glance.title : settingsOpen ? t.settings.title : '')}
@@ -536,7 +537,15 @@
 				collectionGames={detailCollection ? letThrough(gamesOf(detailCollection, entries), detail.id) : []}
 				shelfOpen={page.state.shelf ?? false}
 				onswap={swap}
-				theo={current.theo}
+				theo={current?.theo ?? settings.theo}
+				batocera={{
+					ready: current ? current.batocera.on && current.batocera.ready : settings.batocera.ready,
+					preferred: current?.preferred ?? settings.preferred,
+					unlocked: until !== null && Date.parse(until) > Date.now(),
+					wakeOn: current?.batocera.wake ?? settings.batocera.wake,
+					marked: (current?.notRunning ?? settings.notRunning).includes(detail.id)
+				}}
+				{timeZone}
 			/>
 		{/key}
 	{:else if collection}
@@ -545,11 +554,12 @@
 		{/key}
 	{:else if glanceOpen && glance}
 		<GlanceView {glance} games={entries.length} collections={collections.length} {builtAt} {timeZone} onclose={close} />
-	{:else if settingsOpen && until !== null}
+	{:else if settingsOpen && until !== null && current !== null}
+		{@const held = current}
 		<SettingsView
-			settings={current}
+			settings={held}
 			unlockedUntil={until}
-			bind:writable={() => writable, (canWrite) => learn(current, canWrite)}
+			bind:writable={() => writable, (canWrite) => learn(held, canWrite)}
 			{timeZone}
 			onsaved={(answer) => learn(answer, answer.writable)}
 			onlocked={locked}

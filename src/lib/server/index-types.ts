@@ -1,8 +1,8 @@
 import type { Collection, Detail, ListEntry } from '../types';
 import type { DownloadType } from './vangogh/client';
 
-/** Raised when the shape of the cached index changes. 6: the collections. 8: the age rating. */
-export const INDEX_SCHEMA = 8;
+/** Raised when the shape of the cached index changes. 6: the collections. 8: the age rating. 9: dos games. */
+export const INDEX_SCHEMA = 9;
 
 /** Where a file is in vangogh. Never sent to the browser. */
 export interface FileTarget {

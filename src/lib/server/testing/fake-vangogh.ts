@@ -13,6 +13,8 @@ export interface FakeData {
 	images: Record<string, { type: string; body: Buffer }>;
 	/** Keyed by `<id>/<downloadType>/<manualUrl without its leading slash>`. */
 	files: Record<string, { name: string; body: Buffer }>;
+	/** Keyed by product id, then manual URL: the MD5 of each file. A missing key answers 404. */
+	checksums?: Record<string, Record<string, string>>;
 	/** The tag of the latest release the fake answers at `/releases/latest`, for the version check. Absent: 404. */
 	release?: string;
 }
@@ -38,6 +40,10 @@ export interface FakeVangogh {
 	hang: boolean;
 	/** When above 0, files are sent in small chunks with this delay between them. */
 	slowFileDelayMs: number;
+	/** When above 0, the list of products is answered this much later, so that a rebuild lasts. */
+	listDelayMs: number;
+	/** The address of the control endpoint, with `control: true`. */
+	control: string | null;
 	/** File answers that were started and whose connection is still open. */
 	openFiles: number;
 	revokeTokens(): void;
@@ -151,6 +157,8 @@ function headersOf(req: IncomingMessage): Record<string, string> {
 export interface FakeOptions {
 	/** The address to listen on. 127.0.0.1 unless a container must reach the fake. */
 	host?: string;
+	/** Answers `POST /control` with `{ listDelayMs }`, for the browser tests, which run in another process. */
+	control?: boolean;
 }
 
 export async function startFakeVangogh(
@@ -161,6 +169,11 @@ export async function startFakeVangogh(
 
 	const server = createServer(async (req, res) => {
 		const path = decodeURIComponent(new URL(req.url ?? '/', 'http://fake').pathname);
+		if (options.control && req.method === 'POST' && path === '/control') {
+			const state = JSON.parse((await readBody(req)) || '{}') as { listDelayMs?: unknown };
+			if (typeof state.listDelayMs === 'number') fake.listDelayMs = state.listDelayMs;
+			return send(res, 204);
+		}
 		fake.requests.push(`${req.method} ${path}`);
 		fake.seen.push({
 			path,
@@ -200,7 +213,10 @@ export async function startFakeVangogh(
 		const head = req.method === 'HEAD' && path.startsWith('/api/gog/manual-url/');
 		if (req.method !== 'GET' && !head) return send(res, 405);
 
-		if (path === '/api/available-products') return sendJson(res, data.library);
+		if (path === '/api/available-products') {
+			if (fake.listDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, fake.listDelayMs));
+			return sendJson(res, data.library);
+		}
 
 		let match = /^\/api\/metadata\/([^/]+)\/([^/]+)$/.exec(path);
 		if (match) {
@@ -212,6 +228,12 @@ export async function startFakeVangogh(
 		if (match) {
 			const names = data.filenames[match[1]];
 			return names === undefined ? send(res, 500, 'no details') : sendJson(res, names);
+		}
+
+		match = /^\/api\/gog\/checksums\/([^/]+)$/.exec(path);
+		if (match) {
+			const sums = data.checksums?.[match[1]];
+			return sums === undefined ? send(res, 404, 'not found') : sendJson(res, sums);
 		}
 
 		match = /^\/api\/gog\/image\/([^/]+)$/.exec(path);
@@ -280,6 +302,8 @@ export async function startFakeVangogh(
 		down: false,
 		hang: false,
 		slowFileDelayMs: 0,
+		listDelayMs: 0,
+		control: options.control ? `http://127.0.0.1:${port}/control` : null,
 		openFiles: 0,
 		revokeTokens: () => tokens.clear(),
 		close: () =>
