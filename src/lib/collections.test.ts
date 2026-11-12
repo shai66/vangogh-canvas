@@ -24,6 +24,7 @@ const game = (id: string, over: Partial<ListEntry> = {}): ListEntry => ({
 	collection: null,
 	series: null,
 	packs: [],
+	groups: [],
 	adult: false,
 	...over
 });
@@ -46,7 +47,7 @@ describe('systemsOf', () => {
 
 describe('gamesOf', () => {
 	it("gives the collection's entries in its order, and leaves out an id that is not in the list", () => {
-		const collection: Collection = { id: 's1', kind: 'series', name: 'Dusk', poster: null, total: null, storeUrl: null, joined: [], games: ['3', '9', '1'] };
+		const collection: Collection = { id: 's1', kind: 'series', name: 'Dusk', poster: null, total: null, storeUrl: null, joined: [], groups: [], games: ['3', '9', '1'] };
 		expect(gamesOf(collection, [game('1'), game('2'), game('3')]).map((g) => g.id)).toEqual(['3', '1']);
 	});
 });

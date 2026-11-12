@@ -1,4 +1,6 @@
 <script module lang="ts">
+	import { OwnQueue } from '$lib/own-saver';
+
 	/**
 	 * Until when this browser is unlocked, as the page last learned it; undefined until it learns it. The layout's
 	 * data is not loaded again by a navigation inside the app: the list of another route, drawn after an unlock or
@@ -11,13 +13,24 @@
 	 * settings the server drew the page with. Written in the browser only.
 	 */
 	let learnedSettings: { settings: SettingsAnswer; writable: boolean } | undefined;
+	/**
+	 * The own collections as the page last learned them; undefined until then. For the same reason: a list of another
+	 * route would start from the ones the server drew the page with. Written in the browser only.
+	 */
+	let learnedOwn: OwnCollection[] | undefined;
+	/** The changes of the own collections, one at a time in a browser, in the order they were made. */
+	const queue = new OwnQueue();
 </script>
 
 <script lang="ts">
+	import { tick, untrack } from 'svelte';
 	import { afterNavigate, beforeNavigate, goto, preloadData, pushState, replaceState } from '$app/navigation';
 	import { page } from '$app/state';
 	import { browser } from '$app/environment';
 	import { gamesOf } from '$lib/collections';
+	import { bandsOf, byTitle, isOwnId, resolveOwn, sameName, type OwnCollection } from '$lib/own';
+	import { applyResult, failureText, type OwnRequest, type OwnResult } from '$lib/own-saver';
+	import { Picking } from '$lib/picking.svelte';
 	import { nextRemembered, recall, rememberedCookie, type Remembered } from '$lib/remember';
 	import { DEFAULT_STATE, parseState, toParams, type ViewState } from '$lib/search/state';
 	import type { SettingsAnswer, SettingsInfo } from '$lib/settings';
@@ -25,6 +38,7 @@
 	import type { Collection, Detail, Glance, ListEntry } from '$lib/types';
 	import { View } from '$lib/view.svelte';
 	import { detectVisitor, type Visitor } from '$lib/visitor';
+	import AddToList from './AddToList.svelte';
 	import Card from './Card.svelte';
 	import CollectionCard from './CollectionCard.svelte';
 	import CollectionView from './CollectionView.svelte';
@@ -34,6 +48,10 @@
 	import Foot from './Foot.svelte';
 	import GlanceView from './GlanceView.svelte';
 	import Icon from './Icon.svelte';
+	import NewCollection from './NewCollection.svelte';
+	import OwnCard from './OwnCard.svelte';
+	import OwnCollectionView from './OwnCollectionView.svelte';
+	import PickBar from './PickBar.svelte';
 	import PinPrompt from './PinPrompt.svelte';
 	import SettingsView from './SettingsView.svelte';
 	import Sheet from './Sheet.svelte';
@@ -43,6 +61,8 @@
 		entries: ListEntry[];
 		/** The collections of the library. */
 		collections: Collection[];
+		/** The own collections, as stored; none without a PIN. */
+		own: OwnCollection[];
 		/** The library at a glance, worked out by the server from the index. */
 		glance: Glance | null;
 		builtAt: string | null;
@@ -57,6 +77,8 @@
 		linked?: Detail | null;
 		/** The collection of the address, when the page was opened at `/collection/{id}`. */
 		linkedCollection?: Collection | null;
+		/** The own collection of the address, as stored, when the page was opened at `/collection/h{n}`. */
+		linkedOwn?: OwnCollection | null;
 		/** True when the page was opened at `/glance`. */
 		linkedGlance?: boolean;
 		/** What the page is told of the settings: whether a PIN is set, and until when this browser is unlocked. */
@@ -71,6 +93,7 @@
 	let {
 		entries,
 		collections,
+		own: stored,
 		glance,
 		builtAt,
 		version,
@@ -80,6 +103,7 @@
 		remembered,
 		linked = null,
 		linkedCollection = null,
+		linkedOwn = null,
 		linkedGlance = false,
 		settings,
 		defaults,
@@ -88,8 +112,14 @@
 	}: Props = $props();
 
 	const onList = () => page.url.pathname === '/';
+	/**
+	 * True on an entry of the history whose collection is in no sheet: an own collection deleted, then Forward onto its
+	 * entry. Nothing lies over the list there, and the note of an unknown collection shows.
+	 */
+	let dead = $state(false);
 	/** True while a detail, a collection's sheet, the library at a glance or the settings, opened by a click, lie over the list. */
-	const covered = () => page.state.detail !== undefined || page.state.collection !== undefined || page.state.glance === true || page.state.settings === true;
+	const covered = () =>
+		page.state.detail !== undefined || (page.state.collection !== undefined && !dead) || page.state.glance === true || page.state.settings === true;
 	const address = (state: ViewState) => {
 		const params = toParams(state).toString();
 		return params ? `/?${params}` : '/';
@@ -125,6 +155,12 @@
 		return goto(target, { replaceState: true, keepFocus: true, noScroll: true }).catch(() => {});
 	}
 
+	/** The own collections as stored: as the page last learned them, else as the server drew the page with them. */
+	// svelte-ignore state_referenced_locally
+	let own = $state(learnedOwn ?? stored);
+	/** The own collections against the index. */
+	const shown = $derived(resolveOwn(own, entries, collections));
+
 	const view = new View(
 		() => entries,
 		initial,
@@ -136,7 +172,8 @@
 			const next = nextRemembered(recall(document.cookie, defaults), before, state);
 			if (next) document.cookie = rememberedCookie(next);
 		},
-		() => collections
+		() => collections,
+		() => shown
 	);
 
 	/** The entries by id: a collection's card shows its oldest game's picture when it has none of its own. */
@@ -205,30 +242,56 @@
 	// ---------- The game detail ----------
 
 	const detail = $derived(page.state.detail ?? linked);
-	/** The collection whose sheet is open. A game opened from it takes its place. */
-	const collection = $derived.by(() => {
+	/** The id of the collection whose sheet is open, GOG's or an own one. A game opened from it takes its place. */
+	const sheetId = $derived.by(() => {
 		if (page.state.detail) return null;
-		const id = page.state.collection;
-		if (id !== undefined) return collections.find((c) => c.id === id) ?? null;
-		if (linkedCollection) return linkedCollection;
+		const id = page.state.collection ?? linkedCollection?.id ?? linkedOwn?.id;
+		if (id !== undefined) return id;
 		// Back onto the entry of a sheet that came by its address is a shallow popstate (same navigation index as the list's
 		// entry): the list's route stays mounted with an empty state, and only the address says which sheet.
 		const named = /^\/collection\/([^/]+)$/.exec(page.url.pathname);
 		if (!named) return null;
-		let namedId: string;
 		try {
-			namedId = decodeURIComponent(named[1]);
+			return decodeURIComponent(named[1]);
 		} catch {
 			// A malformed % sequence in the address names no collection.
 			return null;
 		}
-		return collections.find((c) => c.id === namedId) ?? null;
+	});
+	/** GOG's collection whose sheet is open. */
+	const collection = $derived(sheetId !== null && !isOwnId(sheetId) ? (collections.find((c) => c.id === sheetId) ?? null) : null);
+	/** The own collection whose sheet is open, against the index. */
+	const ownSheet = $derived(sheetId !== null && isOwnId(sheetId) ? (shown.find((o) => o.id === sheetId) ?? null) : null);
+	// Worked out when an entry is reached, not when its collection goes: a sheet whose collection was just deleted is
+	// closing, and says nothing.
+	$effect(() => {
+		const id = page.state.collection;
+		untrack(() => {
+			dead = id !== undefined && collection === null && ownSheet === null;
+			if (dead) note = 'collection';
+		});
 	});
 	/** The collection of the open game, for its row of posters. */
 	const detailCollection = $derived(detail?.collection ? (collections.find((c) => c.id === detail.collection) ?? null) : null);
 	/** The games of a collection as the chip "Hide 18+" lets them through; the open game stays in its own row. */
 	const letThrough = (games: ListEntry[], keep: string | null = null) =>
 		view.hide18 ? games.filter((e) => !e.adult || e.id === keep) : games;
+	/** The rows of posters of the open game, one per collection that holds it: GOG's first, then the own ones, A to Z. */
+	const shelves = $derived.by(() => {
+		if (!detail) return [];
+		const here = detail.id;
+		const rows: { key: string; name: string; line: string; games: ListEntry[] }[] = [];
+		if (detailCollection) {
+			const games = letThrough(gamesOf(detailCollection, entries), here);
+			rows.push({ key: detailCollection.id, name: detailCollection.name, line: t.collections.shelf(detailCollection.kind, games.length), games });
+		}
+		const holding = shown.filter((o) => o.games.some((g) => g.id === here)).sort((a, b) => byTitle(a.name, b.name));
+		for (const { id, name, games: all } of holding) {
+			const games = letThrough(all, here);
+			rows.push({ key: id, name, line: t.own.shelf(games.length), games });
+		}
+		return rows;
+	});
 	/**
 	 * True while the library at a glance lies over the list: opened by a click, or by its address. Back onto the entry
 	 * of a sheet that came by its address is a shallow popstate: only the address says so, as for a collection.
@@ -260,17 +323,29 @@
 	$effect(() => {
 		const shown = covered();
 		if (!shown) closed();
-		if (over && !shown && location.pathname === '/') {
+		// The entry of a deleted collection is left as a sheet is.
+		const away = shown || dead;
+		if (over && !away && location.pathname === '/') {
 			clearTimeout(pending);
 			pending = undefined;
 			follow(new URL(location.href));
 		}
-		over = shown;
+		over = away;
 	});
 
 	/** A plain left click, without a modifier key: the ones a browser would not open elsewhere. */
 	const isPlainClick = (event: MouseEvent): boolean =>
 		event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
+
+	/**
+	 * How many entries of the history lie between the list and what opens over the open sheet: one more than for the
+	 * sheet, or 0 when the sheet came by its address; 1 when no sheet is open.
+	 */
+	function behind(): number {
+		if (page.state.collection === undefined || dead) return collection !== null || ownSheet !== null ? 0 : 1;
+		const sheet = page.state.back ?? 1;
+		return sheet === 0 ? 0 : sheet + 1;
+	}
 
 	/** A plain click opens the detail over the list, without leaving it. Anything else is a normal link. */
 	async function open(event: MouseEvent, href: string) {
@@ -286,8 +361,7 @@
 			if (result.type === 'loaded' && result.status === 200 && result.data.detail) {
 				if (!page.state.detail) {
 					// From a collection's sheet the game takes the sheet's place, and closing it goes past the sheet to the list.
-					const back = page.state.collection !== undefined ? 2 : collection !== null ? 0 : 1;
-					pushState(href, { detail: result.data.detail as Detail, list: page.state.list ?? address(view.state), back });
+					pushState(href, { detail: result.data.detail as Detail, list: page.state.list ?? address(view.state), back: behind() });
 				}
 			} else {
 				await goto(href);
@@ -300,10 +374,15 @@
 		}
 	}
 
-	/** A plain click on a collection's card opens its sheet over the list. What it shows is in the page already. */
+	/** A plain click on a collection's card opens its sheet over the list. */
 	async function openCollection(event: MouseEvent, id: string) {
 		if (!isPlainClick(event)) return;
 		event.preventDefault();
+		await showCollection(id);
+	}
+
+	/** Opens a collection's sheet over the list. What it shows is in the page already. */
+	async function showCollection(id: string) {
 		if (opening || covered()) return;
 		opening = true;
 		try {
@@ -313,6 +392,22 @@
 		} finally {
 			opening = false;
 		}
+	}
+
+	/**
+	 * A plain click on a GOG collection's card in an own collection's sheet opens its sheet in the own one's place, as a
+	 * game opened from a sheet does: closing it shows the list, and Back shows the own sheet again.
+	 */
+	function openFromSheet(event: MouseEvent, id: string) {
+		if (!isPlainClick(event)) return;
+		event.preventDefault();
+		showInPlace(id);
+	}
+
+	/** Opens a collection's sheet in the open sheet's place: from an own one, also after its "Add to…" or "Create". */
+	function showInPlace(id: string) {
+		if (opening || page.state.detail) return;
+		pushState(`/collection/${encodeURIComponent(id)}`, { collection: id, list: page.state.list ?? address(view.state), back: behind() });
 	}
 
 	/** A plain click on the count opens the library at a glance over the list. What it shows is in the page already. */
@@ -350,21 +445,22 @@
 	function close() {
 		// A second press before the first has taken effect would go back out of the list.
 		if (closing) return;
-		const back = page.state.detail ? (page.state.back ?? 1) : page.state.collection !== undefined || page.state.glance || page.state.settings ? 1 : 0;
+		const taken = page.state.detail !== undefined || page.state.collection !== undefined;
+		const back = taken ? (page.state.back ?? 1) : page.state.glance || page.state.settings ? 1 : 0;
 		if (back > 0) {
 			// Opened over the list, perhaps from a collection's sheet: going back that far shows the list where it was.
 			closing = true;
 			// Released by the navigation, and by the clock should the navigation never happen.
 			closingTimer = setTimeout(closed, 1500);
 			history.go(-back);
-		} else if (page.state.detail) {
-			// Opened over a page that came by its address: the list takes the detail's place, and Back shows that page again.
+		} else if (taken) {
+			// Opened over a page that came by its address: the list takes its place, and Back shows that page again.
 			goto(page.state.list ?? '/', { replaceState: true });
 		} else goto('/');
 	}
 
-	/** Another game of the open collection's row opens in place of this one, with its row open. */
-	async function swap(event: MouseEvent, href: string) {
+	/** Another game of an open row opens in place of this one, with that row open. */
+	async function swap(event: MouseEvent, href: string, key: string) {
 		if (!isPlainClick(event)) return;
 		event.preventDefault();
 		if (opening) return;
@@ -378,7 +474,7 @@
 					detail: result.data.detail as Detail,
 					list: page.state.list ?? address(view.state),
 					back: shallow ? (page.state.back ?? 1) : 0,
-					shelf: true
+					shelf: key
 				});
 			} else {
 				await goto(href);
@@ -426,6 +522,7 @@
 		learn(answer, answer.writable);
 		until = learnedUntil = answer.unlockedUntil;
 		lockedAgain = false;
+		ownLocked = false;
 	}
 
 	function locked(again: boolean) {
@@ -434,6 +531,131 @@
 		if (!again) {
 			locking = true;
 			close();
+		}
+	}
+
+	// ---------- Own collections: picking and saving ----------
+
+	/**
+	 * True while the PIN prompt lies over the page because a change of the own collections found this browser locked
+	 * (spec of own collections, section 13): after the right PIN the person is back where they were.
+	 */
+	let ownLocked = $state(false);
+	/** The PIN prompt is closed. Over the page after a save, it goes and the browser stays locked; at /settings, the sheet closes. */
+	function closePin() {
+		if (ownLocked) ownLocked = false;
+		else close();
+	}
+
+	/**
+	 * True while "Select" is in the bar: a PIN is set and this browser is unlocked (spec of own collections, section
+	 * 8.1), or a save found it locked and picking waits for the PIN.
+	 */
+	const selectable = $derived(settings.enabled && (until !== null || ownLocked));
+	const picking = new Picking();
+	// Locked while picking ("Lock", or the PIN prompt of a save closed without the PIN): Select leaves the bar, and
+	// picking ends with it.
+	$effect(() => {
+		if (!selectable) picking.stop();
+	});
+
+	/** True while the list "Add to…" is open, and while the dialog "New collection" is. */
+	let addOpen = $state(false);
+	let naming = $state(false);
+	/** Why the last save from the bar, or from the dialog, failed: its red line. */
+	let pickError = $state<string | null>(null);
+	let namingError = $state<string | null>(null);
+	// However picking ends, the list, the dialog and the red lines go with it.
+	$effect(() => {
+		if (picking.active) return;
+		addOpen = false;
+		naming = false;
+		pickError = namingError = null;
+	});
+
+	/** Picks or unpicks a card. What is picked has changed: the bar says what it is again. */
+	function toggle(id: string, kind: 'game' | 'collection') {
+		picking.toggle(id, kind);
+		pickError = null;
+	}
+
+	/** The own collections that the picks can go into, for "Add to…". */
+	const choices = $derived(
+		shown.map((o) => ({ id: o.id, name: o.name, games: letThrough(o.games).length, bands: bandsOf(o, view.hide18) }))
+	);
+	/** The own collections that the members of the open own sheet can go into: the others. */
+	const others = $derived(choices.filter((c) => c.id !== ownSheet?.id));
+	/** The picture of what is picked, for the dialog "New collection". */
+	const pickedBands = () => bandsOf(resolveOwn([{ id: '', name: '', members: picking.members() }], entries, collections)[0], view.hide18);
+	const taken = (name: string) => own.some((c) => sameName(c.name, name));
+
+	/**
+	 * Sends a change of the own collections, after the ones before it, and applies the answer to the page's copy. A
+	 * browser found locked brings the PIN prompt over the page; nothing is sent again by itself. From the settings sheet
+	 * (`overPage` false) it does not: the sheet gives way to the prompt itself, as for a change of the settings. A
+	 * collection that is gone when it is deleted counts as deleted.
+	 */
+	async function saveOwn(request: OwnRequest, overPage = true): Promise<OwnResult> {
+		const answer = await queue.run(request);
+		const result: OwnResult = request.kind === 'delete' && answer.kind === 'gone' ? { kind: 'saved', collection: null } : answer;
+		const before = $state.snapshot(own);
+		const next = applyResult(before, request, result);
+		if (next !== before) own = learnedOwn = next;
+		if (result.kind === 'locked' && overPage) {
+			until = learnedUntil = null;
+			ownLocked = true;
+		}
+		return result;
+	}
+
+	/** True while "Add to…" or "Create" is being saved: another click waits for it. */
+	let saving = false;
+
+	/** After a save from picking: picking ends and the collection's sheet opens, so what changed is seen even with Collections off. */
+	async function showSaved(id: string) {
+		picking.stop();
+		await tick();
+		await showCollection(id);
+	}
+
+	/** "Add to…": the picks go into that collection; those already in it stay as they are. */
+	async function addTo(id: string) {
+		addOpen = false;
+		if (saving) return;
+		saving = true;
+		pickError = null;
+		try {
+			const result = await saveOwn({ kind: 'change', id, body: { add: picking.members() } });
+			if (result.kind === 'saved') await showSaved(id);
+			else if (picking.active) pickError = failureText(result);
+		} finally {
+			saving = false;
+		}
+	}
+
+	function startNaming() {
+		addOpen = false;
+		namingError = null;
+		naming = true;
+	}
+
+	/** "Create": a collection of the picks, named so. */
+	async function create(name: string) {
+		if (saving) return;
+		saving = true;
+		namingError = null;
+		try {
+			const result = await saveOwn({ kind: 'create', body: { name, members: picking.members() } });
+			if (result.kind === 'saved' && result.collection) {
+				// The dialog closes first: the focus it gives back then goes on into the sheet.
+				naming = false;
+				await tick();
+				await showSaved(result.collection.id);
+			} else if (naming) namingError = failureText(result);
+			// The dialog was closed meanwhile: the bar says why.
+			else if (picking.active) pickError = failureText(result);
+		} finally {
+			saving = false;
 		}
 	}
 
@@ -448,6 +670,8 @@
 			event.preventDefault();
 			bar.focusSearch();
 		}
+		// Esc ends picking, unless it closes a sheet or empties the search box.
+		if (event.key === 'Escape' && picking.active && !event.defaultPrevented && !document.querySelector('dialog[open]')) picking.stop();
 	}
 
 	/** From the search box to the first card: it has the focus and its ring. False when the list is empty. */
@@ -484,10 +708,10 @@
 <svelte:window onkeydown={keydown} />
 
 <svelte:head>
-	<title>{detail ? t.gameTitle(detail.title) : collection ? t.collectionTitle(collection.name) : glanceOpen ? t.glanceTitle : settingsOpen ? t.settingsTitle : t.pageTitle}</title>
+	<title>{detail ? t.gameTitle(detail.title) : collection ? t.collectionTitle(collection.name) : ownSheet ? t.collectionTitle(ownSheet.name) : glanceOpen ? t.glanceTitle : settingsOpen ? t.settingsTitle : t.pageTitle}</title>
 </svelte:head>
 
-<TopBar bind:this={bar} {view} onfilters={() => (filtersOpen = true)} onresults={toResults} />
+<TopBar bind:this={bar} {view} onfilters={() => (filtersOpen = true)} onresults={toResults} {selectable} {picking} />
 
 <main>
 	{#if note}
@@ -495,12 +719,21 @@
 	{/if}
 	<CountLine {view} onglance={openGlance} />
 	{#if view.cards.length > 0}
-		<div class="grid" bind:this={grid}>
+		<div class="grid" class:has-pick-room={selectable} bind:this={grid}>
 			{#each view.shown as card (card.key)}
 				{#if card.kind === 'game'}
-					<Card match={card} onopen={open} />
+					{@const id = card.entry.id}
+					<Card match={card} onopen={open} pick={picking.active ? { picked: picking.has(id), ontoggle: () => toggle(id, 'game') } : null} />
+				{:else if card.kind === 'collection'}
+					{@const id = card.collection.id}
+					<CollectionCard
+						{card}
+						oldest={byId.get(card.collection.games[0])}
+						onopen={openCollection}
+						pick={picking.active ? { picked: picking.has(id), ontoggle: () => toggle(id, 'collection') } : null}
+					/>
 				{:else}
-					<CollectionCard {card} oldest={byId.get(card.collection.games[0])} onopen={openCollection} />
+					<OwnCard {card} bands={bandsOf(card.own, view.hide18)} onopen={openCollection} faded={picking.active} />
 				{/if}
 			{/each}
 		</div>
@@ -514,17 +747,34 @@
 	<div class="sentinel" bind:this={sentinel}></div>
 </main>
 
+{#if picking.active}
+	<PickBar counts={picking.counts} error={pickError} onaddto={() => (addOpen = !addOpen)} onnew={startNaming} oncancel={() => picking.stop()} {addOpen}>
+		<AddToList count={picking.counts.n} {choices} onchoose={addTo} onnew={startNaming} onclose={() => (addOpen = false)} />
+	</PickBar>
+	<!-- The dialog "New collection": a small sheet of its own, in the look of the PIN prompt. -->
+	<Sheet open={naming} onclose={() => (naming = false)} class="pin new-coll" label={t.own.newCollection}>
+		<NewCollection
+			bands={pickedBands()}
+			what={t.own.picks(picking.counts.games, picking.counts.collections)}
+			{taken}
+			error={namingError}
+			oncreate={create}
+			onclose={() => (naming = false)}
+		/>
+	</Sheet>
+{/if}
+
 <Foot {version} {builtAt} {timeZone} {update} settings={settings.enabled ? 'on' : 'off'} onsettings={openSettings} />
 
 <FilterPanel open={filtersOpen} onclose={() => (filtersOpen = false)} {view} {entries} />
 
 <!-- One sheet for a game, a collection, the library at a glance and the settings: a game opened from a collection takes its place without the sheet closing. -->
 <Sheet
-	open={detail !== null || collection !== null || (glanceOpen && glance !== null) || (settingsOpen && until !== null && current !== null)}
+	open={detail !== null || collection !== null || ownSheet !== null || (glanceOpen && glance !== null) || (settingsOpen && until !== null && current !== null)}
 	onclose={close}
 	class="detail"
-	label={detail?.title ?? collection?.name ?? (glanceOpen ? t.glance.title : settingsOpen ? t.settings.title : '')}
-	view={detail ? `game/${detail.id}` : collection ? `collection/${collection.id}` : glanceOpen ? 'glance' : settingsOpen ? 'settings' : ''}
+	label={detail?.title ?? collection?.name ?? ownSheet?.name ?? (glanceOpen ? t.glance.title : settingsOpen ? t.settings.title : '')}
+	view={detail ? `game/${detail.id}` : collection ? `collection/${collection.id}` : ownSheet ? `collection/${ownSheet.id}` : glanceOpen ? 'glance' : settingsOpen ? 'settings' : ''}
 >
 	{#if detail}
 		{#key detail.id}
@@ -533,9 +783,8 @@
 				{visitor}
 				onclose={close}
 				ontag={searchTag}
-				collection={detailCollection}
-				collectionGames={detailCollection ? letThrough(gamesOf(detailCollection, entries), detail.id) : []}
-				shelfOpen={page.state.shelf ?? false}
+				{shelves}
+				openShelf={page.state.shelf ?? null}
 				onswap={swap}
 				theo={current?.theo ?? settings.theo}
 				batocera={{
@@ -552,6 +801,20 @@
 		{#key collection.id}
 			<CollectionView {collection} games={letThrough(gamesOf(collection, entries))} onclose={close} onopen={open} />
 		{/key}
+	{:else if ownSheet}
+		{#key ownSheet.id}
+			<OwnCollectionView
+				own={ownSheet}
+				hide18={view.hide18}
+				onclose={close}
+				onopen={open}
+				onopencollection={openFromSheet}
+				unlocked={selectable}
+				{others}
+				save={saveOwn}
+				onshow={showInPlace}
+			/>
+		{/key}
 	{:else if glanceOpen && glance}
 		<GlanceView {glance} games={entries.length} collections={collections.length} {builtAt} {timeZone} onclose={close} />
 	{:else if settingsOpen && until !== null && current !== null}
@@ -564,11 +827,14 @@
 			onsaved={(answer) => learn(answer, answer.writable)}
 			onlocked={locked}
 			onclose={close}
+			own={choices}
+			saveOwn={(request) => saveOwn(request, false)}
 		/>
 	{/if}
 </Sheet>
 
-<!-- The PIN prompt: a small sheet of its own, at /settings while this browser is locked. -->
-<Sheet open={settingsOpen && until === null && !locking} onclose={close} class="pin" label={t.pin.title}>
-	<PinPrompt again={lockedAgain} onunlocked={unlocked} onclose={close} />
+<!-- The PIN prompt: a small sheet of its own, at /settings while this browser is locked, and over the page when a
+     change of the own collections found it locked. -->
+<Sheet open={(settingsOpen && until === null && !locking) || ownLocked} onclose={closePin} class="pin" label={t.pin.title}>
+	<PinPrompt again={lockedAgain || ownLocked} onunlocked={unlocked} onclose={closePin} />
 </Sheet>

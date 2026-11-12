@@ -6,6 +6,7 @@ import { NO_SERVER, NO_SETTINGS, type ServerSettings, type Settings } from '../s
 import { createApp } from './app';
 import { Batocera } from './batocera/service';
 import { createLogger, silentLogger, type Logger } from './log';
+import { OwnStore } from './own-store';
 import { SettingsStore } from './settings';
 import { FIRST_CHECK_MS } from './updates';
 
@@ -26,6 +27,12 @@ describe('createApp', () => {
 	it('creates the Batocera service whenever it creates a settings store', () => {
 		expect(createApp(required, silentLogger).batocera).toBeNull();
 		expect(createApp({ ...required, SETTINGS_PIN: '2468' }, silentLogger).batocera).toBeInstanceOf(Batocera);
+	});
+
+	// Without a PIN the collections file is not read: spec of own collections, section 4.
+	it('creates the store of own collections whenever it creates a settings store', () => {
+		expect(createApp(required, silentLogger).own).toBeNull();
+		expect(createApp({ ...required, SETTINGS_PIN: '2468' }, silentLogger).own).toBeInstanceOf(OwnStore);
 	});
 });
 

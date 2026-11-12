@@ -2,7 +2,7 @@
 	import { genreName } from '$lib/genres';
 	import type { Preferred } from '$lib/settings';
 	import { t } from '$lib/strings';
-	import type { Collection, Detail, ListEntry, Os } from '$lib/types';
+	import type { Detail, ListEntry, Os } from '$lib/types';
 	import type { Visitor } from '$lib/visitor';
 	import DownloadBlock from './DownloadBlock.svelte';
 	import Icon from './Icon.svelte';
@@ -19,14 +19,12 @@
 		onclose: () => void;
 		/** A tag was chosen: the list is searched for it. */
 		ontag: (tag: string) => void;
-		/** The game's collection, or null. */
-		collection?: Collection | null;
-		/** Its games in the list, oldest first. */
-		collectionGames?: ListEntry[];
-		/** True when the game was opened from the open row of its collection: the row starts open. */
-		shelfOpen?: boolean;
-		/** Another game of the row was clicked: it opens in place of this one. */
-		onswap?: (event: MouseEvent, href: string) => void;
+		/** The collections that hold the game, each a folded line: GOG's first, then the own ones, A to Z. Their games in the list, oldest first. */
+		shelves?: { key: string; name: string; line: string; games: ListEntry[] }[];
+		/** The key of the row the game was opened from: that row starts open. */
+		openShelf?: string | null;
+		/** Another game of a row was clicked: it opens in place of this one. */
+		onswap?: (event: MouseEvent, href: string, key: string) => void;
 		/** True while the settings switch the theo command on. */
 		theo?: boolean;
 		/** Batocera and the preferred platform, as the settings say them for this browser (0.12.0). */
@@ -34,7 +32,7 @@
 		/** The time zone the day of a send to Batocera is written in. */
 		timeZone?: string;
 	}
-	let { detail, visitor, onclose, ontag, collection = null, collectionGames = [], shelfOpen = false, onswap = () => {}, theo = false, batocera = null, timeZone = 'UTC' }: Props = $props();
+	let { detail, visitor, onclose, ontag, shelves = [], openShelf = null, onswap = () => {}, theo = false, batocera = null, timeZone = 'UTC' }: Props = $props();
 
 	const developers = $derived(detail.developers.join(', '));
 	const hasMakers = $derived(developers !== '' || detail.publisher !== '');
@@ -110,9 +108,9 @@
 		<div class="dl-slot"><DownloadBlock {detail} {visitor} onsystem={blockShows} {theo} {batocera} {timeZone} /></div>
 	</div>
 
-	{#if collection}
-		<Shelf {collection} games={collectionGames} here={detail.id} open={shelfOpen} onopen={onswap} />
-	{/if}
+	{#each shelves as shelf (shelf.key)}
+		<Shelf {...shelf} here={detail.id} open={openShelf === shelf.key} onopen={onswap} />
+	{/each}
 
 	<Screenshots screenshots={detail.screenshots} />
 

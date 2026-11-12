@@ -221,7 +221,7 @@ async function holdsTheTabs(page: Page): Promise<void> {
 		await choose(page, name);
 		expect(await rooms(page, IN_PLACE)).toEqual(held);
 	}
-	await expect(shownPanels(page).locator('h2')).toHaveText(['How the library opens in a browser that has not chosen its own view']);
+	await expect(shownPanels(page).locator('h2')).toHaveText(['How the library opens in a browser that has not chosen its own view', 'Your collections 0, A to Z']);
 	const [under, starts] = await page.evaluate(() =>
 		['.settings-tabs', '.settings-section'].map((part) => {
 			const box = document.querySelector(`dialog.detail ${part}`)!.getBoundingClientRect();
@@ -230,7 +230,7 @@ async function holdsTheTabs(page: Page): Promise<void> {
 	);
 	// The sheet scrolls by whole pixels: the section starts within one of the row's bottom.
 	expect(Math.abs(starts - under)).toBeLessThan(1);
-	await expect(shownPanels(page)).toBeInViewport({ ratio: 1 });
+	await expect(shownPanels(page).first()).toBeInViewport({ ratio: 1 });
 	// Back at the top the row is at rest again, with nothing behind it.
 	await sheet(page).evaluate((dialog) => dialog.scrollTo(0, 0));
 	await expect.poll(background).toBe('rgba(0, 0, 0, 0)');
@@ -413,7 +413,7 @@ test.describe('the settings sheet', () => {
 		await openPrompt(page);
 		await unlock(page);
 		const panels = shownPanels(page);
-		await expect(panels.locator('h2')).toHaveText(['How the library opens in a browser that has not chosen its own view']);
+		await expect(panels.locator('h2')).toHaveText(['How the library opens in a browser that has not chosen its own view', 'Your collections 0, A to Z']);
 		const rows = panels.first().locator('.set-row');
 		await expect(rows.locator('.set-k')).toHaveText(['Sorted', 'Platforms', 'Collections', 'Age']);
 		await expect(rows.nth(0).locator('button.chip')).toHaveText(['A to Z', 'Recently added', 'Release year']);
@@ -612,13 +612,13 @@ test.describe('the settings sheet', () => {
 		const tabs = sheet(page).getByRole('tab');
 		const section = sheet(page).getByRole('tabpanel');
 		const panelTitles = section.locator('.settings-panel h2');
-		const LIBRARY = ['How the library opens in a browser that has not chosen its own view'];
+		const LIBRARY = ['How the library opens in a browser that has not chosen its own view', 'Your collections 0, A to Z'];
 		const SERVER = ['This Canvas what the server says now', 'Server what Canvas does on its own'];
 		await expect(tabs).toHaveText(['Library', 'Downloads', 'Batocera', 'Server']);
 		await expect(sheet(page).getByRole('tab', { selected: true })).toHaveText('Library');
 		await expect(section).toHaveAccessibleName('Library');
-		// Its panel is the only one shown; each tab has a section of its own.
-		await expect(sheet(page).locator('.settings-panel').filter({ visible: true })).toHaveCount(1);
+		// Its panels are the only ones shown; each tab has a section of its own.
+		await expect(sheet(page).locator('.settings-panel').filter({ visible: true })).toHaveCount(2);
 		await expect(panelTitles).toHaveText(LIBRARY);
 		const ids = ['library', 'downloads', 'batocera', 'server'].map((name) => `settings-section-${name}`);
 		expect(await tabs.evaluateAll((nodes) => nodes.map((node) => node.getAttribute('aria-controls')))).toEqual(ids);

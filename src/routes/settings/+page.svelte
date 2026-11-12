@@ -8,6 +8,7 @@
 <Library
 	entries={data.entries}
 	collections={data.collections}
+	own={data.own}
 	glance={data.glance}
 	builtAt={data.builtAt}
 	version={data.version}

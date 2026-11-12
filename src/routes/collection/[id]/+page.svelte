@@ -8,6 +8,7 @@
 <Library
 	entries={data.entries}
 	collections={data.collections}
+	own={data.own}
 	glance={data.glance}
 	builtAt={data.builtAt}
 	version={data.version}
@@ -18,5 +19,6 @@
 	settings={data.settings}
 	defaults={data.defaults}
 	linkedCollection={data.collection}
-	unknown={data.collection === null ? 'collection' : null}
+	linkedOwn={data.linkedOwn}
+	unknown={data.collection === null && data.linkedOwn === null ? 'collection' : null}
 />

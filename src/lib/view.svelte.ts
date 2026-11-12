@@ -1,3 +1,4 @@
+import type { ShownOwn } from './own';
 import { cards, type ListCard } from './search/cards';
 import type { Sort, Together, ViewState } from './search/state';
 import type { Collection, ListEntry, Os } from './types';
@@ -11,6 +12,16 @@ function toggled<T>(list: T[], value: T): T[] {
 
 function same(a: ViewState, b: ViewState): boolean {
 	return JSON.stringify(a) === JSON.stringify(b);
+}
+
+/** How many games the cards stand for, each once: a game may be in two collections' cards. */
+function gameCount(cards: ListCard[]): number {
+	const ids = new Set<string>();
+	for (const card of cards) {
+		if (card.kind === 'game') ids.add(card.entry.id);
+		else for (const entry of card.games) ids.add(entry.id);
+	}
+	return ids.size;
 }
 
 /**
@@ -36,9 +47,9 @@ export class View {
 	readonly cards: ListCard[];
 	/** The cards that are drawn. */
 	readonly shown: ListCard[];
-	/** How many games the cards stand for: a collection's card counts its games. */
+	/** How many games the cards stand for: a collection's card counts its games, and a game counts once. */
 	readonly games: number;
-	/** How many of the cards are collections. */
+	/** How many of the cards are collections, own and GOG's. */
 	readonly collectionCount: number;
 	/** The size of the whole library. */
 	readonly total: number;
@@ -49,19 +60,20 @@ export class View {
 
 	#changed: (state: ViewState, before: ViewState) => void;
 
-	/** `entries` and `collections` are functions, so that newer ones are picked up when the page data changes. */
+	/** `entries`, `collections` and `own` are functions, so that newer ones are picked up when the page data changes. */
 	constructor(
 		entries: () => ListEntry[],
 		initial: ViewState,
 		changed: (state: ViewState, before: ViewState) => void = () => {},
-		collections: () => Collection[] = () => []
+		collections: () => Collection[] = () => [],
+		own: () => ShownOwn[] = () => []
 	) {
 		this.#changed = changed;
 		this.#set(initial);
-		this.cards = $derived(cards(entries(), collections(), this.state));
+		this.cards = $derived(cards(entries(), collections(), this.state, own()));
 		this.shown = $derived(this.cards.slice(0, this.limit));
-		this.games = $derived(this.cards.reduce((n, card) => n + (card.kind === 'collection' ? card.games.length : 1), 0));
-		this.collectionCount = $derived(this.cards.filter((card) => card.kind === 'collection').length);
+		this.games = $derived(gameCount(this.cards));
+		this.collectionCount = $derived(this.cards.filter((card) => card.kind !== 'game').length);
 		this.total = $derived(entries().length);
 		this.filterCount = $derived(this.os.length + this.genres.length + this.together.length + (this.hide18 ? 1 : 0));
 		this.narrowed = $derived(this.filterCount > 0 || this.q.trim() !== '');

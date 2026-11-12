@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { kindCounts } from '$lib/extras';
 	import { genreName } from '$lib/genres';
+	import { pickKey, type Pick } from '$lib/picking.svelte';
 	import type { Match } from '$lib/search/query';
 	import { t } from '$lib/strings';
 	import Icon from './Icon.svelte';
@@ -12,8 +13,10 @@
 		match: Match;
 		/** Called for a click. The card is a link and works without it. */
 		onopen?: (event: MouseEvent, href: string) => void;
+		/** While picking (spec of own collections, section 8.2): a click, Enter or Space picks or unpicks it instead of opening it. */
+		pick?: Pick | null;
 	}
-	let { match, onopen }: Props = $props();
+	let { match, onopen, pick = null }: Props = $props();
 
 	const entry = $derived(match.entry);
 	const missing = $derived(entry.complete && !entry.hasFiles);
@@ -31,14 +34,24 @@
 
 <a
 	class="card"
+	class:is-picking={pick !== null}
+	class:is-picked={pick?.picked}
 	{href}
-	onclick={(event) => onopen?.(event, href)}
+	role={pick ? 'button' : undefined}
+	aria-pressed={pick ? pick.picked : undefined}
+	onclick={(event) => {
+		if (!pick) return onopen?.(event, href);
+		event.preventDefault();
+		pick.ontoggle();
+	}}
+	onkeydown={(event) => pickKey(event, pick)}
 	onmouseenter={run}
 	onmouseleave={rest}
 	onfocus={run}
 	onblur={rest}
 >
 	<div class="poster">
+		{#if pick}<span class="pick-dot" aria-hidden="true"><Icon name="check" /></span>{/if}
 		<Poster title={entry.title} poster={entry.poster} banner={entry.banner} />
 		{#if missing}
 			<span class="badge-warn" title={t.card.filesMissingLong}><WarnSign /></span>

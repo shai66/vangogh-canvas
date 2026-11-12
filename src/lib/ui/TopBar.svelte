@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { Picking } from '$lib/picking.svelte';
 	import { t } from '$lib/strings';
 	import { ALL_OS } from '$lib/types';
 	import type { View } from '$lib/view.svelte';
@@ -9,8 +10,11 @@
 		onfilters: () => void;
 		/** Enter or the down arrow in the box: moves the focus to the first result. False when there is none. */
 		onresults: () => boolean;
+		/** True while "Select" is in the bar: a PIN is set and this browser is unlocked (spec of own collections, section 8.1). */
+		selectable: boolean;
+		picking: Picking | null;
 	}
-	let { view, onfilters, onresults }: Props = $props();
+	let { view, onfilters, onresults, selectable, picking }: Props = $props();
 
 	let input: HTMLInputElement;
 
@@ -76,6 +80,19 @@
 	<button class="view-toggle" type="button" aria-pressed={view.grouped} aria-label={t.bar.collections} title={t.bar.collectionsTitle} onclick={() => view.toggleGrouped()}>
 		<Icon name="stack" /><span class="label">{t.bar.collections}</span>
 	</button>
+	{#if selectable && picking}
+		{@const picks = picking}
+		<button
+			class="view-toggle select-toggle"
+			type="button"
+			aria-pressed={picks.active}
+			aria-label={t.bar.select}
+			title={t.bar.selectTitle}
+			onclick={() => (picks.active ? picks.stop() : picks.start())}
+		>
+			<Icon name="ok" /><span class="label">{t.bar.select}</span>
+		</button>
+	{/if}
 	<button
 		class="filter-button"
 		class:is-active={view.filterCount > 0}

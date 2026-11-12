@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { tick } from 'svelte';
 	import { dayWhen } from '$lib/age';
+	import type { Band } from '$lib/own';
+	import { failureText, type OwnRequest, type OwnResult } from '$lib/own-saver';
 	import type { Sort } from '$lib/search/state';
 	import { PREFERRED, SORTS, type Preferred, type ServerSettings, type SettingsAnswer, type SettingsBody } from '$lib/settings';
 	import { SettingsSaver, sendSettings } from '$lib/settings-saver';
@@ -9,6 +11,7 @@
 	import BatoceraSettings from './BatoceraSettings.svelte';
 	import type { IconName } from './icons';
 	import Icon from './Icon.svelte';
+	import OwnCollectionsPanel from './OwnCollectionsPanel.svelte';
 	import ServerTab from './ServerTab.svelte';
 	import { nextTab } from './tabs';
 
@@ -26,8 +29,12 @@
 		/** The browser is locked: by "Lock" (false), or it was locked meanwhile (true). */
 		onlocked: (again: boolean) => void;
 		onclose: () => void;
+		/** The own collections, for the panel "Your collections". */
+		own: { id: string; name: string; games: number; bands: Band[] }[];
+		/** Sends a change of the own collections and applies the answer to the page's copy. A browser found locked is left to the sheet. */
+		saveOwn: (request: OwnRequest) => Promise<OwnResult>;
 	}
-	let { settings, unlockedUntil, writable = $bindable(), timeZone, onsaved, onlocked, onclose }: Props = $props();
+	let { settings, unlockedUntil, writable = $bindable(), timeZone, onsaved, onlocked, onclose, own, saveOwn }: Props = $props();
 
 	const until = $derived(t.settings.until(dayWhen(new Date(unlockedUntil), timeZone)));
 
@@ -37,11 +44,9 @@
 	/** What the chips and the switch show: changed at the press, and back to what the server holds when a save fails. */
 	// svelte-ignore state_referenced_locally
 	let shown = $state<SettingsAnswer>($state.snapshot(settings));
-	/** How the last change failed, when it got no answer or Canvas refused it. */
-	let failure = $state<'unreachable' | 'forbidden' | null>(null);
-	const notice = $derived(
-		failure === 'unreachable' ? t.settings.unreachable : failure === 'forbidden' ? t.settings.refused : writable ? null : t.settings.unwritable
-	);
+	/** Why the last change failed, when it got no answer, Canvas refused it, or the own collection was gone: the notice's words. */
+	let failure = $state<string | null>(null);
+	const notice = $derived(failure ?? (writable ? null : t.settings.unwritable));
 
 	/** "Saved" shows for a moment after each change that was saved. */
 	let savedShown = $state(false);
@@ -98,11 +103,7 @@
 			const { ready, hostKey, mac } = result.answer.batocera;
 			shown = { ...shown, batocera: { ...shown.batocera, ready, hostKey, mac }, inEffect: result.answer.inEffect };
 			// Only the latest press says "Saved": the answer to an earlier one comes while a later is still under way.
-			if (press === presses) {
-				savedShown = true;
-				clearTimeout(savedTimer);
-				savedTimer = setTimeout(() => (savedShown = false), 1600);
-			}
+			if (press === presses) flashSaved();
 			onsaved(result.answer);
 			return;
 		}
@@ -124,8 +125,40 @@
 			failure = null;
 			writable = false;
 		} else if (result.kind === 'unreachable' || result.kind === 'forbidden') {
-			failure = result.kind;
+			failure = result.kind === 'unreachable' ? t.settings.unreachable : t.settings.refused;
 		}
+	}
+
+	/** "Saved" shows for a moment. */
+	function flashSaved() {
+		savedShown = true;
+		clearTimeout(savedTimer);
+		savedTimer = setTimeout(() => (savedShown = false), 1600);
+	}
+
+	/**
+	 * A change of the own collections, from the panel "Your collections" (spec of own collections, section 10). What
+	 * failed says why in the notice under the head and "Not saved" in the foot, as for a change of the settings; a
+	 * browser found locked gives way to the PIN prompt, as a refused change of the settings does.
+	 */
+	async function changeOwn(request: OwnRequest): Promise<OwnResult> {
+		const result = await saveOwn(request);
+		if (result.kind === 'saved') {
+			failure = null;
+			notSaved = false;
+			// The folder was written: it can be written.
+			if (!writable) writable = true;
+		} else if (result.kind === 'locked') {
+			onlocked(true);
+		} else {
+			savedShown = false;
+			notSaved = true;
+			if (result.kind === 'unwritable') {
+				failure = null;
+				writable = false;
+			} else failure = failureText(result);
+		}
+		return result;
 	}
 
 	const setDefaults = (part: Partial<SettingsAnswer['defaults']>) => change({ ...shown, defaults: { ...shown.defaults, ...part } });
@@ -338,6 +371,7 @@
 					</div>
 					<p class="set-note">{t.settings.keepsOwn}</p>
 				</section>
+				<OwnCollectionsPanel {own} save={changeOwn} onsaved={flashSaved} />
 			</div>
 			<div role="tabpanel" id="settings-section-downloads" aria-labelledby="settings-tab-downloads" hidden={tab !== 'downloads'}>
 				<section class="settings-panel">
@@ -387,7 +421,7 @@
 					onpassword={setPassword}
 					ontested={tested}
 					onlocked={() => onlocked(true)}
-					onrefused={() => (failure = 'forbidden')}
+					onrefused={() => (failure = t.settings.refused)}
 				/>
 			</div>
 			<div role="tabpanel" id="settings-section-server" aria-labelledby="settings-tab-server" hidden={tab !== 'server'}>
@@ -398,7 +432,7 @@
 					stack={shown.stack}
 					onchange={setServer}
 					onlocked={() => onlocked(true)}
-					onrefused={() => (failure = 'forbidden')}
+					onrefused={() => (failure = t.settings.refused)}
 				/>
 			</div>
 		</div>

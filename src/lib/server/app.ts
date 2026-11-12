@@ -4,6 +4,7 @@ import { Batocera } from './batocera/service';
 import { loadConfig, type Config } from './config';
 import { buildIndex } from './indexer';
 import { createLogger, type Logger } from './log';
+import { OwnStore } from './own-store';
 import { Rebuilder } from './rebuilder';
 import { Scheduler } from './scheduler';
 import { SettingsStore } from './settings';
@@ -26,6 +27,8 @@ export interface App {
 	startedAt: string;
 	/** Null while no PIN is set: then the settings file is not read. */
 	settings: SettingsStore | null;
+	/** Null while no PIN is set, as `settings` is: then the collections file is not read. */
+	own: OwnStore | null;
 	/** Null while settings are off: everything of Batocera needs them. */
 	batocera: Batocera | null;
 	/**
@@ -76,6 +79,7 @@ export function createApp(
 	const urlReplaced = stackUrl !== '' && stackUrl !== config.versionCheckUrl;
 	let checking = false;
 	const settings = config.settingsPin ? new SettingsStore({ dir: config.settingsDir, log }) : null;
+	const own = settings ? new OwnStore({ dir: config.settingsDir, log }) : null;
 	const batocera = settings ? new Batocera({ config, settings, store, client, log }) : null;
 	const app: App = {
 		config,
@@ -88,6 +92,7 @@ export function createApp(
 		updatesOn: () => checking,
 		startedAt,
 		settings,
+		own,
 		batocera,
 		applyServer() {
 			const inEffect = serverInEffect(settings?.get().server ?? NO_SERVER, stackServer(config));
@@ -116,6 +121,7 @@ export async function startApp(
 	const app = createApp(env);
 	const cached = await app.store.load();
 	await app.settings?.load();
+	await app.own?.load();
 	await app.batocera?.start();
 	// The values in effect: the sheet's where it changed them, else the stack's.
 	const inEffect = serverInEffect(app.settings?.get().server ?? NO_SERVER, stackServer(app.config));
@@ -126,7 +132,8 @@ export async function startApp(
 		timeZone: inEffect.timeZone,
 		cachedIndex: cached,
 		versionCheck: inEffect.versionCheck,
-		settings: app.settings !== null
+		settings: app.settings !== null,
+		ownCollections: app.own?.all().length ?? 0
 	});
 	app.scheduler.start();
 	app.applyServer();

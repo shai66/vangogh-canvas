@@ -10,7 +10,7 @@ import type { LayoutServerLoad } from './$types';
 
 /** What every page needs: the whole list, and a few facts about Canvas and the visitor. */
 export const load: LayoutServerLoad = ({ request, cookies }) => {
-	const { store, config, updates, updatesOn, rebuilder, client, settings } = getApp();
+	const { store, config, updates, updatesOn, rebuilder, client, settings, own } = getApp();
 	const index = store.get();
 	const saved = settings?.get() ?? NO_SETTINGS;
 	const until = unlockedUntil(config.settingsPin, cookies.get(UNLOCK_COOKIE));
@@ -23,6 +23,8 @@ export const load: LayoutServerLoad = ({ request, cookies }) => {
 		preparing: index ? null : preparingState(rebuilder.status(), client.loginState),
 		entries: index?.entries ?? [],
 		collections: index?.collections ?? [],
+		// Spec of own collections, section 4: as stored; none without a PIN, since then the file is not read.
+		own: own?.all() ?? [],
 		// Worked out once per index, from the details on the server: the page gets the numbers only.
 		glance: index ? glanceFor(index) : null,
 		builtAt: index?.builtAt ?? null,

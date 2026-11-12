@@ -26,6 +26,8 @@ const osName: Record<Os, string> = { windows: 'Windows', macos: 'macOS', linux: 
 
 /** What a collection is, as the card, the sheet and the row name it. */
 const COLLECTION_KIND: Record<CollectionKind, string> = { series: 'Series', pack: 'Pack', collection: 'Collection' };
+/** What an own collection is, where a GOG collection says its kind. */
+const HAND_PICKED = 'Hand-picked';
 
 /** The names the kinds of extras are shown by, by GOG's word. Their order is in src/lib/extras.ts. */
 const EXTRA_KIND_NAMES = new Map<string, string>([
@@ -265,7 +267,10 @@ export const t = {
 		filters: 'Filters',
 		filtersOn: (n: number) => `Filters, ${n} on`,
 		collections: 'Collections',
-		collectionsTitle: 'Show each collection as one card'
+		collectionsTitle: 'Show each collection as one card',
+		/** Picking for own collections (spec of own collections, section 8.1). */
+		select: 'Select',
+		selectTitle: 'Pick games for your collections'
 	},
 
 	count: {
@@ -296,6 +301,7 @@ export const t = {
 			dlc: (value: string) => `contains: ${value}`,
 			series: (value: string) => `series: ${value}`,
 			pack: (value: string) => `pack: ${value}`,
+			collection: (value: string) => `collection: ${value}`,
 			genre: (value: string) => `genre: ${value}`,
 			tag: (value: string) => `tag: ${value}`,
 			developer: (value: string) => `by ${value}`,
@@ -411,6 +417,78 @@ export const t = {
 		here: (year: number | null) => (year ? `This game · ${year}` : 'This game'),
 		earlier: 'Earlier games',
 		more: 'More games'
+	},
+
+	/** Own collections (0.13.0). */
+	own: {
+		/** Where GOG's collections say Series or Pack; Claude's wording (spec of own collections, section 7). */
+		kind: HAND_PICKED,
+		/** The tooltip of an own collection's badge: "Hand-picked, 6 games: A, B, C, D, E, F". */
+		pill: (titles: string[]) => `${HAND_PICKED}, ${plural(titles.length, 'game', 'games')}: ${titles.join(', ')}`,
+		/** What an own collection is, on its sheet: "**Hand-picked**, 6 games in your library, **1997–2020**". */
+		what: (games: number, years: string): TextPart[] => {
+			const parts: TextPart[] = [
+				{ plain: '', bold: HAND_PICKED },
+				{ plain: `, ${plural(games, 'game', 'games')} in your library`, bold: '' }
+			];
+			if (years) parts.push({ plain: ', ', bold: years });
+			return parts;
+		},
+		/** The folded line in a game's detail, after the collection's name: "Hand-picked, 6 games in your library". */
+		shelf: (n: number) => `${HAND_PICKED}, ${plural(n, 'game', 'games')} in your library`,
+		membersTitle: 'In this collection',
+		/**
+		 * After the heading of the sheet: "3 games and 1 series, oldest first". One GOG collection says its kind; more
+		 * than one, "2 GOG collections".
+		 */
+		membersNote: (games: number, gog: CollectionKind[]) => {
+			const parts = games > 0 ? [plural(games, 'game', 'games')] : [];
+			if (gog.length === 1) parts.push(`1 ${COLLECTION_KIND[gog[0]].toLowerCase()}`);
+			else if (gog.length > 1) parts.push(`${gog.length} GOG collections`);
+			return `${parts.join(' and ')}, oldest first`;
+		},
+		/** A sheet without members, or none that the chip "Hide 18+" lets through. */
+		empty: 'Nothing in it yet.',
+		/** A change of a collection that another browser deleted; Claude's wording (spec of own collections, section 13). */
+		gone: 'That collection is gone. It was deleted in another browser.',
+		/** A name that another own collection has, letter case ignored (section 8.4). */
+		taken: 'There is already a collection of that name.',
+		/** The bar while picking (section 8.2): "3 selected", and under it what they are, "2 games and 1 GOG collection". */
+		selected: (n: number) => `${n} selected`,
+		picks: (games: number, collections: number) => {
+			const parts = games > 0 ? [plural(games, 'game', 'games')] : [];
+			if (collections > 0) parts.push(plural(collections, 'GOG collection', 'GOG collections'));
+			return parts.length > 0 ? parts.join(' and ') : 'Click cards to pick them';
+		},
+		addTo: 'Add to…',
+		newCollection: 'New collection',
+		cancel: 'Cancel',
+		/** The list "Add to…" (section 8.3): its head, "Add 3 to", and its last row. */
+		addHead: (n: number) => `Add ${n} to`,
+		addNew: 'New collection…',
+		/** The dialog "New collection" (section 8.4), after what is picked: "2 games and 1 GOG collection. You can add more, …". */
+		newText: (what: string) => `${what}. You can add more, or take some out, later.`,
+		name: 'Name',
+		create: 'Create',
+		/** Editing in a collection's sheet (section 9.2): the row under the facts, and the bar at the sheet's foot. */
+		edit: 'Edit',
+		done: 'Done',
+		deleteCollection: 'Delete collection',
+		takeHint: 'Pick cards to take them out or add them to another collection',
+		takeOut: 'Take out',
+		/** The question before a delete: "Delete “Party night”? Its games stay in the library." */
+		deleteAsk: (name: string) => `Delete “${name}”? Its games stay in the library.`,
+		delete: 'Delete',
+		keep: 'Keep',
+		/** The panel in the settings' Library tab (section 10): its title, and after it "3, A to Z". */
+		panel: 'Your collections',
+		panelNote: (n: number) => `${n}, A to Z`,
+		rename: 'Rename',
+		save: 'Save',
+		none: 'No collections yet.',
+		panelHint: 'To make one, close the settings and press Select in the library. To take games out of one, open it and press Edit.',
+		/** Why "Save" is off for a name of spaces, under the field; Claude's wording. */
+		nameEmpty: 'The name is empty.'
 	},
 
 	download: {

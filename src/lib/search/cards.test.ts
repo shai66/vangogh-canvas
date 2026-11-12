@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { resolveOwn, type OwnCollection } from '$lib/own';
 import type { Collection, ListEntry } from '$lib/types';
 import { cards } from './cards';
 import { query } from './query';
@@ -25,6 +26,7 @@ function entry(over: Partial<ListEntry> & { id: string; title: string }): ListEn
 		collection: null,
 		series: null,
 		packs: [],
+		groups: [],
 		adult: false,
 		...over
 	};
@@ -38,6 +40,7 @@ const thornwick: Collection = {
 	total: null,
 	storeUrl: null,
 	joined: [],
+	groups: ['s500'],
 	games: ['1', '2', '3']
 };
 const parallax: Collection = {
@@ -48,6 +51,7 @@ const parallax: Collection = {
 	total: 3,
 	storeUrl: null,
 	joined: [],
+	groups: ['p800'],
 	games: ['5', '4']
 };
 const library = [
@@ -117,6 +121,66 @@ describe('cards', () => {
 	});
 });
 
+describe('cards with own collections', () => {
+	// The Thornwick series and Night Ferry: games 1, 2, 3 and 6, oldest first.
+	const puzzleBox: OwnCollection = { id: 'h1', name: 'The Puzzle Box', members: [{ collection: 's500' }, { game: '6' }] };
+	const withOwn = (state: Partial<ViewState> = {}, games = library, own = [puzzleBox]) =>
+		cards(games, collections, { ...DEFAULT_STATE, grouped: true, ...state }, resolveOwn(own, games, collections));
+	const keys = (state: Partial<ViewState> = {}) => withOwn(state).map((c) => c.key);
+
+	it('mixes own and GOG cards in each order', () => {
+		// "The Puzzle Box" sorts as "Puzzle Box", between Parallax and Quiet Harbour.
+		expect(keys({ sort: 'title' })).toEqual(['p800', 'h1', '7']);
+		// The lowest order: Night Ferry 0 of the own one, Quiet Harbour 3, Helix Drift 4 of Parallax.
+		expect(keys({ sort: 'recent' })).toEqual(['h1', '7', 'p800']);
+		// The newest game: Night Ferry 2015 of the own one, Quiet Harbour 2012, Parallax up to 2004.
+		expect(keys({ sort: 'year' })).toEqual(['h1', '7', 'p800']);
+	});
+
+	it('takes a game of an own collection out of the list', () => expect(keys()).not.toContain('6'));
+
+	it('takes a GOG collection inside an own one out of the list', () => expect(keys()).not.toContain('s500'));
+
+	it('shows an own card only for games that pass, and says what found it', () => {
+		const linux = withOwn({ os: ['linux'] });
+		expect(linux.map((c) => c.key)).toEqual(['h1', '7']);
+		const own = linux[0];
+		expect(own.kind === 'own' && own.games.map((g) => g.id)).toEqual(['1']);
+
+		const named = withOwn({ q: 'puzzle box' });
+		expect(named.map((c) => c.key)).toEqual(['h1']);
+		expect(named[0].kind === 'own' && named[0].found).toBeNull();
+
+		const byGame = withOwn({ q: 'saltwater' });
+		expect(byGame.map((c) => c.key)).toEqual(['h1']);
+		const card = byGame[0];
+		expect(card.kind === 'own' && card.found?.id).toBe('3');
+		expect(card.kind === 'own' && card.games.map((g) => g.id)).toEqual(['1', '2', '3', '6']);
+		expect(keys({ q: 'saltwater', os: ['linux'] })).toEqual([]);
+	});
+
+	it('finds an own card by its name and a game together', () => {
+		const list = withOwn({ q: 'puzzle saltwater' });
+		expect(list.map((c) => c.key)).toEqual(['h1']);
+		expect(list[0].kind === 'own' && list[0].found?.id).toBe('3');
+	});
+
+	it("finds a game by an own collection's name while the toggle is off", () => {
+		const list = cards(library, collections, { ...DEFAULT_STATE, q: 'puzzle' }, resolveOwn([puzzleBox], library, collections));
+		expect(list.map((c) => c.key)).toEqual(['6', '3', '1', '2']);
+		expect(list[0].kind === 'game' && list[0].reason).toEqual({ field: 'collection', value: 'The Puzzle Box' });
+	});
+
+	it('shows no own card whose games Hide 18+ hides', () => {
+		const games = [...library, entry({ id: '8', title: 'Velvet Lounge', releaseYear: 2019, order: 2, adult: true })];
+		const afterDark: OwnCollection = { id: 'h2', name: 'After Dark', members: [{ game: '8' }] };
+		const shown = (hide18: boolean) => withOwn({ hide18 }, games, [afterDark]).map((c) => c.key);
+		expect(shown(false)).toContain('h2');
+		expect(shown(true)).not.toContain('h2');
+		expect(shown(true)).not.toContain('8');
+	});
+});
+
 describe('speed with the toggle on', () => {
 	const library: ListEntry[] = Array.from({ length: 5000 }, (_, i) =>
 		entry({ id: String(i), title: `Game ${i} ${i % 3 === 0 ? 'Harbour' : 'Meadow'}`, order: i, collection: i % 8 === 0 ? `c${i / 8}` : null })
@@ -129,6 +193,7 @@ describe('speed with the toggle on', () => {
 		total: null,
 		storeUrl: null,
 		joined: [],
+		groups: [],
 		games: [String(k * 8)]
 	}));
 	const average = (grouped: boolean) => {

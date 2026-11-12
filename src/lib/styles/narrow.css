@@ -32,6 +32,14 @@
 		padding: 0;
 		justify-content: center;
 	}
+	/* While "Select" is there (0.13.0) it follows Collections as its mark alone: the box gives up 54 px more, so the
+	   three share the row and the bar keeps its two rows. */
+	.bar:has(.select-toggle) .search {
+		flex-basis: calc(100% - 108px);
+	}
+	.select-toggle {
+		order: 7;
+	}
 	.search .key {
 		display: none;
 	}
@@ -278,5 +286,44 @@
 	}
 	.lightbox img {
 		max-width: 100vw;
+	}
+}
+
+/* A phone: the count of the bar while picking stands on its own line, and its buttons share the next one. */
+@media (max-width: 640px) {
+	.pickbar-inner {
+		flex-wrap: wrap;
+		gap: 8px 10px;
+	}
+	.pickbar-actions {
+		width: 100%;
+	}
+	.pickbar-actions .addto-wrap,
+	.pickbar-actions > .btn {
+		flex: 1;
+	}
+	.pickbar-actions .btn {
+		width: 100%;
+		justify-content: center;
+	}
+	/* The bar of an own collection's sheet while editing, likewise: its line, then "Add to…" and "Take out". */
+	.take-bar {
+		flex-wrap: wrap;
+	}
+	.take-actions {
+		width: 100%;
+	}
+	.take-actions .addto-wrap,
+	.take-actions > .btn {
+		flex: 1;
+	}
+	.take-actions .btn {
+		width: 100%;
+	}
+	/* "Add to…" opens from the left edge of its button, which starts the row. */
+	.addto-pop {
+		right: auto;
+		left: 0;
+		width: min(310px, calc(100vw - 32px));
 	}
 }

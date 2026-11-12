@@ -238,9 +238,9 @@ describe('the pages, as the server draws them', () => {
 		expect(text).toContain('Strategy 2 Adventure 1 Role-playing 1');
 	});
 
-	it('leaves the cached index as it was: its schema is 9', async () => {
+	it('leaves the cached index as it was: its schema is 10', async () => {
 		const cached = JSON.parse(await readFile(join(cacheDir, 'index.json'), 'utf8')) as { schema: number };
-		expect(cached.schema).toBe(9);
+		expect(cached.schema).toBe(10);
 	});
 
 	it('gives the name of the system the visitor sits at to the download block', async () => {
@@ -601,6 +601,188 @@ describe('the settings', () => {
 	});
 });
 
+// Spec of own collections, sections 4 and 13. The Canvas without a PIN is the one of the whole file, at `base`.
+describe('own collections', () => {
+	let folder: string;
+	let settingsDir: string;
+	let pinnedChild: ChildProcess | undefined;
+	/** A Canvas with a PIN, which keeps its collections in a folder that is empty at first. */
+	let pinned: string;
+	/** The cookie of a browser unlocked at `pinned`. */
+	let cookie: string;
+	const UNKNOWN = 'This collection is not in the library.';
+
+	/** Starts the Canvas with a PIN on a free port, with the same folders each time. */
+	async function start(): Promise<void> {
+		const port = await freePort();
+		pinned = `http://127.0.0.1:${port}`;
+		pinnedChild = launch({
+			PORT: String(port),
+			VANGOGH_URL: fake.url,
+			VANGOGH_USERNAME: 'api',
+			VANGOGH_PASSWORD: PASSWORD,
+			VERSION_CHECK: 'off',
+			CACHE_DIR: join(folder, 'cache'),
+			SETTINGS_DIR: settingsDir,
+			SETTINGS_PIN: PIN
+		});
+		await waitFor(async () => (await fetch(`${pinned}/healthz`)).status === 200, `the Canvas at ${pinned}`);
+	}
+
+	/** Unlocks the Canvas at `pinned`, and gives the cookie as the browser sends it back. */
+	async function unlock(): Promise<string> {
+		const res = await fetch(`${pinned}/api/settings/unlock`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ pin: PIN })
+		});
+		expect(res.status).toBe(204);
+		return (res.headers.get('set-cookie') ?? '').split(';')[0];
+	}
+
+	beforeAll(async () => {
+		folder = await mkdtemp(join(tmpdir(), 'canvas-it-own-'));
+		settingsDir = join(folder, 'settings');
+		await mkdir(settingsDir);
+		await start();
+		cookie = await unlock();
+	});
+
+	afterAll(async () => {
+		await stop(pinnedChild);
+		if (folder) await rm(folder, { recursive: true, force: true });
+	});
+
+	/** A request with a JSON body, as the page sends it; the answer's status, body and `cache-control`. */
+	async function call(at: string, method: string, path: string, body?: unknown, headers: Record<string, string> = {}) {
+		const res = await fetch(`${at}${path}`, {
+			method,
+			headers: { 'content-type': 'application/json', ...headers },
+			body: body === undefined || typeof body === 'string' ? body : JSON.stringify(body)
+		});
+		const text = await res.text();
+		return { status: res.status, body: text ? JSON.parse(text) : null, cache: res.headers.get('cache-control') };
+	}
+	const sending = (unlocked?: string): Record<string, string> => (unlocked ? { cookie: unlocked } : {});
+	const post = (at: string, path: string, body: unknown, unlocked?: string) => call(at, 'POST', path, body, sending(unlocked));
+	const patch = (at: string, path: string, body: unknown, unlocked?: string) => call(at, 'PATCH', path, body, sending(unlocked));
+	const del = (at: string, path: string, unlocked?: string) => call(at, 'DELETE', path, undefined, sending(unlocked));
+	/** An answer without its `cache-control`, to compare with what is expected. */
+	const plain = (answer: { status: number; body: unknown }) => ({ status: answer.status, body: answer.body });
+
+	it('refuses everything without a PIN', async () => {
+		const off = { status: 404, body: { error: 'settings-off' } };
+		expect(plain(await post(base, '/api/collections', { name: 'A', members: [] }))).toEqual(off);
+		expect(plain(await patch(base, '/api/collections/h1', { name: 'B' }))).toEqual(off);
+		expect(plain(await del(base, '/api/collections/h1'))).toEqual(off);
+		// The file is not read: an own collection's address is a collection not in the library.
+		expect(await (await fetch(`${base}/collection/h1`)).text()).toContain(UNKNOWN);
+	});
+
+	it('refuses a locked browser and another site', async () => {
+		const locked = { status: 401, body: { error: 'locked' } };
+		expect(plain(await post(pinned, '/api/collections', { name: 'A', members: [] }))).toEqual(locked);
+		expect(plain(await patch(pinned, '/api/collections/h1', { name: 'B' }))).toEqual(locked);
+		expect(plain(await del(pinned, '/api/collections/h1'))).toEqual(locked);
+		const elsewhere = { cookie, origin: 'http://elsewhere' };
+		const crossSite = { status: 403, body: { error: 'cross-site' } };
+		expect(plain(await call(pinned, 'POST', '/api/collections', { name: 'A', members: [] }, elsewhere))).toEqual(crossSite);
+		expect(plain(await call(pinned, 'PATCH', '/api/collections/h1', { name: 'B' }, elsewhere))).toEqual(crossSite);
+		expect(plain(await call(pinned, 'DELETE', '/api/collections/h1', undefined, elsewhere))).toEqual(crossSite);
+	});
+
+	it('creates, renames, adds, removes and deletes', async () => {
+		const made = await post(pinned, '/api/collections', { name: 'Rainy', members: [{ game: '11' }] }, cookie);
+		expect(made.status).toBe(201);
+		expect(made.body.collection).toEqual({ id: 'h1', name: 'Rainy', members: [{ game: '11' }] });
+		const renamed = await patch(pinned, '/api/collections/h1', { name: ' Rainy Sundays ' }, cookie);
+		expect(plain(renamed)).toEqual({
+			status: 200,
+			body: { collection: { id: 'h1', name: 'Rainy Sundays', members: [{ game: '11' }] } }
+		});
+		const added = await patch(pinned, '/api/collections/h1', { add: [{ collection: 's5' }] }, cookie);
+		expect(added.body.collection.members).toEqual([{ game: '11' }, { collection: 's5' }]);
+		const removed = await patch(pinned, '/api/collections/h1', { remove: [{ game: '11' }] }, cookie);
+		expect(removed.body.collection.members).toEqual([{ collection: 's5' }]);
+		expect(plain(await del(pinned, '/api/collections/h1', cookie))).toEqual({ status: 204, body: null });
+		const gone = { status: 404, body: { error: 'no-collection' } };
+		expect(plain(await patch(pinned, '/api/collections/h1', { name: 'Again' }, cookie))).toEqual(gone);
+		expect(plain(await del(pinned, '/api/collections/h1', cookie))).toEqual(gone);
+	});
+
+	it('answers 409 for a taken name and 404 for an unknown or malformed id', async () => {
+		const made = await post(pinned, '/api/collections', { name: 'Party Night', members: [{ game: '12' }] }, cookie);
+		expect(made.body.collection.id).toBe('h2');
+		const taken = { status: 409, body: { error: 'name-taken' } };
+		expect(plain(await post(pinned, '/api/collections', { name: 'party night', members: [] }, cookie))).toEqual(taken);
+		expect((await post(pinned, '/api/collections', { name: 'Quiet', members: [] }, cookie)).body.collection.id).toBe('h3');
+		expect(plain(await patch(pinned, '/api/collections/h3', { name: 'PARTY NIGHT' }, cookie))).toEqual(taken);
+		const unknown = { status: 404, body: { error: 'no-collection' } };
+		for (const path of ['/api/collections/h99', '/api/collections/s5']) {
+			expect(plain(await patch(pinned, path, { name: 'Elsewhere' }, cookie)), path).toEqual(unknown);
+			expect(plain(await del(pinned, path, cookie)), path).toEqual(unknown);
+		}
+	});
+
+	it('answers 400 for a bad body', async () => {
+		const file = join(settingsDir, 'collections.json');
+		const before = await readFile(file, 'utf8');
+		const bad = { status: 400, body: { error: 'bad-collection' } };
+		for (const body of [{ name: 'Odd', members: [{ collection: 'h2' }] }, { name: '   ', members: [] }, 'not json']) {
+			expect(plain(await post(pinned, '/api/collections', body, cookie)), JSON.stringify(body)).toEqual(bad);
+		}
+		for (const body of [{}, { name: 'Odd', add: [] }, { add: [{ collection: 'h3' }] }, 'not json']) {
+			expect(plain(await patch(pinned, '/api/collections/h2', body, cookie)), JSON.stringify(body)).toEqual(bad);
+		}
+		// The id is looked at before the body.
+		expect(plain(await patch(pinned, '/api/collections/h99', {}, cookie))).toEqual({ status: 404, body: { error: 'no-collection' } });
+		expect(await readFile(file, 'utf8')).toBe(before);
+	});
+
+	it('writes the file and reads it after a restart', async () => {
+		expect(JSON.parse(await readFile(join(settingsDir, 'collections.json'), 'utf8'))).toEqual({
+			version: 1,
+			next: 4,
+			collections: [
+				{ id: 'h2', name: 'Party Night', members: [{ game: '12' }] },
+				{ id: 'h3', name: 'Quiet', members: [] }
+			]
+		});
+		await stop(pinnedChild);
+		await start();
+		cookie = await unlock();
+		const changed = await patch(pinned, '/api/collections/h2', { add: [{ game: '13' }] }, cookie);
+		expect(plain(changed)).toEqual({
+			status: 200,
+			body: { collection: { id: 'h2', name: 'Party Night', members: [{ game: '12' }, { game: '13' }] } }
+		});
+		// The number of the deleted h1 is not used again.
+		expect((await post(pinned, '/api/collections', { name: 'Late', members: [] }, cookie)).body.collection.id).toBe('h4');
+		// Every page has them in the layout's data, and an own collection's address is no unknown collection.
+		expect(await (await fetch(`${pinned}/`)).text()).toContain('Party Night');
+		expect(await (await fetch(`${pinned}/collection/h3`)).text()).not.toContain(UNKNOWN);
+		expect(await (await fetch(`${pinned}/collection/h99`)).text()).toContain(UNKNOWN);
+	});
+
+	it('serves no-store on every answer', async () => {
+		const made = await post(pinned, '/api/collections', { name: 'Kept nowhere', members: [] }, cookie);
+		const path = `/api/collections/${made.body.collection.id}`;
+		const answers = [
+			made,
+			await patch(pinned, path, { name: 'Still nowhere' }, cookie),
+			await del(pinned, path, cookie),
+			await post(pinned, '/api/collections', { name: '' }, cookie),
+			await post(pinned, '/api/collections', { name: 'A', members: [] }),
+			await call(pinned, 'POST', '/api/collections', { name: 'A', members: [] }, { cookie, origin: 'http://elsewhere' }),
+			await post(base, '/api/collections', { name: 'A', members: [] }),
+			await del(pinned, path, cookie),
+			await post(pinned, '/api/collections', { name: 'Party Night', members: [] }, cookie)
+		];
+		expect(answers.map((a) => a.status)).toEqual([201, 200, 204, 400, 401, 403, 404, 404, 409]);
+		for (const a of answers) expect(a.cache, String(a.status)).toBe('no-store');
+	});
+});
+
 describe('the routes', () => {
 	it('reports its health', async () => {
 		const body = await (await fetch(`${base}/healthz`)).json();
@@ -687,6 +869,7 @@ describe('the routes', () => {
 				total: null,
 				storeUrl: null,
 				joined: [{ kind: 'pack', name: 'Road Trilogy' }],
+				groups: ['s77', 'p3001'],
 				games: ['1001', '1002']
 			}
 		]);

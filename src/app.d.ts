@@ -10,14 +10,15 @@ declare global {
 			/** The id of the collection whose sheet lies over the list. Set when its card is clicked. */
 			collection?: string;
 			/**
-			 * How many entries of the history lie between a detail and the list: 1 for a detail opened
-			 * over the list, 2 for one opened from a collection's sheet that was opened over the list,
-			 * 0 when the page under it was opened by its address. Closing goes back that far, or, for
-			 * 0, shows the list in place of the detail.
+			 * How many entries of the history lie between a detail, or a collection's sheet, and the list:
+			 * 1 for one opened over the list (a sheet's state leaves it unset), one more for each sheet it
+			 * was opened from in turn (2 from a sheet opened over the list, 3 from a sheet opened from that
+			 * one, and so on), 0 when the page under it was opened by its address. Closing goes back that
+			 * far, or, for 0, shows the list in its place.
 			 */
-			back?: 0 | 1 | 2;
-			/** True for a game opened from the open row of its collection: its row starts open. */
-			shelf?: boolean;
+			back?: number;
+			/** The id of the collection from whose open row the game was opened: that row starts open. */
+			shelf?: string;
 			/** Set while the library at a glance lies over the list, opened by a click on the count. */
 			glance?: true;
 			/** Set while the settings, or the PIN prompt, lie over the list, opened by a click on "Settings" in the foot. */

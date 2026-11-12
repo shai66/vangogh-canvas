@@ -39,6 +39,12 @@
 		display: none;
 	}
 }
+/* While "Select" is in the bar (0.13.0), "for vangogh" goes a step earlier, so that the bar stays in the window. */
+@media (max-width: 900px) {
+	.bar:has(.select-toggle) .brand .by {
+		display: none;
+	}
+}
 .brand img,
 .brand svg {
 	width: 30px;
@@ -49,6 +55,11 @@
 	position: relative;
 	flex: 1 1 320px;
 	max-width: 560px;
+}
+/* While "Select" is in the bar (0.13.0) the box gives way below its own smallest width, down to the phone's layout,
+   so that the bar stays in the window. */
+.bar:has(.select-toggle) .search {
+	min-width: 0;
 }
 .search .ic-lead {
 	position: absolute;
@@ -196,6 +207,20 @@
 	border-color: rgb(var(--sky) / 0.7);
 	background: rgb(var(--sky) / 0.14);
 	color: rgb(var(--sky));
+}
+/* "Select" (0.13.0), in the look of the toggle "Collections". While it is on it is yellow, Canvas's "this is on":
+   only colours change, so it keeps its size. */
+.select-toggle[aria-pressed='true'],
+.select-toggle[aria-pressed='true']:hover {
+	border-color: var(--accent);
+	background: var(--accent-wash);
+	color: var(--accent);
+}
+/* Where the platforms give up their names, Select shows its mark alone. */
+@media (max-width: 1100px) {
+	.select-toggle .label {
+		display: none;
+	}
 }
 .filter-button {
 	position: relative;

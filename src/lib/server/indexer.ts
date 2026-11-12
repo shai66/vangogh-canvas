@@ -398,6 +398,7 @@ export async function buildIndex(
 			collection: null,
 			series: null,
 			packs: [],
+			groups: [],
 			adult: product?.adult ?? false
 		};
 		members.push({ id, title, releaseYear: entry.releaseYear, storeUrl: product?.storeUrl ?? null, series: product?.series ?? null });

@@ -28,6 +28,7 @@ function entry(id: string, o: Partial<ListEntry> = {}): ListEntry {
 		collection: null,
 		series: null,
 		packs: [],
+		groups: [],
 		adult: false,
 		...o
 	};

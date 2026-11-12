@@ -492,6 +492,114 @@ dialog.pin[open] {
 	font: inherit;
 	appearance: auto;
 }
+/* The panel "Your collections" (0.13.0, spec of own collections, section 10): a row per own collection, with its small
+   picture, its name on one line, its number of games, "Rename" and "Delete". */
+.own-rows {
+	display: grid;
+	gap: 6px;
+	margin: 6px 0 0;
+	padding: 0;
+	list-style: none;
+}
+.own-row {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	min-height: 66px;
+	padding: 6px 10px 6px 8px;
+	border-radius: 10px;
+	background: color-mix(in srgb, var(--starlight) 3%, transparent);
+	box-shadow: 0 0 0 1px var(--night-line);
+}
+.own-row .addto-thumb {
+	width: 38px;
+}
+/* A row's three states, at rest, renaming and asking, lie in one place and one is seen: the row is as high as the
+   highest at every width, so it keeps its height when it changes. */
+.own-row-states {
+	display: grid;
+	flex: 1;
+	grid-template-columns: minmax(0, 1fr);
+	align-items: center;
+	min-width: 0;
+}
+.own-row-state {
+	grid-area: 1 / 1;
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	min-width: 0;
+	visibility: hidden;
+}
+.own-row-state.on {
+	visibility: visible;
+}
+.own-row .btn .ic {
+	margin-right: 6px;
+}
+/* The name and the number of games. */
+.own-row-what {
+	display: flex;
+	flex: 1;
+	align-items: center;
+	gap: 14px;
+	min-width: 0;
+}
+.own-row-name {
+	flex: 1;
+	min-width: 0;
+	font-weight: 600;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.own-row-state.is-confirm .own-row-name {
+	font-weight: 550;
+	white-space: normal;
+}
+.own-row-n {
+	margin-right: 4px;
+	color: var(--starlight-faint);
+	font-size: 13px;
+	font-variant-numeric: tabular-nums;
+}
+/* Renaming: the field with Save and Cancel beside it, and under the field the line that says why a name cannot be
+   saved. Together they fit the row's height: the line is as high as the room the buttons leave under the field. */
+.own-row-state.is-renaming {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto auto;
+	gap: 0 14px;
+}
+.own-row-fieldbox {
+	display: contents;
+}
+.own-row-why {
+	grid-area: 2 / 1;
+	margin-top: 2px;
+	color: var(--danger);
+	font-size: 12.5px;
+	line-height: 14px;
+}
+.own-row-field {
+	flex: 1;
+	min-width: 0;
+	height: 36px;
+	padding: 0 10px;
+	border: 1px solid var(--night-edge);
+	border-radius: var(--radius-control);
+	background: var(--night-control);
+	color: var(--starlight);
+	font: inherit;
+	font-size: 16px;
+}
+.own-row-field:focus {
+	outline: 2px solid var(--accent);
+	outline-offset: 1px;
+}
+/* A name that cannot be saved: a red edge, and the line under the field says why. */
+.own-row-field[aria-invalid='true'] {
+	border-color: var(--danger);
+}
 /* The foot of the sheet: "Saved", until when this browser is unlocked, and "Lock" on the right. Held at the window's
    bottom, with the sheet's night behind it. */
 .settings-foot {
@@ -572,6 +680,10 @@ dialog.pin[open] {
 	.settings-panel {
 		padding: 16px 16px 4px;
 	}
+	/* The buttons are higher here, and the field stands in their middle: the line of a refused name starts under them. */
+	.own-row-why {
+		margin-top: 0;
+	}
 }
 /* On a phone, and in a narrow window, the name of a row stands above its chips. A fact's value, what goes with it and
    "Read now" each have a line of their own, so a value that comes moves nothing. */
@@ -598,6 +710,55 @@ dialog.pin[open] {
 	}
 	.bato-settings .set-row > .set-k {
 		padding-top: 0;
+	}
+	/* A row of "Your collections": beside the picture, in a line as high as it, the name with the number of games under
+	   it, the field, or the question; under them the two buttons on the right, down to a phone of 320 px. The states lie
+	   over the whole row, and keep the picture's room in their first line. */
+	.own-row {
+		display: grid;
+		grid-template-columns: 38px minmax(0, 1fr);
+		align-items: start;
+	}
+	.own-row .addto-thumb {
+		grid-area: 1 / 1;
+	}
+	.own-row-states {
+		grid-area: 1 / 1 / 2 / -1;
+		align-items: start;
+	}
+	.own-row-state {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto auto;
+		grid-template-rows: minmax(calc(38px * 482 / 342), auto);
+	}
+	.own-row-what,
+	.own-row-fieldbox,
+	.own-row-state.is-confirm .own-row-name {
+		grid-column: 1 / -1;
+		margin-left: 52px;
+	}
+	.own-row-what {
+		display: grid;
+		gap: 0;
+	}
+	/* The field with the line of a refused name under it, beside the picture; the buttons on the next line. */
+	.own-row-state.is-renaming {
+		row-gap: 14px;
+	}
+	.own-row-fieldbox {
+		display: grid;
+	}
+	.own-row-why {
+		margin-top: 2px;
+	}
+	.own-row-state > .btn {
+		grid-row: 2;
+	}
+	.own-row-state > .btn:nth-last-child(2) {
+		grid-column: 2;
+	}
+	.own-row-state > .btn:last-child {
+		grid-column: 3;
 	}
 }
 /* A narrow phone, down to 320 px: the tabs in smaller type and closer together, so the four fit beside the close

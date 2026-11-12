@@ -3,7 +3,7 @@ import type { ListEntry } from '$lib/types';
 import type { Sort, ViewState } from './state';
 import { normalize, sortKey, words } from './text';
 
-export type MatchField = 'dlc' | 'series' | 'pack' | 'genre' | 'tag' | 'developer' | 'publisher';
+export type MatchField = 'dlc' | 'series' | 'pack' | 'collection' | 'genre' | 'tag' | 'developer' | 'publisher';
 
 export interface MatchReason {
 	field: MatchField;
@@ -16,12 +16,14 @@ export interface Match {
 	reason: MatchReason | null;
 }
 
-function candidates(entry: ListEntry): MatchReason[] {
+function candidates(entry: ListEntry, ownNames: readonly string[]): MatchReason[] {
 	return [
 		...entry.dlc.map((value) => ({ field: 'dlc' as const, value })),
 		// Spec, section 9: every series, also one of a single game, and the packs that count.
 		...(entry.series ? [{ field: 'series' as const, value: entry.series }] : []),
 		...entry.packs.map((value) => ({ field: 'pack' as const, value })),
+		// Spec of own collections, section 12: the own collections that hold it.
+		...ownNames.map((value) => ({ field: 'collection' as const, value })),
 		...entry.genres.map((value) => ({ field: 'genre' as const, value })),
 		// A genre is also found by the name it is shown by: "first" finds FPP.
 		...entry.genres
@@ -35,16 +37,16 @@ function candidates(entry: ListEntry): MatchReason[] {
 
 /**
  * Every wanted word must be found in the title or in another field.
- * `wanted` is the output of `words`.
+ * `wanted` is the output of `words`; `ownNames` the names of the own collections that hold the entry.
  */
-export function matchEntry(entry: ListEntry, wanted: string[]): Match | null {
+export function matchEntry(entry: ListEntry, wanted: string[], ownNames: readonly string[] = []): Match | null {
 	if (wanted.length === 0) return { entry, reason: null };
 	const title = normalize(entry.title);
 	let others: MatchReason[] | null = null;
 	let reason: MatchReason | null = null;
 	for (const word of wanted) {
 		if (title.includes(word)) continue;
-		others ??= candidates(entry);
+		others ??= candidates(entry, ownNames);
 		const hit = others.find((c) => normalize(c.value).includes(word));
 		if (!hit) return null;
 		reason ??= hit;
@@ -52,8 +54,11 @@ export function matchEntry(entry: ListEntry, wanted: string[]): Match | null {
 	return { entry, reason };
 }
 
-/** The entries to show for a view: filtered, searched and, unless `sorted` is false, sorted. */
-export function query(entries: ListEntry[], state: ViewState, sorted = true): Match[] {
+/**
+ * The entries to show for a view: filtered, searched and, unless `sorted` is false, sorted. `ownNames` gives, by an
+ * entry's id, the names of the own collections that hold it, which find it too.
+ */
+export function query(entries: ListEntry[], state: ViewState, sorted = true, ownNames?: Map<string, string[]>): Match[] {
 	const wanted = words(state.q);
 	// Genre, setting and style are three questions: any chosen value within one
 	// is enough, and every one that was asked must hold.
@@ -73,7 +78,7 @@ export function query(entries: ListEntry[], state: ViewState, sorted = true): Ma
 		if (state.together.length > 0 && !state.together.some((flag) => entry[flag])) continue;
 		// The games for adults, before the search: a hidden game is not found either.
 		if (state.hide18 && entry.adult) continue;
-		const match = matchEntry(entry, wanted);
+		const match = matchEntry(entry, wanted, ownNames?.get(entry.id));
 		if (match) matches.push(match);
 	}
 	return sorted ? sortBy(matches, state.sort, (m) => m.entry) : matches;

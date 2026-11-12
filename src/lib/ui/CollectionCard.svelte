@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { systemsOf, yearSpan } from '$lib/collections';
+	import { pickKey, type Pick } from '$lib/picking.svelte';
 	import type { CollectionCard } from '$lib/search/cards';
 	import { t } from '$lib/strings';
 	import type { ListEntry } from '$lib/types';
@@ -13,8 +14,10 @@
 		oldest: ListEntry | undefined;
 		/** Called for a click, with the collection's id. The card is a link and works without it. */
 		onopen?: (event: MouseEvent, id: string) => void;
+		/** While picking (spec of own collections, section 8.2): a click, Enter or Space picks or unpicks it as a whole instead of opening it. */
+		pick?: Pick | null;
 	}
-	let { card, oldest, onopen }: Props = $props();
+	let { card, oldest, onopen, pick = null }: Props = $props();
 
 	const collection = $derived(card.collection);
 	const href = $derived(`/collection/${encodeURIComponent(collection.id)}`);
@@ -28,14 +31,26 @@
 
 <a
 	class="card is-collection"
+	class:is-picking={pick !== null}
+	class:is-picked={pick?.picked}
 	{href}
-	onclick={(event) => onopen?.(event, collection.id)}
+	role={pick ? 'button' : undefined}
+	aria-pressed={pick ? pick.picked : undefined}
+	onclick={(event) => {
+		if (!pick) return onopen?.(event, collection.id);
+		event.preventDefault();
+		pick.ontoggle();
+	}}
+	onkeydown={(event) => pickKey(event, pick)}
 	onmouseenter={run}
 	onmouseleave={rest}
 	onfocus={run}
 	onblur={rest}
 >
-	<div class="poster"><CollectionPoster {collection} {oldest} /></div>
+	<div class="poster">
+		{#if pick}<span class="pick-dot" aria-hidden="true"><Icon name="check" /></span>{/if}
+		<CollectionPoster {collection} {oldest} />
+	</div>
 	<div class="card-text">
 		<h3 class="card-title" bind:this={title}><span>{collection.name}</span></h3>
 		<div class="card-meta">

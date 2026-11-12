@@ -27,6 +27,7 @@ function entry(over: Partial<ListEntry> & { id: string; title: string }): ListEn
 		collection: null,
 		series: null,
 		packs: [],
+		groups: [],
 		adult: false,
 		...over
 	};
@@ -249,6 +250,15 @@ describe('query', () => {
 	it('takes typed text as text, not as a pattern', () => {
 		expect(ids({ q: '.*' })).toEqual([]);
 		expect(ids({ q: '3:' })).toEqual(['1']);
+	});
+
+	it('finds a game by an own collection, after pack', () => {
+		const dusk = entry({ id: '9', title: 'Dusk One', packs: ['Sunday Bundle'], tags: ['Rainy Weather'] });
+		const entries = [dusk, entry({ id: '8', title: 'Morning Two' })];
+		const names = new Map([['9', ['Rainy Sundays']]]);
+		expect(query(entries, { ...DEFAULT_STATE, q: 'rainy' }, true, names)[0].reason).toEqual({ field: 'collection', value: 'Rainy Sundays' });
+		expect(query(entries, { ...DEFAULT_STATE, q: 'sunday' }, true, names)[0].reason).toEqual({ field: 'pack', value: 'Sunday Bundle' });
+		expect(query(entries, { ...DEFAULT_STATE, q: 'sundays' }).map((m) => m.entry.id)).toEqual([]);
 	});
 });
 

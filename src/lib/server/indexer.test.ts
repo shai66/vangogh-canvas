@@ -43,7 +43,7 @@ describe('buildIndex', () => {
 			['2002', 'orphaned-dlc'],
 			['1003', 'game']
 		]);
-		expect(index.schema).toBe(9);
+		expect(index.schema).toBe(10);
 		expect(index.builtAt).toBe('2026-09-29T02:30:00.000Z');
 	});
 
@@ -76,6 +76,7 @@ describe('buildIndex', () => {
 			collection: null,
 			series: null,
 			packs: ['Road Trilogy'],
+			groups: ['p3001'],
 			adult: true
 		});
 	});
@@ -1025,6 +1026,7 @@ describe('buildIndex and collections', () => {
 				total: null,
 				storeUrl: null,
 				joined: [{ kind: 'pack', name: 'Dusk Double' }],
+				groups: ['s77', 'p6900'],
 				games: ['6001', '6002', '6003']
 			}
 		]);

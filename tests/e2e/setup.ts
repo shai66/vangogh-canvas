@@ -471,12 +471,16 @@ async function waitFor(url: string, wanted: number, output: () => string): Promi
 }
 
 /**
- * Starts seven fake vangoghs, a fake Batocera box and nine copies of the built app:
+ * Starts seven fake vangoghs, a fake Batocera box and eleven copies of the built app:
  *   CANVAS_URL        a Canvas with the library of the fixtures
  *   CANVAS_EMPTY_URL  a Canvas whose vangogh is not there, so it has no library yet
  *   CANVAS_MAC_URL    a Canvas with the two games of macLibrary()
  *   CANVAS_RICH_URL   a Canvas with the three games of richLibrary()
  *   CANVAS_COLLECTIONS_URL  a Canvas with the seventeen games of collectionLibrary()
+ *   CANVAS_OWN_URL          a Canvas with a PIN, 2468, the same vangogh, and three own collections in the file before it
+ *                           starts: h1 "Rainy Sundays", h2 "Racing nights" and h3 "Late night"
+ *   CANVAS_OWN_EDIT_URL     the same with an empty settings folder of its own: the tests make, change and delete own
+ *                           collections there
  *   CANVAS_SETTINGS_URL     a Canvas with a PIN, 2468, and the library of settingsLibrary(). Its vangogh's control
  *                           address is FAKE_SETTINGS_CONTROL.
  *   CANVAS_THEO_URL         the same, with a vangogh of its own and theo switched on before it starts
@@ -568,6 +572,8 @@ export default async function setup(): Promise<() => Promise<void>> {
 	const macPort = await freePort();
 	const richPort = await freePort();
 	const collectionsPort = await freePort();
+	const ownPort = await freePort();
+	const ownEditPort = await freePort();
 	const settingsPort = await freePort();
 	const theoPort = await freePort();
 	const batoceraPort = await freePort();
@@ -583,6 +589,42 @@ export default async function setup(): Promise<() => Promise<void>> {
 	launch({ PORT: String(macPort), VANGOGH_URL: macFake.url, CACHE_DIR: join(cache, 'mac'), TZ: 'UTC', VERSION_CHECK: 'off' });
 	launch({ PORT: String(richPort), VANGOGH_URL: richFake.url, CACHE_DIR: join(cache, 'rich'), TZ: 'UTC', VERSION_CHECK_URL: `${richFake.url}/releases/latest` });
 	launch({ PORT: String(collectionsPort), VANGOGH_URL: collectionsFake.url, CACHE_DIR: join(cache, 'collections'), TZ: 'UTC', VERSION_CHECK: 'off' });
+	// Own collections in the file before Canvas reads it. The pack 4801 is joined into the series 500, so h1 holds the
+	// series through its groups: 5 games, 1996 to 2015. h3 holds only the game rated PEGI 18.
+	await mkdir(join(cache, 'own'), { recursive: true });
+	await writeFile(
+		join(cache, 'own', 'collections.json'),
+		JSON.stringify({
+			version: 1,
+			next: 4,
+			collections: [
+				{ id: 'h1', name: 'Rainy Sundays', members: [{ collection: 'p4801' }, { game: '4117' }, { game: '4116' }] },
+				{ id: 'h2', name: 'Racing nights', members: [{ collection: 'p4802' }, { game: '4117' }] },
+				{ id: 'h3', name: 'Late night', members: [{ game: '4103' }] }
+			]
+		})
+	);
+	launch({
+		PORT: String(ownPort),
+		VANGOGH_URL: collectionsFake.url,
+		CACHE_DIR: join(cache, 'own-cache'),
+		SETTINGS_PIN: '2468',
+		SETTINGS_DIR: join(cache, 'own'),
+		TZ: 'UTC',
+		VERSION_CHECK: 'off',
+		VERSION_CHECK_URL: `${collectionsFake.url}/releases/latest`
+	});
+	await mkdir(join(cache, 'own-edit'), { recursive: true });
+	launch({
+		PORT: String(ownEditPort),
+		VANGOGH_URL: collectionsFake.url,
+		CACHE_DIR: join(cache, 'own-edit-cache'),
+		SETTINGS_PIN: '2468',
+		SETTINGS_DIR: join(cache, 'own-edit'),
+		TZ: 'UTC',
+		VERSION_CHECK: 'off',
+		VERSION_CHECK_URL: `${collectionsFake.url}/releases/latest`
+	});
 	launch({
 		PORT: String(settingsPort),
 		VANGOGH_URL: settingsFake.url,
@@ -651,6 +693,8 @@ export default async function setup(): Promise<() => Promise<void>> {
 	process.env.CANVAS_MAC_URL = `http://127.0.0.1:${macPort}`;
 	process.env.CANVAS_RICH_URL = `http://127.0.0.1:${richPort}`;
 	process.env.CANVAS_COLLECTIONS_URL = `http://127.0.0.1:${collectionsPort}`;
+	process.env.CANVAS_OWN_URL = `http://127.0.0.1:${ownPort}`;
+	process.env.CANVAS_OWN_EDIT_URL = `http://127.0.0.1:${ownEditPort}`;
 	process.env.CANVAS_SETTINGS_URL = `http://127.0.0.1:${settingsPort}`;
 	process.env.CANVAS_THEO_URL = `http://127.0.0.1:${theoPort}`;
 	process.env.CANVAS_BATOCERA_URL = `http://127.0.0.1:${batoceraPort}`;
@@ -664,6 +708,8 @@ export default async function setup(): Promise<() => Promise<void>> {
 		await waitFor(`${process.env.CANVAS_MAC_URL}/healthz`, 200, () => output);
 		await waitFor(`${process.env.CANVAS_RICH_URL}/healthz`, 200, () => output);
 		await waitFor(`${process.env.CANVAS_COLLECTIONS_URL}/healthz`, 200, () => output);
+		await waitFor(`${process.env.CANVAS_OWN_URL}/healthz`, 200, () => output);
+		await waitFor(`${process.env.CANVAS_OWN_EDIT_URL}/healthz`, 200, () => output);
 		await waitFor(`${process.env.CANVAS_SETTINGS_URL}/healthz`, 200, () => output);
 		await waitFor(`${process.env.CANVAS_THEO_URL}/healthz`, 200, () => output);
 		await waitFor(`${process.env.CANVAS_BATOCERA_URL}/healthz`, 200, () => output);

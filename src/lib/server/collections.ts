@@ -32,6 +32,8 @@ export interface MemberGroups {
 	series: string | null;
 	/** The names of the packs that count and hold it, A to Z. */
 	packs: string[];
+	/** The ids of its series, also a series of one, and of the packs that count and hold it, in the order found. */
+	groups: string[];
 }
 
 export interface Collected {
@@ -191,6 +193,7 @@ export function collect(members: Member[], packs: PackRecord[]): Collected {
 			storeUrl: lead.soldAs ? lead.storeUrl : null,
 			// Rule 10: what was joined, in the order of rule 6.
 			joined: rest.map((g): JoinedGroup => ({ kind: g.kind, name: g.name })),
+			groups: inside.map((g) => g.key),
 			games: [...games].sort(oldestFirst)
 		};
 		collections.push(collection);
@@ -204,7 +207,8 @@ export function collect(members: Member[], packs: PackRecord[]): Collected {
 		of.set(member.id, {
 			collection: collectionOf.get(member.id) ?? null,
 			series: seriesOf.get(member.id)?.name ?? null,
-			packs: [...new Set(names)].sort(byName)
+			packs: [...new Set(names)].sort(byName),
+			groups: [...new Set(groupsOf.get(member.id))]
 		});
 	}
 	return { collections, of };

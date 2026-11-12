@@ -77,6 +77,7 @@ function detail(over: Partial<Detail> = {}): Detail {
 		collection: null,
 		series: null,
 		packs: [],
+		groups: [],
 		adult: false,
 		...over
 	};

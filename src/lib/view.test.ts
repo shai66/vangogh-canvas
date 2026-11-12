@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { resolveOwn } from './own';
 import { DEFAULT_STATE, type ViewState } from './search/state';
 import type { ListEntry } from './types';
 import { BATCH, View } from './view.svelte';
@@ -26,6 +27,7 @@ function entry(id: number, over: Partial<ListEntry> = {}): ListEntry {
 		collection: null,
 		series: null,
 		packs: [],
+		groups: [],
 		adult: false,
 		...over
 	};
@@ -111,12 +113,22 @@ describe('View', () => {
 
 	it('shows a collection as one card while the toggle is on, and counts the games its card stands for', () => {
 		const games = [entry(1, { collection: 's1' }), entry(2, { collection: 's1' }), entry(3)];
-		const dusk = { id: 's1', kind: 'series' as const, name: 'Dusk', poster: null, total: null, storeUrl: null, joined: [], games: ['1', '2'] };
+		const dusk = { id: 's1', kind: 'series' as const, name: 'Dusk', poster: null, total: null, storeUrl: null, joined: [], groups: [], games: ['1', '2'] };
 		const v = new View(() => games, DEFAULT_STATE, () => {}, () => [dusk]);
 		expect([v.cards.length, v.games, v.collectionCount]).toEqual([3, 3, 0]);
 		v.toggleGrouped();
 		expect(v.cards.map((c) => c.key)).toEqual(['s1', '3']);
 		expect([v.games, v.collectionCount]).toEqual([3, 1]);
+	});
+
+	it('counts a game in two cards once', () => {
+		const games = [entry(1, { collection: 's1' }), entry(2, { collection: 's1' }), entry(3)];
+		const dusk = { id: 's1', kind: 'series' as const, name: 'Dusk', poster: null, total: null, storeUrl: null, joined: [], groups: ['s1'], games: ['1', '2'] };
+		const own = resolveOwn([{ id: 'h1', name: 'Picks', members: [{ game: '1' }, { game: '3' }] }], games, [dusk]);
+		const view = new View(() => games, { ...DEFAULT_STATE, grouped: true }, () => {}, () => [dusk], () => own);
+		expect(view.cards.map((c) => c.key)).toEqual(['s1', 'h1']);
+		expect(view.collectionCount).toBe(2);
+		expect(view.games).toBe(3);
 	});
 
 	it('counts the filters, and knows when the list is narrowed', () => {

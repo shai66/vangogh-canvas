@@ -1,23 +1,27 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
 	import { t } from '$lib/strings';
-	import type { Collection, ListEntry } from '$lib/types';
+	import type { ListEntry } from '$lib/types';
 	import Icon from './Icon.svelte';
 	import Poster from './Poster.svelte';
 	import { Strip } from './strip.svelte';
 
 	interface Props {
-		collection: Collection;
+		/** The collection's id, GOG's or an own one. */
+		key: string;
+		name: string;
+		/** What it is, after its name: "Series, 3 games in your library". */
+		line: string;
 		/** Its games in the list, oldest first. */
 		games: ListEntry[];
 		/** The id of the game whose detail this is. */
 		here: string;
-		/** True when the game was opened from the open row of its collection: the row starts open. */
+		/** True when the game was opened from this open row: the row starts open. */
 		open: boolean;
 		/** Another game of the row was clicked: it opens in place of this one. Its poster is a link and works without it. */
-		onopen: (event: MouseEvent, href: string) => void;
+		onopen: (event: MouseEvent, href: string, key: string) => void;
 	}
-	let { collection, games, here, open: startsOpen, onopen }: Props = $props();
+	let { key, name, line: what, games, here, open: startsOpen, onopen }: Props = $props();
 
 	// Once open, the row stays open: there is no folding it again.
 	// svelte-ignore state_referenced_locally
@@ -68,7 +72,7 @@
 					{#if game.id === here}
 						<div class="card shelf-card is-here" aria-current="true">{@render poster(game, true)}</div>
 					{:else}
-						<a class="card shelf-card" href={hrefOf(game)} onclick={(event) => onopen(event, hrefOf(game))}>{@render poster(game, false)}</a>
+						<a class="card shelf-card" href={hrefOf(game)} onclick={(event) => onopen(event, hrefOf(game), key)}>{@render poster(game, false)}</a>
 					{/if}
 				{/each}
 			</div>
@@ -80,7 +84,7 @@
 </section>
 
 {#snippet line()}
-	<Icon name="stack" /><b>{collection.name}</b><span>{t.collections.shelf(collection.kind, games.length)}</span><span class="caret"><Icon name="right" /></span>
+	<Icon name="stack" /><b>{name}</b><span>{what}</span><span class="caret"><Icon name="right" /></span>
 {/snippet}
 
 {#snippet poster(game: ListEntry, isHere: boolean)}

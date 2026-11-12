@@ -34,11 +34,11 @@ describe('collect', () => {
 			[]
 		);
 		expect(collections).toEqual([
-			{ id: 's77', kind: 'series', name: 'Dusk', poster: null, total: null, storeUrl: null, joined: [], games: ['1', '2'] }
+			{ id: 's77', kind: 'series', name: 'Dusk', poster: null, total: null, storeUrl: null, joined: [], groups: ['s77'], games: ['1', '2'] }
 		]);
-		expect(of.get('1')).toEqual({ collection: 's77', series: 'Dusk', packs: [] });
+		expect(of.get('1')).toEqual({ collection: 's77', series: 'Dusk', packs: [], groups: ['s77'] });
 		// A series of one is no collection, and its name still finds the game.
-		expect(of.get('3')).toEqual({ collection: null, series: 'Lone', packs: [] });
+		expect(of.get('3')).toEqual({ collection: null, series: 'Lone', packs: [], groups: ['s78'] });
 	});
 
 	// Review focus 1
@@ -70,7 +70,7 @@ describe('collect', () => {
 		const library = ['1', '2', '3', '4'].map((id) => game(id));
 		const { collections, of } = collect(library, [pack('900', ['1', '2', '98', '99']), pack('901', ['3', '4', '95', '96', '97'])]);
 		expect(collections.map((c) => c.id)).toEqual(['p900']);
-		expect(of.get('3')).toEqual({ collection: null, series: null, packs: [] });
+		expect(of.get('3')).toEqual({ collection: null, series: null, packs: [], groups: [] });
 	});
 
 	it('counts only the games of the library', () => {
@@ -163,7 +163,7 @@ describe('collect', () => {
 		);
 		expect(collections).toHaveLength(1);
 		expect(collections[0]).toMatchObject({ id: 's77', kind: 'series', name: 'Dusk', games: ['1', '2', '3'] });
-		expect(of.get('1')).toEqual({ collection: 's77', series: 'Dusk', packs: ['Pack 901'] });
+		expect(of.get('1')).toEqual({ collection: 's77', series: 'Dusk', packs: ['Pack 901'], groups: ['s77', 'p901'] });
 	});
 
 	it("keeps a game's own series over the one of its pack of one", () => {
@@ -192,6 +192,34 @@ describe('collect', () => {
 		const packs = [pack('901', ['1'], { series: dusk }), pack('902', ['1'], { series: { id: '78', name: 'Lone' } })];
 		expect(collect([game('1')], packs).of.get('1')?.series).toBe('Dusk');
 		expect(collect([game('1')], [...packs].reverse()).of.get('1')?.series).toBe('Lone');
+	});
+
+	it('names the groups of a lone series, a lone pack and a joined collection', () => {
+		const seven = { id: '7', name: 'Seven' };
+		const seriesOnly = collect([game('1', { series: seven }), game('2', { series: seven })], []);
+		const packOnly = collect([game('1'), game('2')], [pack('900', ['1', '2'])]);
+		// The lead holds four games, then 902 three; the series and 901 hold one each, the series first.
+		const joined = collect(
+			[game('1', { series: dusk }), game('2'), game('3'), game('4')],
+			[pack('900', ['1', '2', '3', '4']), pack('901', ['1']), pack('902', ['1', '2', '3'])]
+		);
+		expect(seriesOnly.collections[0].groups).toEqual(['s7']);
+		expect(packOnly.collections[0].groups).toEqual(['p900']);
+		expect(joined.collections[0].groups).toEqual(['p900', 'p902', 's77', 'p901']);
+	});
+
+	it('gives each entry the ids of its groups, a series of one among them', () => {
+		const seven = { id: '7', name: 'Seven' };
+		const result = collect(
+			[game('11', { series: seven }), game('12', { series: seven }), game('lonely', { series: { id: '8', name: 'Eight' } }), game('lent'), game('loose')],
+			// 902 holds too few games of the library to count.
+			[pack('900', ['11', '99']), pack('901', ['lent'], { series: { id: '9', name: 'Nine' } }), pack('902', ['loose', '97', '98'])]
+		);
+		expect(result.of.get('11')!.groups).toEqual(['s7', 'p900']);
+		// A series that holds one game of the library: no collection, still a group.
+		expect(result.of.get('lonely')!.groups).toEqual(['s8']);
+		expect(result.of.get('lent')!.groups).toEqual(['s9', 'p901']);
+		expect(result.of.get('loose')!.groups).toEqual([]);
 	});
 
 	it('gives a series no poster, total or page', () => {

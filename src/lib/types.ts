@@ -29,6 +29,8 @@ export interface Collection {
 	storeUrl: string | null;
 	/** The other series and packs joined in, the largest first. */
 	joined: JoinedGroup[];
+	/** Ids of the lead and of every group joined in, "s" or "p" and GOG's id: the lead first, then in the order of `joined`. */
+	groups: string[];
 	/** Ids of its list entries, oldest first. Two or more. */
 	games: string[];
 }
@@ -66,6 +68,8 @@ export interface ListEntry {
 	series: string | null;
 	/** The names of the packs that count and hold the game, A to Z. For search. */
 	packs: string[];
+	/** Ids of the game's own groups, "s" or "p" and GOG's id: its series, also a series of one, and the packs that count and hold it. */
+	groups: string[];
 	/** True when the game is for adults by the rule of spec 0.10.0, section 3.1: hidden by "Hide 18+". */
 	adult: boolean;
 }

@@ -174,6 +174,28 @@ Otherwise Canvas takes the page's requests for requests from another site:
 it refuses to unlock and says so. It refuses in the same way when it was
 restarted without `SETTINGS_PIN` while the page was open.
 
+## Own collections
+
+With the settings unlocked you can group games into collections of your
+own. Everyone sees them: beside GOG's series and packs while Collections
+is on, and in the detail of each game they hold.
+
+1. Unlock the settings: "Settings" in the foot, then the PIN.
+2. Press "Select" in the bar and click the cards to pick them. With
+   Collections on, a series or a pack is picked as a whole. Search and
+   the filters keep working while you pick.
+3. Press "Add to…" to add the picks to a collection, or "New collection"
+   to name a new one.
+
+To change one, open it and press "Edit": rename it, take games out, add
+them to another collection, or delete it. The settings' Library tab
+lists them too, with Rename and Delete. Deleting a collection leaves its
+games in the library.
+
+They are kept in `collections.json` beside `settings.json` in
+`/settings`. Without `SETTINGS_PIN` the file is not read and they do not
+show; set the PIN again and they are back.
+
 ## Batocera
 
 Canvas can send a game to a [Batocera](https://batocera.org) box by the
@@ -335,6 +357,9 @@ address, so a view can be shared as a link.
 | `POST /api/batocera/keep-on` | Cancels the shutdown after a send: `204` |
 | `PUT /api/batocera/marks/{id}` | Marks the game "Doesn't run on Batocera": `204`, `401` while locked |
 | `DELETE /api/batocera/marks/{id}` | Takes the mark back: `204`, `401` while locked |
+| `POST /api/collections` | Body `{"name":"…","members":[…]}`, a member `{"game":"<id>"}` or `{"collection":"s<id>"}` (a series; `p<id>` a pack): makes an own collection. `201` with it, `400` when the body is not valid, `401` while locked, `403` when sent from a page of another site, `404` without `SETTINGS_PIN`, `409` when another own collection has that name, `500` when it cannot be written |
+| `PATCH /api/collections/{id}` | Body `{"name":"…"}`, `{"add":[…]}` or `{"remove":[…]}`: renames the own collection, or adds or takes out members. `200` with it, `404` also when there is no such collection, the others as for `POST` |
+| `DELETE /api/collections/{id}` | Deletes the own collection; its games stay. `204`, `401` while locked, `403` when sent from a page of another site, `404` without `SETTINGS_PIN` or when there is no such collection, `500` when it cannot be written |
 
 ## Develop
 

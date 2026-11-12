@@ -61,8 +61,10 @@ import monitorSvg from '@phosphor-icons/core/regular/monitor.svg?raw';
 import multiplayerSvg from '@phosphor-icons/core/fill/users-three-fill.svg?raw';
 import musicNotesSvg from '@phosphor-icons/core/regular/music-notes.svg?raw';
 import packageSvg from '@phosphor-icons/core/regular/package.svg?raw';
+import pencilSimpleSvg from '@phosphor-icons/core/regular/pencil-simple.svg?raw';
 import planetSvg from '@phosphor-icons/core/regular/planet.svg?raw';
 import playSvg from '@phosphor-icons/core/regular/play.svg?raw';
+import plusSvg from '@phosphor-icons/core/regular/plus.svg?raw';
 import plugsConnectedSvg from '@phosphor-icons/core/regular/plugs-connected.svg?raw';
 import powerSvg from '@phosphor-icons/core/regular/power.svg?raw';
 import prohibitSvg from '@phosphor-icons/core/regular/prohibit.svg?raw';
@@ -83,6 +85,7 @@ import swordSvg from '@phosphor-icons/core/regular/sword.svg?raw';
 import televisionSimpleSvg from '@phosphor-icons/core/regular/television-simple.svg?raw';
 import terminalWindowSvg from '@phosphor-icons/core/regular/terminal-window.svg?raw';
 import timerSvg from '@phosphor-icons/core/regular/timer.svg?raw';
+import trashSvg from '@phosphor-icons/core/regular/trash.svg?raw';
 import userCircleSvg from '@phosphor-icons/core/regular/user-circle.svg?raw';
 import userFocusSvg from '@phosphor-icons/core/regular/user-focus.svg?raw';
 import warningSvg from '@phosphor-icons/core/fill/warning-fill.svg?raw';
@@ -183,7 +186,11 @@ export const ICONS = {
 	pending: inner(minusCircleSvg),
 	// The tabs of the settings (0.12.0).
 	books: inner(booksSvg),
-	hardDrives: inner(hardDrivesSvg)
+	hardDrives: inner(hardDrivesSvg),
+	// Own collections (0.13.0).
+	plus: inner(plusSvg),
+	pencil: inner(pencilSimpleSvg),
+	trash: inner(trashSvg)
 } as const;
 
 export type IconName = keyof typeof ICONS;
